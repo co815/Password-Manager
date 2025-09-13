@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/pm
+      database: pm
+
+app:
+  jwt:
+    secret: this_is_a_dev_secret_key_with_32+_chars_
+    expiryMinutes: 15
+  cors:
+    origins: http://localhost:5173
