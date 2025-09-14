@@ -1,5 +1,11 @@
 server:
-  port: 8080
+  port: 8443
+  ssl:
+    key-store: classpath:pass-man-keystore.p12
+    key-store-password: devpasswordman1230
+    key-store-type: PKCS12
+    key-alias: PasswordManager
+    enabled-protocols: TLSv1.3
 
 spring:
   data:
@@ -12,4 +18,6 @@ app:
     secret: this_is_a_dev_secret_key_with_32+_chars_
     expiryMinutes: 15
   cors:
-    origins: http://localhost:5173
+    origins:
+      - http://localhost:5173
+      - https://localhost:5173
