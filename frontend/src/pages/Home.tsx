@@ -1,10 +1,9 @@
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
-import Grid from '@mui/material/Grid';
 import Info from '../components/homePage/Info';
 import Auth from '../components/homePage/Auth';
 
-function Home () {
+export default function Home() {
     return (
         <Box
             sx={{
@@ -26,40 +25,36 @@ function Home () {
                     minHeight: 400,
                 }}
             >
-                <Grid container>  {/* this is the container */}
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, // 1 col pe mobil, 2 pe desktop
+                        '& > .col': {
+                            p: 5,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        },
+                    }}
+                >
                     {/* Left: Info */}
-                    <Grid
-                        size={{ xs: 12, md: 6 }}  // takes full width on small screens, half on md+
+                    <Box
+                        className="col"
                         sx={{
                             background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)',
                             color: '#fff',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            p: 5,
                         }}
                     >
                         <Info />
-                    </Grid>
+                    </Box>
 
                     {/* Right: Auth (login/signup) */}
-                    <Grid
-                        size={{ xs: 12, md: 6 }}
-                        sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            p: 5,
-                        }}
-                    >
-                        <Auth />
-                    </Grid>
-                </Grid>
+                    <Box className="col">
+                        <Auth onSuccess={() => { window.location.href = '/dashboard'; }} />
+                    </Box>
+                </Box>
             </Paper>
         </Box>
     );
-};
-
-export default Home;
+}

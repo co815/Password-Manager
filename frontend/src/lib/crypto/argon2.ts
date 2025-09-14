@@ -1,34 +1,35 @@
-import { hash, ArgonType } from 'argon2-browser';
+import { argon2id } from 'hash-wasm';
 
-function b64(bytes: ArrayBuffer | Uint8Array) {
+function fromB64(s: string) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+function toB64(bytes: ArrayBuffer | Uint8Array) {
     const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     return btoa(String.fromCharCode(...u8));
 }
 
 export async function deriveKEK(masterPassword: string, saltB64: string): Promise<CryptoKey> {
-    const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
-    const { hash: keyBytes } = await hash({
-        pass: masterPassword,
+    const salt = fromB64(saltB64);
+    const keyBytes = await argon2id({
+        password: masterPassword,
         salt,
-        type: ArgonType.Argon2id,
-        time: 3,
-        mem: 64 * 1024,
+        iterations: 3,
+        memorySize: 64 * 1024,
         parallelism: 1,
-        hashLen: 32,
+        hashLength: 32,
+        outputType: 'binary',
     });
-    return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt','decrypt']);
+    return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
 export async function makeVerifier(email: string, mp: string, saltB64: string): Promise<string> {
-    const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
-    const { hash: digest } = await hash({
-        pass: `login|${email}|${mp}`,
+    const salt = fromB64(saltB64);
+    const digest = await argon2id({
+        password: `login|${email}|${mp}`,
         salt,
-        type: ArgonType.Argon2id,
-        time: 3,
-        mem: 64 * 1024,
+        iterations: 3,
+        memorySize: 64 * 1024,
         parallelism: 1,
-        hashLen: 32,
+        hashLength: 32,
+        outputType: 'binary',
     });
-    return b64(digest);
+    return toB64(digest);
 }
