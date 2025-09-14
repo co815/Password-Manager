@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
+import com.example.pm.exceptions.ErrorResponse;
+
 import java.time.Instant;
 import java.util.Map;
 
@@ -13,13 +15,10 @@ public class GlobalExceptionHandler {
 
     //Handle all exceptions
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleException(Exception ex){
+    public ResponseEntity<ErrorResponse> handleException(Exception ex){
+        ErrorResponse error_response = new ErrorResponse(0,"INTERNAL SERVER ERROR","Ai facut ceva NEORTODOX cu serverul");
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of(
-                        "error", true,
-                        "message", ex.getMessage(),
-                        "timestamp", Instant.now().toString()
-                ));
+                .body(error_response);
     }
 }
