@@ -38,6 +38,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .requiresChannel(channel -> channel
+                        .anyRequest().requiresSecure() // <-- enforce HTTPS
+                )
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
                 .cors(Customizer.withDefaults())
