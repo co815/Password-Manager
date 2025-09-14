@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
-import Grid from '@mui/material/Grid';  // updated Grid v2
+import Grid from '@mui/material/Grid';
 import Info from '../components/homePage/Info';
 import Auth from '../components/homePage/Auth';
 

@@ -12,8 +12,6 @@ import java.util.Map;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
-
-    //Handle all exceptions
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception ex){
         ErrorResponse error_response = new ErrorResponse(0,"INTERNAL SERVER ERROR","Ai facut ceva NEORTODOX cu serverul");
