@@ -16,6 +16,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.example.pm.exceptions.ErrorResponse;
+
 import java.util.List;
 
 @Configuration
@@ -41,8 +43,26 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((req, res, e) -> res.sendError(HttpServletResponse.SC_UNAUTHORIZED))
-                        .accessDeniedHandler((req, res, e) -> res.sendError(HttpServletResponse.SC_FORBIDDEN))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            ErrorResponse errorResponse = new ErrorResponse(
+                                    401,
+                                    "UNAUTHORIZED",
+                                    "Nu esti autentificat sau token invalid"
+                            );
+                            response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            ErrorResponse errorResponse = new ErrorResponse(
+                                    403,
+                                    "FORBIDDEN",
+                                    "Nu ai permisiunea necesara"
+                            );
+                            response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(errorResponse));
+                        })
                 );
 
         return http.build();
