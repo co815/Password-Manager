@@ -1,7 +1,20 @@
 import { useMemo, useState } from 'react';
 import {
-    Box, Tabs, Tab, Stack, TextField, Button, Alert, CircularProgress,
-    InputAdornment, IconButton, Typography, LinearProgress
+    Box,
+    Tabs,
+    Tab,
+    Stack,
+    Button,
+    Alert,
+    CircularProgress,
+    IconButton,
+    Typography,
+    LinearProgress,
+    FormControl,
+    InputLabel,
+    OutlinedInput,
+    InputAdornment,
+    FormHelperText,
 } from '@mui/material';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
@@ -35,6 +48,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
 
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
     const disabled = busy || !email || !mp || (mode === 'signup' && mp !== mp2);
+    const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
     async function handleSubmit() {
         setMsg(null);
@@ -62,8 +76,6 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
         }
     }
 
-    const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
-
     return (
         <Box sx={{ width: '100%', maxWidth: 480 }}>
             <Typography variant="h6" textAlign="center" fontWeight={800} letterSpacing={1} mb={1}>
@@ -84,43 +96,45 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                 <Tab value="signup" label="SIGN UP" />
             </Tabs>
 
-            <Stack spacing={2} sx={{ minHeight: fixedHeight ? 320 : 'auto' }}>
-                <TextField
-                    label="Email *"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    fullWidth
-                    slotProps={{
-                        startAdornment: (
+            <Stack spacing={2} sx={{ minHeight: fixedHeight ? 340 : 'auto' }}>
+                <FormControl fullWidth variant="outlined">
+                    <InputLabel htmlFor="email">Email *</InputLabel>
+                    <OutlinedInput
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        startAdornment={
                             <InputAdornment position="start">
                                 <EmailOutlined fontSize="small" />
                             </InputAdornment>
-                        ),
-                    }}
-                />
+                        }
+                        label="Email *"
+                    />
+                </FormControl>
 
-                <TextField
-                    label="Password *"
-                    type={show ? 'text' : 'password'}
-                    value={mp}
-                    onChange={(e) => setMp(e.target.value)}
-                    fullWidth
-                    slotProps={{
-                        startAdornment: (
+                <FormControl fullWidth variant="outlined">
+                    <InputLabel htmlFor="password">Password *</InputLabel>
+                    <OutlinedInput
+                        id="password"
+                        type={show ? 'text' : 'password'}
+                        value={mp}
+                        onChange={(e) => setMp(e.target.value)}
+                        startAdornment={
                             <InputAdornment position="start">
                                 <LockOutlined fontSize="small" />
                             </InputAdornment>
-                        ),
-                        endAdornment: (
+                        }
+                        endAdornment={
                             <InputAdornment position="end">
                                 <IconButton onClick={() => setShow((s) => !s)} edge="end" aria-label="toggle password visibility">
                                     {show ? <VisibilityOff /> : <Visibility />}
                                 </IconButton>
                             </InputAdornment>
-                        ),
-                    }}
-                />
+                        }
+                        label="Password *"
+                    />
+                </FormControl>
 
                 {mode === 'signup' ? (
                     <>
@@ -136,21 +150,27 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                                 },
                             }}
                         />
-                        <TextField
-                            label="Confirm Password *"
-                            type={show ? 'text' : 'password'}
-                            value={mp2}
-                            onChange={(e) => setMp2(e.target.value)}
-                            fullWidth
-                            error={!!mp2 && mp2 !== mp}
-                            helperText={mp2 && mp2 !== mp ? 'Passwords do not match' : ' '}
-                        />
+                        <FormControl fullWidth variant="outlined" error={!!mp2 && mp2 !== mp}>
+                            <InputLabel htmlFor="confirm">Confirm Password *</InputLabel>
+                            <OutlinedInput
+                                id="confirm"
+                                type={show ? 'text' : 'password'}
+                                value={mp2}
+                                onChange={(e) => setMp2(e.target.value)}
+                                label="Confirm Password *"
+                            />
+                            <FormHelperText>{mp2 && mp2 !== mp ? 'Passwords do not match' : ' '}</FormHelperText>
+                        </FormControl>
                     </>
                 ) : (
                     fixedHeight && (
                         <>
                             <Box sx={{ height: 6, borderRadius: 3, opacity: 0 }} />
-                            <Box sx={{ height: 56, opacity: 0 }} />
+                            <FormControl fullWidth variant="outlined" sx={{ opacity: 0 }}>
+                                <InputLabel htmlFor="confirm-hidden">Confirm Password *</InputLabel>
+                                <OutlinedInput id="confirm-hidden" label="Confirm Password *" />
+                                <FormHelperText> </FormHelperText>
+                            </FormControl>
                         </>
                     )
                 )}
