@@ -1,6 +1,9 @@
 package com.example.pm.config;
 
+import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.security.JwtAuthFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,7 +23,12 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) { this.jwtAuthFilter = jwtAuthFilter; }
+    private final ObjectMapper objectMapper;
+
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ObjectMapper objectMapper) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.objectMapper = objectMapper;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -33,18 +41,46 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .requiresChannel(channel -> channel
+                        .anyRequest().requiresSecure() // <-- enforce HTTPS
+                )
                 .httpBasic(b -> b.disable())
                 .formLogin(f -> f.disable())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            writeError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                                    "UNAUTHORIZED", "Nu esti autentificat sau token invalid");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            writeError(response, HttpServletResponse.SC_FORBIDDEN,
+                                    "FORBIDDEN", "Nu ai permisiunea necesara");
+                        })
+                );
 
         return http.build();
     }
+
+    private void writeError(HttpServletResponse response, int status, String code, String message) {
+        response.setContentType("application/json");
+        response.setStatus(status);
+        ErrorResponse errorResponse = new ErrorResponse(status, code, message);
+        try {
+            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+        } catch (Exception e) {
+            // Fallback in case serialization fails
+            try {
+                response.getWriter().write("{\"status\":" + status + ",\"type\":\"" + code + "\",\"message\":\"" + message + "\"}");
+            } catch (Exception ignored) {}
+        }
+    }
+
 
     @Bean
     public CorsConfigurationSource corsSource() {
         var cfg = new CorsConfiguration();
         cfg.setAllowedOriginPatterns(List.of("http://localhost:*", "https://localhost:*"));
-        cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);
 

@@ -33,6 +33,8 @@ public class JwtService {
 
     public String validateAndGetSubject(String token) {
         return Jwts.parser().verifyWith(key).build()
-                .parseSignedClaims(token).getPayload().getSubject();
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
     }
 }

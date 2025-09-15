@@ -1,4 +1,4 @@
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'http://localhost:8080';
+const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
 
 function safeJson(s: string) { try { return JSON.parse(s); } catch { return null; } }
 
