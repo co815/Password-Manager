@@ -91,7 +91,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     fullWidth
-                    InputProps={{
+                    slotProps={{
                         startAdornment: (
                             <InputAdornment position="start">
                                 <EmailOutlined fontSize="small" />
@@ -106,7 +106,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                     value={mp}
                     onChange={(e) => setMp(e.target.value)}
                     fullWidth
-                    InputProps={{
+                    slotProps={{
                         startAdornment: (
                             <InputAdornment position="start">
                                 <LockOutlined fontSize="small" />
