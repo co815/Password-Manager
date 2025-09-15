@@ -35,55 +35,62 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsSource()))
+
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .requestCache(rc -> rc.disable())
+
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .requiresChannel(channel -> channel
-                        .anyRequest().requiresSecure() // <-- enforce HTTPS
+
+                .requiresChannel(ch -> ch.anyRequest().requiresSecure())
+                .headers(h -> h
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                        .frameOptions(f -> f.deny())
                 )
+
                 .httpBasic(b -> b.disable())
                 .formLogin(f -> f.disable())
+                .logout(l -> l.disable())
+
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            writeError(response, HttpServletResponse.SC_UNAUTHORIZED,
-                                    "UNAUTHORIZED", "Nu esti autentificat sau token invalid");
-                        })
-                        .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            writeError(response, HttpServletResponse.SC_FORBIDDEN,
-                                    "FORBIDDEN", "Nu ai permisiunea necesara");
-                        })
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                                        "UNAUTHORIZED", "Nu esti autentificat sau token invalid"))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeError(response, HttpServletResponse.SC_FORBIDDEN,
+                                        "FORBIDDEN", "Nu ai permisiunea necesara"))
                 );
 
         return http.build();
     }
 
-    // Nu stiu ce puii mei ii asta da stie chat
     private void writeError(HttpServletResponse response, int status, String code, String message) {
         response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
         response.setStatus(status);
-        ErrorResponse errorResponse = new ErrorResponse(status, code, message);
+        var body = new ErrorResponse(status, code, message);
         try {
-            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+            response.getWriter().write(objectMapper.writeValueAsString(body));
         } catch (Exception e) {
-            // Fallback in case serialization fails
             try {
                 response.getWriter().write("{\"status\":" + status + ",\"type\":\"" + code + "\",\"message\":\"" + message + "\"}");
             } catch (Exception ignored) {}
         }
     }
 
-
     @Bean
     public CorsConfigurationSource corsSource() {
         var cfg = new CorsConfiguration();
         cfg.setAllowedOriginPatterns(List.of("http://localhost:*", "https://localhost:*"));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         cfg.setAllowCredentials(true);
+        cfg.setMaxAge(3600L);
 
         var src = new UrlBasedCorsConfigurationSource();
         src.registerCorsConfiguration("/**", cfg);

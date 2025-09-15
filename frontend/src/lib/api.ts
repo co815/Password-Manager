@@ -1,14 +1,38 @@
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
 
+const TOKEN_KEY = 'token';
+const PROFILE_KEY = 'profile';
+
 function safeJson(s: string) { try { return JSON.parse(s); } catch { return null; } }
+
+export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
+export function getProfile<T = any>(): T | null {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? (safeJson(raw) as T) : null;
+}
+export function setAuth(token: string, user: any) {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(user));
+}
+export function clearAuth() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(PROFILE_KEY);
+}
+
+function mergeHeaders(init: RequestInit): Headers {
+    const h = new Headers(init.headers || {});
+    if (!h.has('Content-Type')) h.set('Content-Type', 'application/json');
+    if (!h.has('Authorization')) {
+        const t = getToken();
+        if (t) h.set('Authorization', `Bearer ${t}`);
+    }
+    return h;
+}
 
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(`${API_ORIGIN}/api${path}`, {
         ...init,
-        headers: {
-            'Content-Type': 'application/json',
-            ...(init.headers || {}),
-        },
+        headers: mergeHeaders(init),
         credentials: 'include',
     });
 
@@ -18,6 +42,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     const data = text ? safeJson(text) : null;
 
     if (!res.ok) {
+        if (res.status === 401) clearAuth();
         const message = (data && (data.error || data.message)) || `HTTP ${res.status}`;
         const err: any = new Error(message);
         err.status = res.status;
@@ -65,6 +90,8 @@ export interface VaultItem {
 }
 
 export const api = {
+    health: () => req<{ ok: boolean }>(`/health`),
+
     getSalt: (email: string) =>
         req<{ saltClient: string }>(`/auth/salt?email=${encodeURIComponent(email)}`),
 
@@ -74,26 +101,23 @@ export const api = {
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
 
-    listVault: (token: string) =>
-        req<VaultItem[]>(`/vault`, { headers: { Authorization: `Bearer ${token}` } }),
+    loginAndStore: async (body: LoginRequest) => {
+        const data = await req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) });
+        setAuth(data.accessToken, data.user);
+        return data;
+    },
 
-    createVault: (token: string, body: Partial<VaultItem>) =>
-        req<VaultItem>(`/vault`, {
-            method: 'POST',
-            body: JSON.stringify(body),
-            headers: { Authorization: `Bearer ${token}` },
-        }),
+    logout: () => { clearAuth(); },
 
-    updateVault: (token: string, id: string, body: Partial<VaultItem>) =>
-        req<VaultItem>(`/vault/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(body),
-            headers: { Authorization: `Bearer ${token}` },
-        }),
+    listVault: () =>
+        req<VaultItem[]>(`/vault`),
 
-    deleteVault: (token: string, id: string) =>
-        req<{ ok: boolean }>(`/vault/${id}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
-        }),
+    createVault: (body: Partial<VaultItem>) =>
+        req<VaultItem>(`/vault`, { method: 'POST', body: JSON.stringify(body) }),
+
+    updateVault: (id: string, body: Partial<VaultItem>) =>
+        req<VaultItem>(`/vault/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+    deleteVault: (id: string) =>
+        req<{ ok: boolean }>(`/vault/${id}`, { method: 'DELETE' }),
 };

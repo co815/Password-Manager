@@ -20,9 +20,11 @@ import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { createAccountMaterial } from '../../lib/crypto/keys';
 import { makeVerifier } from '../../lib/crypto/argon2';
+import { useAuth } from '../../auth/AuthContext';
 
 type Mode = 'login' | 'signup';
 type Props = { onSuccess?: (token: string, user: any, mp: string) => void; fixedHeight?: boolean };
@@ -46,6 +48,9 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+    const { login } = useAuth();
+    const navigate = useNavigate();
+
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
     const disabled = busy || !email || !mp || (mode === 'signup' && mp !== mp2);
     const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
@@ -64,10 +69,9 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                 const { saltClient } = await api.getSalt(email);
                 const verifier = await makeVerifier(email, mp, saltClient);
                 const data = await api.login({ email, verifier });
-                localStorage.setItem('token', data.accessToken);
-                localStorage.setItem('profile', JSON.stringify(data.user));
-                setMsg({ type: 'success', text: 'Logged in!' });
+                login(data.accessToken, data.user);
                 onSuccess?.(data.accessToken, data.user, mp);
+                navigate('/dashboard', { replace: true });
             }
         } catch (e: any) {
             setMsg({ type: 'error', text: e?.message || 'Something went wrong' });
