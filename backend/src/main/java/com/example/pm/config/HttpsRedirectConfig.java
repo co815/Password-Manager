@@ -14,6 +14,7 @@ public class HttpsRedirectConfig {
         return server -> server.addAdditionalTomcatConnectors(createHttpConnector());
     }
 
+    // Creates a connector which listens for requests on port 8080(HTTP) and redirects them to port 8443(HTTPS)
     private Connector createHttpConnector() {
         Connector connector = new Connector(TomcatServletWebServerFactory.DEFAULT_PROTOCOL);
         connector.setScheme("http");

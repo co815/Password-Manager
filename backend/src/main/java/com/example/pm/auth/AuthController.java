@@ -1,14 +1,13 @@
 package com.example.pm.auth;
 
 import com.example.pm.dto.AuthDtos.*;
+import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.time.Instant;
-import java.util.Map;
 
 @RestController @RequestMapping("/api/auth")
 public class AuthController {
@@ -21,43 +20,40 @@ public class AuthController {
         this.jwt = jwt;
     }
 
+    // Register endpoint Handler
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
 
         if (users.findByEmail(registerRequest.email()).isPresent())
-            return ResponseEntity.status(409).body(Map.of("error","email_exists"));
+            return ResponseEntity.status(409).body(new ErrorResponse(409,"CONFLICT","Email already exists"));
 
-        User u = User.builder()
-                .email(registerRequest.email())
-                .verifier(registerRequest.verifier())
-                .saltClient(registerRequest.saltClient())
-                .dekEncrypted(registerRequest.dekEncrypted())
-                .dekNonce(registerRequest.dekNonce())
-                .build();
-        users.save(u);
+        User newUser = User.fromRegisterRequest(registerRequest);
+        users.save(newUser);
 
-        return ResponseEntity.ok(Map.of("id", u.getId()));
+        return ResponseEntity.ok(new RegisterResponse(newUser.getId()));
     }
 
+    // Salt endpoint Handler
     @GetMapping("/salt")
     public ResponseEntity<?> salt(@RequestParam String email) {
         return users.findByEmail(email)
-                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(Map.of("saltClient", u.getSaltClient())))
-                .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error","not_found")));
+                .<ResponseEntity<?>>map(user -> ResponseEntity.ok(new SaltResponse(user.getSaltClient())))
+                .orElseGet(() -> ResponseEntity.status(404).body(new ErrorResponse(404,"NOT FOUND","Invalid Email - User not found")));
     }
 
+    // Login endpoint Handler
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
 
-        var u = users.findByEmail(loginRequest.email()).orElse(null);
+        return users.findByEmail(loginRequest.email())
+                .filter(user -> user.getVerifier().equals(loginRequest.verifier()))
+                .<ResponseEntity<?>>map(user -> {
+                    String token = jwt.generate(user.getId());
+                    var publicUser = PublicUser.fromUser(user);
+                    return ResponseEntity.ok(new LoginResponse(token, publicUser));
+                })
+                .orElseGet(() -> ResponseEntity.status(401)
+                        .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials")));
 
-        if (u == null || !u.getVerifier().equals(loginRequest.verifier())) {
-            return ResponseEntity.status(401).body(Map.of("error", "invalid_credentials"));
-        }
-
-        String token = jwt.generate(u.getId());
-        var pub = new PublicUser(u.getId(), u.getEmail(), u.getSaltClient(), u.getDekEncrypted(), u.getDekNonce());
-
-        return ResponseEntity.ok(new LoginResponse(token, pub));
     }
 }

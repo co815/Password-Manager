@@ -61,6 +61,7 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // Nu stiu ce puii mei ii asta da stie chat
     private void writeError(HttpServletResponse response, int status, String code, String message) {
         response.setContentType("application/json");
         response.setStatus(status);
