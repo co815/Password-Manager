@@ -34,15 +34,16 @@ public class CredentialController {
 
     }
 
-    @GetMapping("/{service}")
-    public ResponseEntity<?> getCredentialByService(Authentication authentication, @PathVariable String service) {
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getCredentialById(Authentication authentication, @PathVariable String id) {
 
-        String userID = (String) authentication.getPrincipal();
+        String userId = (String) authentication.getPrincipal();
 
-        return credentials.findByUserIdAndService(userID, service)
-                .<ResponseEntity<?>>map(credential -> ResponseEntity.ok(PublicCredential.fromCredential(credential)))
+        return credentials.findById(id)
+                .filter(c -> c.getUserId().equals(userId))  // ensure the credential belongs to the authenticated user
+                .<ResponseEntity<?>>map(c -> ResponseEntity.ok(PublicCredential.fromCredential(c)))
                 .orElseGet(() -> ResponseEntity.status(404)
-                        .body(new ErrorResponse(404,"NOT FOUND","Credential Not Found!")));
+                        .body(new ErrorResponse(404, "NOT FOUND", "Credential Not Found!")));
 
     }
 
