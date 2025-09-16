@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import AddCredentialDialog, {type Credential } from "../components/common/AddCredentialDialog";
 import { useAuth } from '../auth/AuthContext';
 import {
     Box,
@@ -16,6 +16,7 @@ import {
     Card,
     CardContent,
     Button,
+
 } from "@mui/material";
 import {
     Search,
@@ -28,7 +29,7 @@ import {
     Star,
     Edit,
 } from "@mui/icons-material";
-
+import AddIcon from "@mui/icons-material/Add";
 const categories = [
     { text: "Logins", icon: <Key /> },
     { text: "Secure Notes", icon: <Note /> },
@@ -38,20 +39,29 @@ const categories = [
     { text: "Wireless Routers", icon: <Wifi /> },
 ];
 
-const items = [
-    { name: "Driver's License", username: "D6101-40706-60905" },
-    { name: "Dropbox", username: "wendy.c.appleseed@gmail.com" },
-    { name: "E*TRADE", username: "wendy.c.appleseed@gmail.com" },
-    { name: "Evernote", username: "wendy_appleseed@agilebits.com" },
-    { name: "Facebook", username: "wendy.c.appleseed@gmail.com" },
-    { name: "Fantastical", username: "2" },
-    { name: "Gift Shopping List", username: "" },
-    { name: "Google", username: "wendy.c.appleseed@gmail.com" },
-];
 
 export default function PasswordDashboard() {
-    const [selected, setSelected] = useState(items[3]); // default Evernote
     const { user, logout } = useAuth();
+    const onClickAdd = () => setAddDialogOpen(true);
+
+    const handleAddCredential = (newItem: Credential) => {
+        setItems((prev) => [...prev, newItem]);
+        setSelected(newItem); // optionally select the new item
+    };
+
+    const [items, setItems] = useState<Credential[]>([
+        { name: "Driver's License", username: "D6101-40706-60905" },
+        { name: "Dropbox", username: "wendy.c.appleseed@gmail.com" },
+        { name: "E*TRADE", username: "wendy.c.appleseed@gmail.com" },
+        { name: "Evernote", username: "wendy_appleseed@agilebits.com" },
+        { name: "Facebook", username: "wendy.c.appleseed@gmail.com" },
+        { name: "Fantastical", username: "2" },
+        { name: "Gift Shopping List", username: "" },
+        { name: "Google", username: "wendy.c.appleseed@gmail.com" },
+    ]);
+    const [addDialogOpen, setAddDialogOpen] = useState(false);
+    const [selected, setSelected] = useState(items[3]); // default Evernote
+
     return (
         <Box display="flex" height="100vh">
             {/* Sidebar */}
@@ -116,6 +126,19 @@ export default function PasswordDashboard() {
                             <Box display="flex" justifyContent="space-between" alignItems="center">
                                 <Typography variant="h6">{selected.name}</Typography>
                                 <Box>
+                                    <IconButton
+                                        color="primary"
+                                        aria-label="add data"
+                                        onClick={onClickAdd}
+                                        size="large"
+                                    >
+                                        <AddIcon/>
+                                    </IconButton>
+                                    <AddCredentialDialog
+                                        open={addDialogOpen}
+                                        onClose={() => setAddDialogOpen(false)}
+                                        onAdd={handleAddCredential}
+                                    />
                                     <IconButton>
                                         <Star color="warning" />
                                     </IconButton>
