@@ -45,4 +45,14 @@ public class CredentialDtos {
             String passwordNonce
     ) {}
 
+    // Update a credential
+    public record UpdateCredentialRequest(
+            String service,
+            String websiteLink,
+            String usernameEncrypted,
+            String usernameNonce,
+            String passwordEncrypted,
+            String passwordNonce
+    ) {}
+
 }
