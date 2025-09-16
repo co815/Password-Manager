@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, InputAdornment, IconButton, Typography } from '@mui/material';
+import {
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    Button, TextField, InputAdornment, IconButton, Typography
+} from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { deriveKEK } from '../../lib/crypto/argon2';
@@ -14,16 +17,24 @@ export default function UnlockDialog({ open }: { open: boolean }) {
     const [err, setErr] = useState<string | null>(null);
 
     const onUnlock = async () => {
-        setBusy(true); setErr(null);
+        if (!mp || busy) return;
+        setBusy(true);
+        setErr(null);
+
+        const raw = localStorage.getItem('profile');
+        if (!raw) {
+            setErr('Master password invalid');
+            setBusy(false);
+            return;
+        }
+
         try {
-            const raw = localStorage.getItem('profile');
-            if (!raw) throw new Error('No profile');
             const user = JSON.parse(raw);
             const kek = await deriveKEK(mp, user.saltClient);
             const dek = await unwrapDEK(kek, user.dekEncrypted, user.dekNonce);
             setDEK(dek);
             setMp('');
-        } catch (e: any) {
+        } catch {
             setErr('Master password invalid');
         } finally {
             setBusy(false);
@@ -33,14 +44,13 @@ export default function UnlockDialog({ open }: { open: boolean }) {
     return (
         <Dialog
             open={open}
-            maxWidth="xs"
             fullWidth
-            onClose={() => {}}
-            disableEscapeKeyDown
+            maxWidth="xs"
+            onClose={() => {}} // forțăm rămânerea deschis
             slotProps={{
                 backdrop: {
                     sx: {
-                        backdropFilter: 'blur(10px)',
+                        backdropFilter: 'blur(8px)',
                         backgroundColor: 'rgba(2,6,23,0.45)',
                     },
                 },
@@ -54,8 +64,12 @@ export default function UnlockDialog({ open }: { open: boolean }) {
             }}
         >
             <DialogTitle>Unlock vault</DialogTitle>
+
             <DialogContent>
-                <Typography variant="body2" sx={{ mb: 1 }}>Enter your master password to decrypt your vault.</Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                    Enter your master password to decrypt your vault.
+                </Typography>
+
                 <TextField
                     fullWidth
                     autoFocus
@@ -65,20 +79,36 @@ export default function UnlockDialog({ open }: { open: boolean }) {
                     onChange={(e) => setMp(e.target.value)}
                     error={!!err}
                     helperText={err || ' '}
-                    InputProps={{
-                        endAdornment: (
-                            <InputAdornment position="end">
-                                <IconButton onClick={() => setShow(s => !s)} edge="end">
-                                    {show ? <VisibilityOff /> : <Visibility />}
-                                </IconButton>
-                            </InputAdornment>
-                        ),
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') onUnlock();
                     }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !busy && mp) onUnlock(); }}
+                    slotProps={{
+                        input: {
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        onClick={() => setShow((s) => !s)}
+                                        edge="end"
+                                        aria-label="toggle password visibility"
+                                    >
+                                        {show ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        },
+                    }}
                 />
             </DialogContent>
+
             <DialogActions>
-                <Button onClick={onUnlock} disabled={!mp || busy} variant="contained">Unlock</Button>
+                <Button
+                    onClick={onUnlock}
+                    disabled={!mp || busy}
+                    variant="contained"
+                    sx={{ fontWeight: 800 }}
+                >
+                    Unlock
+                </Button>
             </DialogActions>
         </Dialog>
     );
