@@ -1,12 +1,13 @@
 package com.example.pm.credential;
 
+import com.example.pm.dto.CredentialDtos;
 import com.example.pm.dto.CredentialDtos.GetAllCredentialResponse;
 import com.example.pm.dto.CredentialDtos.PublicCredential;
 import com.example.pm.model.Credential;
 import com.example.pm.repo.CredentialRepository;
-import com.example.pm.security.JwtService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import com.example.pm.exceptions.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,18 +15,18 @@ import java.util.List;
 @RestController @RequestMapping("/api/credentials")
 public class CredentialController {
 
-    private final CredentialRepository credentialRepository;
+    private final CredentialRepository credentials;
 
-    public CredentialController(CredentialRepository credentialRepository) {
-        this.credentialRepository = credentialRepository;
+    public CredentialController(CredentialRepository credentials) {
+        this.credentials = credentials;
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllCredentialsByUserId(Authentication authentication) {
+    public ResponseEntity<?> getAllCredentialsForUser(Authentication authentication) {
 
         String userID = (String) authentication.getPrincipal();
 
-        List<PublicCredential> publicCredentialList = credentialRepository.findByUserId(userID).stream()
+        List<PublicCredential> publicCredentialList = credentials.findByUserId(userID).stream()
                 .map(PublicCredential::fromCredential)
                 .toList();
 
@@ -34,27 +35,30 @@ public class CredentialController {
     }
 
     @GetMapping("/{service}")
-    public ResponseEntity<?> getCredentialByUserId(Authentication authentication, @PathVariable String service) {
+    public ResponseEntity<?> getCredentialByService(Authentication authentication, @PathVariable String service) {
 
         String userID = (String) authentication.getPrincipal();
 
-        return ResponseEntity.ok(new PublicCredential(credentialRepository.findByUserIdAndService(userID, service)))
+        return credentials.findByUserIdAndService(userID, service)
+                .<ResponseEntity<?>>map(credential -> ResponseEntity.ok(PublicCredential.fromCredential(credential)))
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404,"NOT FOUND","Credential Not Found!")));
 
     }
 
     @PostMapping
-    public ResponseEntity<?> addCredential(CredentialDtos.RegisterCredentialRequest registerRequest) {
-        return ResponseEntity.ok(credentialRepository.save(new Credential(registerRequest)));
-    }
+    public ResponseEntity<?> addCredential(Authentication authentication, CredentialDtos.AddCredentialRequest addCredentialRequest) {
 
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateCredential(CredentialDtos.ModifyCredentialRequest modifyRequest) {
-        return  ResponseEntity.ok();
-    }
+        String userID = (String) authentication.getPrincipal();
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteCredential(CredentialDtos.DeleteCredentialRequest deleteRequest) {
+        if (credentials.findByService(addCredentialRequest.service()).isPresent()) {
+            return ResponseEntity.status(404).body(new ErrorResponse(409,"CONFLICT","Credential for this service already exists"));
+        }
 
+        Credential newCredential = Credential.fromPostRequest(addCredentialRequest);
+        credentials.save(newCredential);
+
+        return ResponseEntity.ok().build();
     }
 
 }
