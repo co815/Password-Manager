@@ -1,24 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
-    Box,
-    Drawer,
-    List,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Divider,
-    Typography,
-    Avatar,
-    TextField,
-    IconButton,
-    Card,
-    CardContent,
-    Button,
-    InputAdornment,
+    Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText,
+    Divider, Typography, Avatar, TextField, IconButton, Card, CardContent,
+    Button, InputAdornment,
 } from '@mui/material';
 import { Search, AccountBox, CreditCard, Note, Wifi, Key, Assignment, Star, Edit } from '@mui/icons-material';
-import LockButton from '../components/security/LockButton.tsx';
 
 const categories = [
     { text: 'Logins', icon: <Key /> },
@@ -41,7 +28,7 @@ const items = [
 ];
 
 export default function Dashboard() {
-    const [selected, setSelected] = useState(items[3]); // Evernote
+    const [selected, setSelected] = useState(items[3]);
     const { user, logout } = useAuth();
 
     return (
@@ -49,12 +36,14 @@ export default function Dashboard() {
             <Drawer
                 variant="permanent"
                 anchor="left"
-                PaperProps={{
-                    sx: {
-                        width: 260,
-                        borderRight: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: 'background.paper',
+                slotProps={{
+                    paper: {
+                        sx: {
+                            width: 260,
+                            borderRight: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper',
+                        },
                     },
                 }}
             >
@@ -80,12 +69,14 @@ export default function Dashboard() {
                         placeholder="Search"
                         size="small"
                         sx={{ maxWidth: 420 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <Search fontSize="small" />
-                                </InputAdornment>
-                            ),
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search fontSize="small" />
+                                    </InputAdornment>
+                                ),
+                            },
                         }}
                     />
                     <Box display="flex" alignItems="center" gap={2}>
@@ -190,9 +181,6 @@ export default function Dashboard() {
                     </Card>
                 </Box>
             </Box>
-
-            {}
-            <LockButton />
         </Box>
     );
 }
