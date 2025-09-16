@@ -1,30 +1,20 @@
 import { useMemo, useState } from 'react';
 import {
-    Box,
-    Tabs,
-    Tab,
-    Stack,
-    Button,
-    Alert,
-    CircularProgress,
-    IconButton,
-    Typography,
-    LinearProgress,
-    FormControl,
-    InputLabel,
-    OutlinedInput,
-    InputAdornment,
-    FormHelperText,
+    Box, Tabs, Tab, Stack, Button, Alert, CircularProgress, IconButton, Typography,
+    LinearProgress, FormControl, InputLabel, OutlinedInput, InputAdornment, FormHelperText,
 } from '@mui/material';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
+
 import { api } from '../../lib/api';
 import { createAccountMaterial } from '../../lib/crypto/keys';
-import { makeVerifier } from '../../lib/crypto/argon2';
+import { makeVerifier, deriveKEK } from '../../lib/crypto/argon2';
+import { unwrapDEK } from '../../lib/crypto/unwrap';
 import { useAuth } from '../../auth/AuthContext';
+import { useCrypto } from '../../lib/crypto/CryptoContext';
 
 type Mode = 'login' | 'signup';
 type Props = { onSuccess?: (token: string, user: any, mp: string) => void; fixedHeight?: boolean };
@@ -49,6 +39,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const { login } = useAuth();
+    const { setDEK, disarm } = useCrypto();
     const navigate = useNavigate();
 
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
@@ -59,18 +50,31 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
         setMsg(null);
         setBusy(true);
         try {
+            const normalizedEmail = email.trim().toLowerCase();
+
             if (mode === 'signup') {
                 const { saltClient, dekEncrypted, dekNonce } = await createAccountMaterial(mp);
-                const verifier = await makeVerifier(email, mp, saltClient);
-                await api.register({ email, verifier, saltClient, dekEncrypted, dekNonce });
+                const verifier = await makeVerifier(normalizedEmail, mp, saltClient);
+                await api.register({ email: normalizedEmail, verifier, saltClient, dekEncrypted, dekNonce });
                 setMsg({ type: 'success', text: 'Account created. You can log in now.' });
                 setMode('login');
+                setMp('');
+                setMp2('');
             } else {
-                const { saltClient } = await api.getSalt(email);
-                const verifier = await makeVerifier(email, mp, saltClient);
-                const data = await api.login({ email, verifier });
+                disarm();
+
+                const { saltClient } = await api.getSalt(normalizedEmail);
+                const verifier = await makeVerifier(normalizedEmail, mp, saltClient);
+                const data = await api.login({ email: normalizedEmail, verifier });
+
                 login(data.accessToken, data.user);
+
+                const kek = await deriveKEK(mp, data.user.saltClient);
+                const dek = await unwrapDEK(kek, data.user.dekEncrypted, data.user.dekNonce);
+                setDEK(dek);
+
                 onSuccess?.(data.accessToken, data.user, mp);
+                await Promise.resolve();
                 navigate('/dashboard', { replace: true });
             }
         } catch (e: any) {
@@ -80,6 +84,10 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
         }
     }
 
+    const submitOnEnter = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !disabled) handleSubmit();
+    };
+
     return (
         <Box sx={{ width: '100%', maxWidth: 480 }}>
             <Typography variant="h6" textAlign="center" fontWeight={800} letterSpacing={1} mb={1}>
@@ -88,7 +96,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
 
             <Tabs
                 value={mode}
-                onChange={(_, v) => setMode(v)}
+                onChange={(_, v) => setMode(v as Mode)}
                 centered
                 sx={{
                     mb: 2,
@@ -108,6 +116,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        onKeyDown={submitOnEnter}
                         startAdornment={
                             <InputAdornment position="start">
                                 <EmailOutlined fontSize="small" />
@@ -124,6 +133,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                         type={show ? 'text' : 'password'}
                         value={mp}
                         onChange={(e) => setMp(e.target.value)}
+                        onKeyDown={submitOnEnter}
                         startAdornment={
                             <InputAdornment position="start">
                                 <LockOutlined fontSize="small" />
@@ -161,6 +171,7 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                                 type={show ? 'text' : 'password'}
                                 value={mp2}
                                 onChange={(e) => setMp2(e.target.value)}
+                                onKeyDown={submitOnEnter}
                                 label="Confirm Password *"
                             />
                             <FormHelperText>{mp2 && mp2 !== mp ? 'Passwords do not match' : ' '}</FormHelperText>

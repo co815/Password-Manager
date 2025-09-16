@@ -24,7 +24,6 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     const [user, setUser] = useState<AuthUser>(() => {
         const raw = localStorage.getItem('profile');
         return raw ? JSON.parse(raw) : null;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     });
 
     const login = (t: string, u: any) => {
@@ -39,6 +38,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         setUser(null);
         localStorage.removeItem('token');
         localStorage.removeItem('profile');
+        sessionStorage.removeItem('pm-had-dek');
         window.location.href = '/';
     };
 
