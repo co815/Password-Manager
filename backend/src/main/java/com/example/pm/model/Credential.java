@@ -18,10 +18,10 @@ import java.time.Instant;
 public class Credential {
     @Id private String id;
     private String userId;
-    private String service;
-    private String website;
-    private String username;
-    private String passwordEncrypted;
-    private String passwordNonce;
+    private String service;         // facebook, gmail, etc.
+    private String websiteLink;     // www.facebook.com
+    private String username;        // username/email
+    private String passwordEncrypted;   // password Encrypted
+    private String passwordNonce;       //
     @CreatedDate private Instant createdAt;
 }

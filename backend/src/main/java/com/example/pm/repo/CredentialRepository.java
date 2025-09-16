@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface CredentialRepository extends MongoRepository<Credential, String> {
     List<Credential> findByUserId(String userId);
+    Credential findByUserIdAndService(String userId, String service);
 }

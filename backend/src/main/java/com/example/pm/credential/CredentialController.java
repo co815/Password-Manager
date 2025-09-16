@@ -1,6 +1,7 @@
 package com.example.pm.credential;
 
-import com.example.pm.dto.CredentialDtos;
+import com.example.pm.dto.CredentialDtos.GetAllCredentialResponse;
+import com.example.pm.dto.CredentialDtos.PublicCredential;
 import com.example.pm.model.Credential;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.security.JwtService;
@@ -14,29 +15,30 @@ import java.util.List;
 public class CredentialController {
 
     private final CredentialRepository credentialRepository;
-    private final JwtService jwt;
 
-    public CredentialController(CredentialRepository credentialRepository,  JwtService jwt) {
+    public CredentialController(CredentialRepository credentialRepository) {
         this.credentialRepository = credentialRepository;
-        this.jwt = jwt;
     }
 
     @GetMapping
     public ResponseEntity<?> getAllCredentialsByUserId(Authentication authentication) {
 
         String userID = (String) authentication.getPrincipal();
-        List<Credential> credentials = credentialRepository.findByUserId(userID);
 
-        return ResponseEntity.ok(new CredentialDtos.GetAllCredentialResponse(credentials));
+        List<PublicCredential> publicCredentialList = credentialRepository.findByUserId(userID).stream()
+                .map(PublicCredential::fromCredential)
+                .toList();
+
+        return ResponseEntity.ok(new GetAllCredentialResponse(publicCredentialList));
 
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getCredentialByUserId(Authentication authentication, @PathVariable String id) {
+    @GetMapping("/{service}")
+    public ResponseEntity<?> getCredentialByUserId(Authentication authentication, @PathVariable String service) {
 
         String userID = (String) authentication.getPrincipal();
 
-        return
+        return ResponseEntity.ok(new PublicCredential(credentialRepository.findByUserIdAndService(userID, service)))
 
     }
 

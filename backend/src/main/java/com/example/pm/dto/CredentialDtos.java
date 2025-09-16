@@ -18,7 +18,7 @@ public class CredentialDtos {
             return new PublicCredential(
                     credential.getId(),
                     credential.getService(),
-                    credential.getWebsite(),
+                    credential.getWebsiteLink(),
                     credential.getUsername(),
                     credential.getPasswordEncrypted(),
                     credential.getPasswordNonce()
