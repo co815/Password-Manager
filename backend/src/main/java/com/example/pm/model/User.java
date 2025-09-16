@@ -3,6 +3,7 @@ package com.example.pm.model;
 import com.example.pm.dto.AuthDtos;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
@@ -18,6 +19,8 @@ public class User {
 
     @Indexed(unique = true) @NotBlank @Email   // ensures the string is a well-formed address
     private String email;
+    @NotBlank @Size(min = 4)
+    private String username;
 
     private String verifier;            // hashed password from frontend
     private String saltClient;          // client-generated salt
