@@ -1,5 +1,4 @@
-import { useState } from "react";
-
+import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
     Box,
@@ -16,55 +15,58 @@ import {
     Card,
     CardContent,
     Button,
-} from "@mui/material";
-import {
-    Search,
-    AccountBox,
-    CreditCard,
-    Note,
-    Wifi,
-    Key,
-    Assignment,
-    Star,
-    Edit,
-} from "@mui/icons-material";
+    InputAdornment,
+} from '@mui/material';
+import { Search, AccountBox, CreditCard, Note, Wifi, Key, Assignment, Star, Edit } from '@mui/icons-material';
+import LockButton from '../components/security/LockButton.tsx';
 
 const categories = [
-    { text: "Logins", icon: <Key /> },
-    { text: "Secure Notes", icon: <Note /> },
-    { text: "Credit Cards", icon: <CreditCard /> },
-    { text: "Identities", icon: <AccountBox /> },
-    { text: "Software Licenses", icon: <Assignment /> },
-    { text: "Wireless Routers", icon: <Wifi /> },
+    { text: 'Logins', icon: <Key /> },
+    { text: 'Secure Notes', icon: <Note /> },
+    { text: 'Credit Cards', icon: <CreditCard /> },
+    { text: 'Identities', icon: <AccountBox /> },
+    { text: 'Software Licenses', icon: <Assignment /> },
+    { text: 'Wireless Routers', icon: <Wifi /> },
 ];
 
 const items = [
-    { name: "Driver's License", username: "D6101-40706-60905" },
-    { name: "Dropbox", username: "wendy.c.appleseed@gmail.com" },
-    { name: "E*TRADE", username: "wendy.c.appleseed@gmail.com" },
-    { name: "Evernote", username: "wendy_appleseed@agilebits.com" },
-    { name: "Facebook", username: "wendy.c.appleseed@gmail.com" },
-    { name: "Fantastical", username: "2" },
-    { name: "Gift Shopping List", username: "" },
-    { name: "Google", username: "wendy.c.appleseed@gmail.com" },
+    { name: "Driver's License", username: 'D6101-40706-60905', url: '' },
+    { name: 'Dropbox', username: 'wendy.c.appleseed@gmail.com', url: 'https://dropbox.com' },
+    { name: 'E*TRADE', username: 'wendy.c.appleseed@gmail.com', url: 'https://us.etrade.com' },
+    { name: 'Evernote', username: 'wendy_appleseed@agilebits.com', url: 'https://evernote.com' },
+    { name: 'Facebook', username: 'wendy.c.appleseed@gmail.com', url: 'https://facebook.com' },
+    { name: 'Fantastical', username: '2', url: 'https://flexibits.com/fantastical' },
+    { name: 'Gift Shopping List', username: '', url: '' },
+    { name: 'Google', username: 'wendy.c.appleseed@gmail.com', url: 'https://google.com' },
 ];
 
-export default function PasswordDashboard() {
-    const [selected, setSelected] = useState(items[3]); // default Evernote
+export default function Dashboard() {
+    const [selected, setSelected] = useState(items[3]); // Evernote
     const { user, logout } = useAuth();
+
     return (
-        <Box display="flex" height="100vh">
-            {/* Sidebar */}
-            <Drawer variant="permanent" anchor="left">
-                <Box width={240} p={2}>
-                    <Typography variant="h6" gutterBottom>
+        <Box display="flex" minHeight="100vh" sx={{ bgcolor: 'background.default' }}>
+            <Drawer
+                variant="permanent"
+                anchor="left"
+                PaperProps={{
+                    sx: {
+                        width: 260,
+                        borderRight: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'background.paper',
+                    },
+                }}
+            >
+                <Box p={2}>
+                    <Typography variant="h6" fontWeight={700} gutterBottom>
                         All Items ({items.length})
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
-                    <List>
+                    <List dense>
                         {categories.map((cat) => (
                             <ListItemButton key={cat.text}>
-                                <ListItemIcon>{cat.icon}</ListItemIcon>
+                                <ListItemIcon sx={{ minWidth: 36 }}>{cat.icon}</ListItemIcon>
                                 <ListItemText primary={cat.text} />
                             </ListItemButton>
                         ))}
@@ -72,100 +74,125 @@ export default function PasswordDashboard() {
                 </Box>
             </Drawer>
 
-            {/* Main Content */}
-            <Box flex={1} p={3} ml={30}>
-                {/* Header */}
-                <Button variant="outlined" onClick={logout}>Log out</Button>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Box flex={1} p={3} ml={{ xs: 0, md: '260px' }}>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} gap={2}>
                     <TextField
-                        variant="outlined"
-                        size="small"
                         placeholder="Search"
+                        size="small"
+                        sx={{ maxWidth: 420 }}
                         InputProps={{
-                            startAdornment: <Search sx={{ mr: 1 }} />,
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search fontSize="small" />
+                                </InputAdornment>
+                            ),
                         }}
                     />
                     <Box display="flex" alignItems="center" gap={2}>
-                        <Avatar alt={user?.email ? user.email : "No user email found"} src="/avatar.png" />
-                        <Typography> {user?.email ? user.email : "No user email found"} </Typography>
+                        <Button onClick={logout} variant="outlined" size="small">
+                            Log out
+                        </Button>
+                        <Avatar alt={user?.email ?? 'User'} src="/avatar.png" />
+                        <Typography variant="body2">{user?.email ?? 'No user email found'}</Typography>
                     </Box>
                 </Box>
 
-                <Box display="flex">
-                    {/* Items List */}
-                    <Box width={250} pr={2}>
-                        <List>
-                            {items.map((item) => (
-                                <ListItemButton
-                                    key={item.name}
-                                    selected={selected.name === item.name}
-                                    onClick={() => setSelected(item)}
-                                >
-                                    <ListItemText
-                                        primary={item.name}
-                                        secondary={item.username}
-                                    />
-                                </ListItemButton>
-                            ))}
+                <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: '280px 1fr' }} gap={2}>
+                    <Card variant="outlined" sx={{ overflow: 'hidden' }}>
+                        <List dense disablePadding>
+                            {items.map((item) => {
+                                const active = selected.name === item.name;
+                                return (
+                                    <ListItemButton
+                                        key={item.name}
+                                        selected={active}
+                                        onClick={() => setSelected(item)}
+                                        sx={{
+                                            '&.Mui-selected': {
+                                                bgcolor: (t) =>
+                                                    t.palette.mode === 'dark'
+                                                        ? 'rgba(99,102,241,.12)'
+                                                        : 'rgba(99,102,241,.08)',
+                                            },
+                                        }}
+                                    >
+                                        <ListItemText primary={item.name} secondary={item.username || '—'} />
+                                    </ListItemButton>
+                                );
+                            })}
                         </List>
-                    </Box>
+                    </Card>
 
-                    {/* Item Details */}
-                    <Card sx={{ flex: 1 }}>
+                    <Card sx={{ minHeight: 420 }}>
                         <CardContent>
-                            <Box display="flex" justifyContent="space-between" alignItems="center">
-                                <Typography variant="h6">{selected.name}</Typography>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                                <Typography variant="h6" fontWeight={700}>
+                                    {selected.name}
+                                </Typography>
                                 <Box>
-                                    <IconButton>
+                                    <IconButton size="small">
                                         <Star color="warning" />
                                     </IconButton>
-                                    <IconButton>
+                                    <IconButton size="small">
                                         <Edit />
                                     </IconButton>
                                 </Box>
                             </Box>
-                            <Typography variant="body2" color="textSecondary">
+
+                            <Typography variant="caption" color="text.secondary">
                                 username
                             </Typography>
-                            <Typography>{selected.username || "—"}</Typography>
+                            <Typography sx={{ mb: 1 }}>{selected.username || '—'}</Typography>
 
-                            <Typography variant="body2" color="textSecondary" mt={2}>
+                            <Typography variant="caption" color="text.secondary">
                                 password
                             </Typography>
-                            <Typography>••••••••</Typography>
+                            <Typography sx={{ mb: 1 }}>••••••••</Typography>
 
-                            <Typography variant="body2" color="textSecondary" mt={2}>
+                            <Typography variant="caption" color="text.secondary">
                                 strength
                             </Typography>
                             <Box
                                 sx={{
                                     height: 8,
-                                    width: "120px",
-                                    backgroundColor: "#ddd",
+                                    width: 140,
+                                    backgroundColor: 'action.hover',
                                     borderRadius: 4,
                                     mt: 0.5,
+                                    mb: 2,
                                 }}
                             >
                                 <Box
                                     sx={{
-                                        height: "100%",
-                                        width: "40%",
-                                        backgroundColor: "success.main",
+                                        height: '100%',
+                                        width: '40%',
+                                        backgroundColor: 'success.main',
                                         borderRadius: 4,
                                     }}
                                 />
                             </Box>
 
-                            <Typography variant="body2" color="textSecondary" mt={2}>
+                            <Typography variant="caption" color="text.secondary">
                                 website
                             </Typography>
-                            <Button href="https://www.evernote.com" target="_blank">
-                                evernote.com
-                            </Button>
+                            <Box>
+                                {selected.url ? (
+                                    <Button href={selected.url} target="_blank" rel="noreferrer" size="small">
+                                        {new URL(selected.url).hostname}
+                                    </Button>
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary">
+                                        —
+                                    </Typography>
+                                )}
+                            </Box>
                         </CardContent>
                     </Card>
                 </Box>
             </Box>
+
+            {}
+            <LockButton />
         </Box>
     );
 }
