@@ -9,8 +9,11 @@ public class CredentialDtos {
     public record PublicCredential(
             String credentialId,
             String service,
-            String website,
-            String username,
+            String websiteLink,
+
+            String usernameEncrypted,
+            String usernameNonce,
+
             String passwordEncrypted,
             String passwordNonce
     ) {
@@ -19,7 +22,8 @@ public class CredentialDtos {
                     credential.getId(),
                     credential.getService(),
                     credential.getWebsiteLink(),
-                    credential.getUsername(),
+                    credential.getUsernameEncrypted(),
+                    credential.getUsernameNonce(),
                     credential.getPasswordEncrypted(),
                     credential.getPasswordNonce()
             );
@@ -31,5 +35,14 @@ public class CredentialDtos {
             List<PublicCredential> credentials
     ) {}
 
+    // Add new credential
+    public record AddCredentialRequest(
+            String service,
+            String websiteLink,
+            String usernameEncrypted,
+            String usernameNonce,
+            String passwordEncrypted,
+            String passwordNonce
+    ) {}
 
 }
