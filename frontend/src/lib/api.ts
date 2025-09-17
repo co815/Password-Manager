@@ -59,7 +59,6 @@ export interface PublicUser {
     dekEncrypted: string;
     dekNonce: string;
 }
-
 export interface RegisterRequest {
     email: string;
     verifier: string;
@@ -67,16 +66,8 @@ export interface RegisterRequest {
     dekEncrypted: string;
     dekNonce: string;
 }
-
-export interface LoginRequest {
-    email: string;
-    verifier: string;
-}
-
-export interface LoginResponse {
-    accessToken: string;
-    user: PublicUser;
-}
+export interface LoginRequest { email: string; verifier: string; }
+export interface LoginResponse { accessToken: string; user: PublicUser; }
 
 export interface VaultItem {
     id?: string;
@@ -89,35 +80,40 @@ export interface VaultItem {
     createdAt?: string;    updatedAt?: string;
 }
 
+export type CreateCredentialRequest = {
+    title: string;
+    usernameCipher: string;
+    usernameNonce: string;
+    passwordCipher: string;
+    passwordNonce: string;
+    url?: string;
+    notes?: string;
+};
+
 export const api = {
     health: () => req<{ ok: boolean }>(`/health`),
 
     getSalt: (email: string) =>
         req<{ saltClient: string }>(`/auth/salt?email=${encodeURIComponent(email)}`),
-
     register: (body: RegisterRequest) =>
         req<{ id: string }>(`/auth/register`, { method: 'POST', body: JSON.stringify(body) }),
-
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
-
     loginAndStore: async (body: LoginRequest) => {
         const data = await req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) });
         setAuth(data.accessToken, data.user);
         return data;
     },
-
     logout: () => { clearAuth(); },
 
-    listVault: () =>
-        req<VaultItem[]>(`/vault`),
-
+    listVault: () => req<VaultItem[]>(`/vault`),
     createVault: (body: Partial<VaultItem>) =>
         req<VaultItem>(`/vault`, { method: 'POST', body: JSON.stringify(body) }),
-
     updateVault: (id: string, body: Partial<VaultItem>) =>
         req<VaultItem>(`/vault/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-
     deleteVault: (id: string) =>
         req<{ ok: boolean }>(`/vault/${id}`, { method: 'DELETE' }),
+
+    createCredential: (body: CreateCredentialRequest) =>
+        req<{ id: string }>(`/credential`, { method: 'POST', body: JSON.stringify(body) }),
 };

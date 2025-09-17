@@ -5,15 +5,18 @@ import com.example.pm.dto.CredentialDtos.GetAllCredentialResponse;
 import com.example.pm.dto.CredentialDtos.PublicCredential;
 import com.example.pm.model.Credential;
 import com.example.pm.repo.CredentialRepository;
+import com.example.pm.exceptions.ErrorResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import com.example.pm.exceptions.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
-@RestController @RequestMapping("/api/credentials")
+@RestController
+@RequestMapping({"/api/credentials", "/api/credential"})
 public class CredentialController {
 
     private final CredentialRepository credentials;
@@ -24,46 +27,86 @@ public class CredentialController {
 
     @GetMapping
     public ResponseEntity<?> getAllCredentialsForUser(Authentication authentication) {
-
         String userID = (String) authentication.getPrincipal();
 
-        List<PublicCredential> publicCredentialList = credentials.findByUserId(userID).stream()
+        List<PublicCredential> publicCredentialList = credentials.findByUserId(userID)
+                .stream()
                 .map(PublicCredential::fromCredential)
                 .toList();
 
         return ResponseEntity.ok(new GetAllCredentialResponse(publicCredentialList));
-
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getCredentialById(Authentication authentication, @PathVariable String id) {
-
         String userId = (String) authentication.getPrincipal();
 
         return credentials.findById(id)
-                .filter(c -> c.getUserId().equals(userId))  // ensure the credential belongs to the authenticated user
+                .filter(c -> userId.equals(c.getUserId()))
                 .<ResponseEntity<?>>map(c -> ResponseEntity.ok(PublicCredential.fromCredential(c)))
                 .orElseGet(() -> ResponseEntity.status(404)
-                        .body(new ErrorResponse(404, "NOT FOUND", "Credentials Not Found!")));
-
+                        .body(new ErrorResponse(404, "NOT_FOUND", "Credentials Not Found!")));
     }
 
     @PostMapping
     public ResponseEntity<?> addCredential(
             Authentication authentication,
-            @RequestBody @Valid CredentialDtos.AddCredentialRequest addCredentialRequest
+            @RequestBody Map<String, Object> body
     ) {
+        try {
+            String userID = (String) authentication.getPrincipal();
 
-        String userID = (String) authentication.getPrincipal();
+            String service = firstNonNull(
+                    asString(body.get("service")),
+                    asString(body.get("title"))
+            );
+            String websiteLink = firstNonNull(
+                    asString(body.get("websiteLink")),
+                    asString(body.get("url"))
+            );
+            String usernameEnc = firstNonNull(
+                    asString(body.get("usernameEncrypted")),
+                    asString(body.get("usernameCipher"))
+            );
+            String usernameNonce = asString(body.get("usernameNonce"));
+            String passwordEnc = firstNonNull(
+                    asString(body.get("passwordEncrypted")),
+                    asString(body.get("passwordCipher"))
+            );
+            String passwordNonce = asString(body.get("passwordNonce"));
 
-        if (credentials.findByService(addCredentialRequest.service()).isPresent()) {
-            return ResponseEntity.status(409).body(new ErrorResponse(409,"CONFLICT","Credentials for this service already exist"));
+            if (isBlank(service) || isBlank(usernameEnc) || isBlank(usernameNonce)
+                    || isBlank(passwordEnc) || isBlank(passwordNonce)) {
+                return ResponseEntity.badRequest()
+                        .body(new ErrorResponse(400, "BAD_REQUEST",
+                                "Missing required fields (service/title, username*, password*)."));
+            }
+
+            Optional<Credential> existingForService =
+                    tryFindByServiceAndUserId(service, userID);
+
+            if (existingForService.isPresent()) {
+                return ResponseEntity.status(409)
+                        .body(new ErrorResponse(409, "CONFLICT",
+                                "Credentials for this service already exist"));
+            }
+
+            Credential c = new Credential();
+            c.setUserId(userID);
+            c.setService(service);
+            c.setWebsiteLink(websiteLink);
+            c.setUsernameEncrypted(usernameEnc);
+            c.setUsernameNonce(usernameNonce);
+            c.setPasswordEncrypted(passwordEnc);
+            c.setPasswordNonce(passwordNonce);
+
+            credentials.save(c);
+            return ResponseEntity.ok(PublicCredential.fromCredential(c));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(new ErrorResponse(500, "SERVER_ERROR", e.getMessage()));
         }
-
-        Credential newCredential = Credential.fromPostRequest(addCredentialRequest);
-        credentials.save(newCredential);
-
-        return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}")
@@ -72,11 +115,10 @@ public class CredentialController {
             @PathVariable String id,
             @RequestBody @Valid CredentialDtos.UpdateCredentialRequest updateRequest
     ) {
-
         String userId = (String) authentication.getPrincipal();
 
         return credentials.findById(id)
-                .filter(credential -> credential.getUserId().equals(userId))
+                .filter(credential -> userId.equals(credential.getUserId()))
                 .<ResponseEntity<?>>map(existing -> {
                     existing.setService(updateRequest.service());
                     existing.setWebsiteLink(updateRequest.websiteLink());
@@ -86,28 +128,46 @@ public class CredentialController {
                     existing.setPasswordNonce(updateRequest.passwordNonce());
 
                     credentials.save(existing);
-                    return ResponseEntity.ok(CredentialDtos.PublicCredential.fromCredential(existing));
+                    return ResponseEntity.ok(PublicCredential.fromCredential(existing));
                 })
                 .orElseGet(() -> ResponseEntity.status(404)
-                        .body(new ErrorResponse(404, "NOT FOUND", "The Credentials you want to UPDATE were not found!")));
-
+                        .body(new ErrorResponse(404, "NOT_FOUND",
+                                "The Credentials you want to UPDATE were not found!")));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteCredential(
-            Authentication authentication,
-            @PathVariable String id
-    ){
+    public ResponseEntity<?> deleteCredential(Authentication authentication, @PathVariable String id) {
         String userId = (String) authentication.getPrincipal();
 
         return credentials.findById(id)
-                .filter(credential -> credential.getUserId().equals(userId))
+                .filter(credential -> userId.equals(credential.getUserId()))
                 .<ResponseEntity<?>>map(credential -> {
                     credentials.delete(credential);
                     return ResponseEntity.noContent().build();
                 })
                 .orElseGet(() -> ResponseEntity.status(404)
-                        .body(new ErrorResponse(404, "NOT FOUND", "The Credentials you want to DELETE were not found!")));
+                        .body(new ErrorResponse(404, "NOT_FOUND",
+                                "The Credentials you want to DELETE were not found!")));
+    }
 
+    private static String asString(Object o) {
+        return (o instanceof String s) ? s : null;
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    private static String firstNonNull(String a, String b) {
+        return a != null ? a : b;
+    }
+
+    private Optional<Credential> tryFindByServiceAndUserId(String service, String userId) {
+        try {
+            return credentials.findByService(service)
+                    .filter(c -> userId.equals(c.getUserId()));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
     }
 }
