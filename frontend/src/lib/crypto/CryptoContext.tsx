@@ -1,6 +1,11 @@
 import {
-    createContext, useCallback, useContext, useEffect,
-    useMemo, useRef, useState
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from 'react';
 
 type Ctx = {
@@ -13,15 +18,23 @@ type Ctx = {
 };
 
 const CryptoCtx = createContext<Ctx>({
-    dek: null, locked: true, hadDek: false,
-    setDEK: () => {}, lockNow: () => {}, disarm: () => {}
+    dek: null,
+    locked: true,
+    hadDek: false,
+    setDEK: () => {},
+    lockNow: () => {},
+    disarm: () => {},
 });
 export const useCrypto = () => useContext(CryptoCtx);
 
-const DEFAULT_IDLE_MS = Number(import.meta.env.VITE_IDLE_MS ?? 8 * 60 * 1000);
+const DEFAULT_IDLE_MS = Number(import.meta.env.VITE_IDLE_MS ?? 10 * 60 * 1000);
 const HAD_DEK_FLAG = 'pm-had-dek';
 
-export default function CryptoProvider({ children }: { children: React.ReactNode }) {
+export default function CryptoProvider({
+                                           children,
+                                       }: {
+    children: React.ReactNode;
+}) {
     const [dek, setDek] = useState<CryptoKey | null>(null);
     const [locked, setLocked] = useState(true);
     const [hadDek, setHadDek] = useState<boolean>(
@@ -46,20 +59,25 @@ export default function CryptoProvider({ children }: { children: React.ReactNode
 
     const armTimer = useCallback(() => {
         clearTimer();
-        if (!dek) return;
-        timerRef.current = window.setTimeout(() => lockNow(), idleMsRef.current);
-    }, [dek, lockNow, clearTimer]);
+        timerRef.current = window.setTimeout(lockNow, idleMsRef.current);
+    }, [clearTimer, lockNow]);
 
-    const setDEK = useCallback((k: CryptoKey | null) => {
-        setDek(k);
-        setLocked(!k);
-        if (k) {
-            if (!hadDek) { setHadDek(true); sessionStorage.setItem(HAD_DEK_FLAG, '1'); }
-            armTimer();
-        } else {
-            clearTimer();
-        }
-    }, [armTimer, clearTimer, hadDek]);
+    const setDEK = useCallback(
+        (k: CryptoKey | null) => {
+            setDek(k);
+            setLocked(!k);
+            if (k) {
+                if (!hadDek) {
+                    setHadDek(true);
+                    sessionStorage.setItem(HAD_DEK_FLAG, '1');
+                }
+                armTimer();
+            } else {
+                clearTimer();
+            }
+        },
+        [armTimer, clearTimer, hadDek]
+    );
 
     const disarm = useCallback(() => {
         setHadDek(false);
@@ -71,29 +89,49 @@ export default function CryptoProvider({ children }: { children: React.ReactNode
 
         const reset = () => armTimer();
         const events: (keyof WindowEventMap)[] = [
-            'mousemove','mousedown','keydown','scroll','touchstart','pointerdown','wheel','click'
+            'mousemove',
+            'mousedown',
+            'keydown',
+            'scroll',
+            'touchstart',
+            'pointerdown',
+            'wheel',
+            'click',
         ];
-        events.forEach(e => window.addEventListener(e, reset, { passive: true } as AddEventListenerOptions));
+        events.forEach((e) =>
+            window.addEventListener(e, reset, {
+                passive: true,
+            } as AddEventListenerOptions)
+        );
 
-        const onVis = () => {
-            if (document.hidden) lockNow(); else armTimer();
+        const onVisibilityChange = () => {
+            if (!document.hidden) armTimer();
         };
-        document.addEventListener('visibilitychange', onVis);
-        window.addEventListener('blur', onVis);
+        const onBlur = () => armTimer();
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('blur', onBlur);
 
         armTimer();
 
         return () => {
-            events.forEach(e => window.removeEventListener(e, reset as any));
-            document.removeEventListener('visibilitychange', onVis);
-            window.removeEventListener('blur', onVis);
+            events.forEach((e) => window.removeEventListener(e, reset as any));
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', onBlur);
             clearTimer();
         };
-    }, [dek, armTimer, lockNow, clearTimer]);
+    }, [dek, armTimer, clearTimer]);
 
-    const value = useMemo(() => ({
-        dek, locked, hadDek, setDEK, lockNow, disarm
-    }), [dek, locked, hadDek, setDEK, lockNow, disarm]);
+    const value = useMemo(
+        () => ({
+            dek,
+            locked,
+            hadDek,
+            setDEK,
+            lockNow,
+            disarm,
+        }),
+        [dek, locked, hadDek, setDEK, lockNow, disarm]
+    );
 
     return <CryptoCtx.Provider value={value}>{children}</CryptoCtx.Provider>;
 }

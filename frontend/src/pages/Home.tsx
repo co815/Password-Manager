@@ -80,7 +80,7 @@ export default function Home() {
                     </Box>
 
                     <Box className="col">
-                        <Auth onSuccess={() => (window.location.href = '/dashboard')} fixedHeight />
+                        <Auth fixedHeight />
                     </Box>
                 </Box>
             </Paper>
