@@ -98,8 +98,18 @@ export type CreateCredentialRequest = {
     notes?: string;
 };
 
-export type FetchCredentialsRequest = {
-    token: string;
+export type PublicCredential = {
+    credentialId: string;
+    service: string;
+    websiteLink: string;
+    usernameEncrypted: string;
+    usernameNonce: string;
+    passwordEncrypted: string;
+    passwordNonce: string;
+};
+
+export type GetAllCredentialResponse = {
+    credentials: PublicCredential[];
 };
 
 export const api = {
@@ -129,10 +139,5 @@ export const api = {
     createCredential: (body: CreateCredentialRequest) =>
         req<{ id: string }>(`/credential`, { method: 'POST', body: JSON.stringify(body) }),
 
-    fetchCredentials: (body: FetchCredentialsRequest) =>
-        req<{ credentials: VaultItem[] }>(`/credentials`,
-            { method: 'GET', withCredentials: true,
-            headers: {
-                Authorization: `Bearer ${body.token}`,
-            }, }),
+    fetchCredentials: () => req<GetAllCredentialResponse>(`/credentials`),
 };
