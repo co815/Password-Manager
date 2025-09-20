@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useCrypto } from '../lib/crypto/CryptoContext';
 import { api } from '../lib/api';
 import Alert from '@mui/material/Alert';
+import axios from 'axios';
+import { deriveKEK } from '../lib/crypto/argon2';
+import { unwrapDEK } from '../lib/crypto/unwrap';
 
 import {
     Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
@@ -15,7 +18,30 @@ import {
     Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon,
 } from '@mui/icons-material';
 
-type Item = { name: string; username: string; url?: string };
+const td = new TextDecoder();
+
+async function decryptField(dek: CryptoKey, cipher: string, nonce: string) {
+    const ct = Uint8Array.from(atob(cipher), c => c.charCodeAt(0));
+    const iv = Uint8Array.from(atob(nonce), c => c.charCodeAt(0));
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, dek, ct);
+    return td.decode(pt);
+}
+
+type EncryptedCredential = {
+    name: string;
+    url?: string;
+    encryptedUsername: string;
+    nonceUsername: string;
+    encryptedPassword: string;
+    noncePassword: string;
+};
+
+type Credential = {
+    name: string;
+    url?: string;
+    username: string;
+    password: string;
+}
 
 const categories = [
     { text: 'Logins', icon: <Key /> },
@@ -30,6 +56,7 @@ const te = new TextEncoder();
 const toB64 = (buf: ArrayBuffer | Uint8Array) =>
     btoa(String.fromCharCode(...new Uint8Array(buf instanceof ArrayBuffer ? buf : buf.buffer)));
 const randIv = (len = 12) => crypto.getRandomValues(new Uint8Array(len));
+
 async function encryptField(dek: CryptoKey, text: string) {
     const iv = randIv();
     const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, dek, te.encode(text ?? ''));
@@ -47,22 +74,19 @@ function scorePassword(p: string) {
 }
 
 export default function Dashboard() {
-    const { user, logout } = useAuth();
-    const { dek } = useCrypto();
+    const { user, logout, token } = useAuth();
+    const { dek, locked, setDEK } = useCrypto();
 
-    const [items, setItems] = useState<Item[]>([
-        { name: "Driver's License", username: 'D6101-40706-60905' },
-        { name: 'Dropbox', username: 'wendy.c.appleseed@gmail.com', url: 'https://dropbox.com' },
-        { name: 'E*TRADE', username: 'wendy.c.appleseed@gmail.com', url: 'https://us.etrade.com' },
-        { name: 'Evernote', username: 'wendy_appleseed@agilebits.com', url: 'https://evernote.com' },
-        { name: 'Facebook', username: 'wendy.c.appleseed@gmail.com', url: 'https://facebook.com' },
-        { name: 'Fantastical', username: '2' },
-        { name: 'Gift Shopping List', username: '' },
-        { name: 'Google', username: 'wendy.c.appleseed@gmail.com', url: 'https://google.com' },
-    ]);
-    const [selected, setSelected] = useState<Item>(items[3]);
+    const [credentials, setCredentials] = useState<Credential[]>([]);
+    const [selected, setSelected] = useState<Credential | null>(null);
 
     const [openAdd, setOpenAdd] = useState(false);
+    const [showUnlockForAdd, setShowUnlockForAdd] = useState(false);
+    const [unlockPassword, setUnlockPassword] = useState('');
+    const [showUnlockPwd, setShowUnlockPwd] = useState(false);
+    const [unlockBusy, setUnlockBusy] = useState(false);
+    const [unlockError, setUnlockError] = useState<string | null>(null);
+
     const [title, setTitle] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -73,6 +97,84 @@ export default function Dashboard() {
 
     const pwdScore = useMemo(() => scorePassword(password), [password]);
     const saveDisabled = busy || !title.trim() || !username.trim() || !password;
+
+    useEffect(() => {
+        console.log("useEffect triggered", { dek, token: token });
+
+        if (!dek) {
+            console.log("No DEK yet → vault still locked");
+            return;
+        }
+        if (!token) {
+            console.log("No user token → user not logged in");
+            return;
+        }
+
+        (async () => {
+            console.log("Calling /api/credentials");
+            try {
+                console.log("trying to fetch credentials");
+                const res = await axios.get<EncryptedCredential[]>(
+                    "https://localhost:8443/api/credentials",
+                    {
+                        withCredentials: true,
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+                if (!res.data.credentials)
+                    throw new Error("Malformed response from server");
+                console.log("Fetched credentials:");
+                console.log(res);
+
+                const decrypted: Credential[] = [];
+                for (const enc of res.data.credentials) {
+                    // Map backend fields to local types and decrypt
+                    const username = await decryptField(dek, enc.usernameEncrypted, enc.usernameNonce);
+                    const password = await decryptField(dek, enc.passwordEncrypted, enc.passwordNonce);
+                    decrypted.push({
+                        name: enc.service, // service -> name
+                        url: enc.websiteLink, // websiteLink -> url
+                        username,
+                        password,
+                    });
+                }
+
+                setCredentials(decrypted);
+                setSelected(decrypted[0] ?? null);
+            } catch (err: any) {
+                setToast({ type: "error", msg: err.message || "Failed to load credentials" });
+            }
+        })();
+    }, [dek, token]);
+
+    const handleUnlock = async () => {
+        if (!unlockPassword || unlockBusy) return;
+        setUnlockBusy(true);
+        setUnlockError(null);
+
+        const raw = localStorage.getItem('profile');
+        if (!raw) {
+            setUnlockError('Master password invalid');
+            setUnlockBusy(false);
+            return;
+        }
+
+        try {
+            const userProfile = JSON.parse(raw);
+            const kek = await deriveKEK(unlockPassword, userProfile.saltClient);
+            const dekKey = await unwrapDEK(kek, userProfile.dekEncrypted, userProfile.dekNonce);
+            setDEK(dekKey);
+            setUnlockPassword('');
+            setShowUnlockForAdd(false);
+            setOpenAdd(true);
+        } catch {
+            setUnlockError('Master password invalid');
+        } finally {
+            setUnlockBusy(false);
+        }
+    };
 
     async function handleAddSave() {
         try {
@@ -91,9 +193,15 @@ export default function Dashboard() {
                 passwordNonce,
             });
 
-            const newItem: Item = { name: title.trim(), username: username.trim(), url: url.trim() || undefined };
-            setItems((prev) => [newItem, ...prev]);
-            setSelected(newItem);
+            const newCredential: Credential = {
+                name: title.trim(),
+                url: url.trim() || undefined,
+                username: username.trim(),
+                password: password
+            };
+
+            setCredentials((prev) => [newCredential, ...prev]);
+            setSelected(newCredential);
 
             setTitle(''); setUsername(''); setPassword(''); setUrl('');
             setOpenAdd(false);
@@ -121,7 +229,7 @@ export default function Dashboard() {
             >
                 <Box p={2}>
                     <Typography variant="h6" fontWeight={700} gutterBottom>
-                        All Items ({items.length})
+                        All Credentials ({credentials.length})
                     </Typography>
                 </Box>
                 <Divider />
@@ -161,13 +269,13 @@ export default function Dashboard() {
                 <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: '280px 1fr' }} gap={2}>
                     <Card variant="outlined" sx={{ overflow: 'hidden' }}>
                         <List dense disablePadding>
-                            {items.map((item) => {
-                                const active = selected?.name === item.name && selected?.username === item.username;
+                            {credentials.map((credential) => {
+                                const active = selected?.name === credential.name;
                                 return (
                                     <ListItemButton
-                                        key={`${item.name}-${item.username}`}
+                                        key={credential.name}
                                         selected={!!active}
-                                        onClick={() => setSelected(item)}
+                                        onClick={() => setSelected(credential)}
                                         sx={{
                                             '&.Mui-selected': {
                                                 bgcolor: (t) =>
@@ -175,7 +283,7 @@ export default function Dashboard() {
                                             },
                                         }}
                                     >
-                                        <ListItemText primary={item.name} secondary={item.username || '—'} />
+                                        <ListItemText primary={credential.name} secondary={credential.username || '—'} />
                                     </ListItemButton>
                                 );
                             })}
@@ -186,10 +294,20 @@ export default function Dashboard() {
                         <CardContent>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
                                 <Typography variant="h6" fontWeight={700}>
-                                    {selected?.name}
+                                    {selected?.name || 'Select a credential'}
                                 </Typography>
                                 <Box>
-                                    <IconButton size="small" onClick={() => setOpenAdd(true)} title="Add credential">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                            if (!dek || locked) {
+                                                setShowUnlockForAdd(true);
+                                                return;
+                                            }
+                                            setOpenAdd(true);
+                                        }}
+                                        title="Add credential"
+                                    >
                                         <AddIcon />
                                     </IconButton>
                                     <IconButton size="small">
@@ -233,6 +351,7 @@ export default function Dashboard() {
                 </Box>
             </Box>
 
+            {/* Add Credential Dialog */}
             <Dialog
                 open={openAdd}
                 onClose={() => (!busy ? setOpenAdd(false) : undefined)}
@@ -314,6 +433,69 @@ export default function Dashboard() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Unlock Dialog */}
+            <Dialog
+                open={showUnlockForAdd}
+                onClose={() => setShowUnlockForAdd(false)}
+                fullWidth
+                maxWidth="xs"
+                slotProps={{ backdrop: { sx: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)' } } }}
+                PaperProps={{ sx: { borderRadius: 4, backgroundImage: 'none' } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Unlock Vault to Add Credential</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Your vault is currently locked. Please enter your master password to unlock it and add new credentials.
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        autoFocus
+                        label="Master password"
+                        type={showUnlockPwd ? 'text' : 'password'}
+                        value={unlockPassword}
+                        onChange={(e) => setUnlockPassword(e.target.value)}
+                        error={!!unlockError}
+                        helperText={unlockError || ' '}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleUnlock();
+                        }}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        onClick={() => setShowUnlockPwd(!showUnlockPwd)}
+                                        edge="end"
+                                    >
+                                        {showUnlockPwd ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button
+                        onClick={() => {
+                            setShowUnlockForAdd(false);
+                            setUnlockPassword('');
+                            setUnlockError(null);
+                        }}
+                        disabled={unlockBusy}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleUnlock}
+                        disabled={!unlockPassword || unlockBusy}
+                        variant="contained"
+                        sx={{ fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)' }}
+                    >
+                        {unlockBusy ? 'Unlocking…' : 'Unlock'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <Snackbar
                 open={!!toast}
                 autoHideDuration={3500}

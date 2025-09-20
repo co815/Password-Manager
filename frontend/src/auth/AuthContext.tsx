@@ -1,6 +1,6 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import type { PropsWithChildren } from 'react';
-
+import { AUTH_CLEARED_EVENT, clearAuth } from '../lib/api';
 export type AuthUser = { id: string; email: string; [k: string]: any } | null;
 
 type AuthCtx = {
@@ -26,6 +26,35 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         return raw ? JSON.parse(raw) : null;
     });
 
+    const applyAuthCleared = useCallback(() => {
+        setToken(null);
+        setUser(null);
+        sessionStorage.removeItem('pm-had-dek');
+    }, []);
+
+    useEffect(() => {
+        const onAuthCleared = (_event: Event) => {
+            applyAuthCleared();
+        };
+
+        const onStorage = (event: StorageEvent) => {
+            if (event.storageArea !== localStorage) return;
+            if (event.key === null || event.key === 'token' || event.key === 'profile') {
+                const hasToken = localStorage.getItem('token');
+                if (!hasToken) {
+                    applyAuthCleared();
+                }
+            }
+        };
+
+        window.addEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
+        window.addEventListener('storage', onStorage);
+        return () => {
+            window.removeEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
+            window.removeEventListener('storage', onStorage);
+        };
+    }, [applyAuthCleared]);
+
     const login = (t: string, u: any) => {
         setToken(t);
         setUser(u);
@@ -34,11 +63,8 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     };
 
     const logout = () => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('profile');
-        sessionStorage.removeItem('pm-had-dek');
+        clearAuth();
+        applyAuthCleared();
         window.location.href = '/';
     };
 
