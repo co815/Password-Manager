@@ -3,6 +3,13 @@ const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
 const TOKEN_KEY = 'token';
 const PROFILE_KEY = 'profile';
 
+export const AUTH_CLEARED_EVENT = 'auth-cleared';
+
+function emitAuthCleared() {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AUTH_CLEARED_EVENT));
+    }
+}
 function safeJson(s: string) { try { return JSON.parse(s); } catch { return null; } }
 
 export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
@@ -17,6 +24,7 @@ export function setAuth(token: string, user: any) {
 export function clearAuth() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
+    emitAuthCleared();
 }
 
 function mergeHeaders(init: RequestInit): Headers {
@@ -90,6 +98,10 @@ export type CreateCredentialRequest = {
     notes?: string;
 };
 
+export type FetchCredentialsRequest = {
+    token: string;
+};
+
 export const api = {
     health: () => req<{ ok: boolean }>(`/health`),
 
@@ -116,4 +128,11 @@ export const api = {
 
     createCredential: (body: CreateCredentialRequest) =>
         req<{ id: string }>(`/credential`, { method: 'POST', body: JSON.stringify(body) }),
+
+    fetchCredentials: (body: FetchCredentialsRequest) =>
+        req<{ credentials: VaultItem[] }>(`/credentials`,
+            { method: 'GET', withCredentials: true,
+            headers: {
+                Authorization: `Bearer ${body.token}`,
+            }, }),
 };
