@@ -1,9 +1,8 @@
 import {useMemo, useState, useEffect} from 'react';
 import {useAuth} from '../auth/AuthContext';
 import {useCrypto} from '../lib/crypto/CryptoContext';
-import {api} from '../lib/api';
+import {api, type PublicCredential} from '../lib/api';
 import Alert from '@mui/material/Alert';
-import axios from 'axios';
 import {deriveKEK} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
 
@@ -27,16 +26,7 @@ async function decryptField(dek: CryptoKey, cipher: string, nonce: string) {
     return td.decode(pt);
 }
 
-type EncryptedCredential = {
-    name: string;
-    url?: string;
-    encryptedUsername: string;
-    nonceUsername: string;
-    encryptedPassword: string;
-    noncePassword: string;
-};
-
-type Credential = {
+export type Credential = {
     name: string;
     url?: string;
     username: string;
@@ -128,24 +118,24 @@ export default function Dashboard() {
             console.log("Calling /api/credentials");
             try {
                 console.log("trying to fetch credentials");
-                const res = await axios.get<EncryptedCredential[]>(
-                    "https://localhost:8443/api/credentials",
-                    {
-                        withCredentials: true,
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    }
-                );
+                const {credentials: encCreds}: {credentials: PublicCredential[]} =
+                    await api.fetchCredentials();
 
-                const encryptedCredentials: EncryptedCredential[] = res.data;
                 const decrypted: Credential[] = [];
-                for (const enc of encryptedCredentials) {
-                    const username = await decryptField(dek, enc.encryptedUsername, enc.nonceUsername);
-                    const password = await decryptField(dek, enc.encryptedPassword, enc.noncePassword);
+                for (const enc of encCreds) {
+                    const {
+                        service,
+                        websiteLink,
+                        usernameEncrypted,
+                        usernameNonce,
+                        passwordEncrypted,
+                        passwordNonce,
+                    } = enc;
+                    const username = await decryptField(dek, usernameEncrypted, usernameNonce);
+                    const password = await decryptField(dek, passwordEncrypted, passwordNonce);
                     decrypted.push({
-                        name: enc.name,
-                        url: enc.url || undefined,
+                        name: service,
+                        url: websiteLink || undefined,
                         username,
                         password,
                     });
