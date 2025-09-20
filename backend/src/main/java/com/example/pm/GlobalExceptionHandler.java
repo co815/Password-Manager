@@ -14,7 +14,7 @@ import java.util.Map;
 public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception ex){
-        ErrorResponse error_response = new ErrorResponse(0,"INTERNAL SERVER ERROR","Ai facut ceva NEORTODOX cu serverul");
+        ErrorResponse error_response = new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),"INTERNAL SERVER ERROR","Ai facut ceva NEORTODOX cu serverul");
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(error_response);

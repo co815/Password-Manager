@@ -122,7 +122,7 @@ class CredentialControllerSecurityTest {
 
     @Test
     void addCredentialWithValidTokenSavesCredential() throws Exception {
-        when(credentialRepository.findByService("Email"))
+        when(credentialRepository.findByUserIdAndService("user-123", "Email"))
                 .thenReturn(Optional.empty());
         when(credentialRepository.save(any(Credential.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -147,6 +147,49 @@ class CredentialControllerSecurityTest {
         verify(credentialRepository).save(argThat(saved ->
                 "user-123".equals(saved.getUserId()) &&
                         "Email".equals(saved.getService())));
+    }
+
+    @Test
+    void getAllCredentialsWhenRepositoryThrowsReturns500WithStatusPayload() throws Exception {
+        when(credentialRepository.findByUserId("user-123"))
+                .thenThrow(new RuntimeException("boom"));
+
+        String token = jwtService.generate("user-123");
+
+        mockMvc.perform(get("/api/credentials")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .secure(true))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500));
+    }
+
+    @Test
+    void addCredentialWithExistingServiceReturnsConflict() throws Exception {
+        var credential = new Credential();
+        credential.setId("cred-1");
+        credential.setUserId("user-123");
+        credential.setService("Email");
+
+        when(credentialRepository.findByUserIdAndService("user-123", "Email"))
+                .thenReturn(Optional.of(credential));
+
+        String token = jwtService.generate("user-123");
+
+        mockMvc.perform(post("/api/credentials")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"service\":\"Email\"," +
+                                "\"websiteLink\":\"https://mail.example\"," +
+                                "\"usernameEncrypted\":\"usernameEnc\"," +
+                                "\"usernameNonce\":\"usernameNonce\"," +
+                                "\"passwordEncrypted\":\"passwordEnc\"," +
+                                "\"passwordNonce\":\"passwordNonce\"}")
+                        .secure(true))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("CONFLICT"))
+                .andExpect(jsonPath("$.message")
+                        .value("Credentials for this service already exist"));
     }
 
     @Test

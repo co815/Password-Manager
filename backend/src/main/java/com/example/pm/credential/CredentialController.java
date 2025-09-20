@@ -3,9 +3,9 @@ package com.example.pm.credential;
 import com.example.pm.dto.CredentialDtos;
 import com.example.pm.dto.CredentialDtos.GetAllCredentialResponse;
 import com.example.pm.dto.CredentialDtos.PublicCredential;
+import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.Credential;
 import com.example.pm.repo.CredentialRepository;
-import com.example.pm.exceptions.ErrorResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -52,57 +52,52 @@ public class CredentialController {
             @RequestBody Map<String, Object> body
     ) {
         return requireUser(authentication, userId -> {
-            try {
-                String service = firstNonNull(
-                        asString(body.get("service")),
-                        asString(body.get("title"))
-                );
-                String websiteLink = firstNonNull(
-                        asString(body.get("websiteLink")),
-                        asString(body.get("url"))
-                );
-                String usernameEnc = firstNonNull(
-                        asString(body.get("usernameEncrypted")),
-                        asString(body.get("usernameCipher"))
-                );
-                String usernameNonce = asString(body.get("usernameNonce"));
-                String passwordEnc = firstNonNull(
-                        asString(body.get("passwordEncrypted")),
-                        asString(body.get("passwordCipher"))
-                );
-                String passwordNonce = asString(body.get("passwordNonce"));
+            String service = firstNonNull(
+                    asString(body.get("service")),
+                    asString(body.get("title"))
+            );
+            String websiteLink = firstNonNull(
+                    asString(body.get("websiteLink")),
+                    asString(body.get("url"))
+            );
+            String usernameEnc = firstNonNull(
+                    asString(body.get("usernameEncrypted")),
+                    asString(body.get("usernameCipher"))
+            );
+            String usernameNonce = asString(body.get("usernameNonce"));
+            String passwordEnc = firstNonNull(
+                    asString(body.get("passwordEncrypted")),
+                    asString(body.get("passwordCipher"))
+            );
+            String passwordNonce = asString(body.get("passwordNonce"));
 
-                if (isBlank(service) || isBlank(usernameEnc) || isBlank(usernameNonce)
-                        || isBlank(passwordEnc) || isBlank(passwordNonce)) {
-                    return ResponseEntity.badRequest()
-                            .body(new ErrorResponse(400, "BAD_REQUEST",
-                                    "Missing required fields (service/title, username*, password*)."));
-                }
-
-                Optional<Credential> existingForService =
-                        tryFindByServiceAndUserId(service, userId);
-
-                if (existingForService.isPresent()) {
-                    return ResponseEntity.status(409)
-                            .body(new ErrorResponse(409, "CONFLICT",
-                                    "Credentials for this service already exist"));
-                }
-
-                Credential c = new Credential();
-                c.setUserId(userId);
-                c.setService(service);
-                c.setWebsiteLink(websiteLink);
-                c.setUsernameEncrypted(usernameEnc);
-                c.setUsernameNonce(usernameNonce);
-                c.setPasswordEncrypted(passwordEnc);
-                c.setPasswordNonce(passwordNonce);
-
-                credentials.save(c);
-                return ResponseEntity.ok(PublicCredential.fromCredential(c));
-            } catch (Exception e) {
-                return ResponseEntity.status(500)
-                        .body(new ErrorResponse(500, "SERVER_ERROR", e.getMessage()));
+            if (isBlank(service) || isBlank(usernameEnc) || isBlank(usernameNonce)
+                    || isBlank(passwordEnc) || isBlank(passwordNonce)) {
+                return ResponseEntity.badRequest()
+                        .body(new ErrorResponse(400, "BAD_REQUEST",
+                                "Missing required fields (service/title, username*, password*)."));
             }
+
+            Optional<Credential> existingForService =
+                    credentials.findByUserIdAndService(userId, service);
+
+            if (existingForService.isPresent()) {
+                return ResponseEntity.status(409)
+                        .body(new ErrorResponse(409, "CONFLICT",
+                                "Credentials for this service already exist"));
+            }
+
+            Credential c = new Credential();
+            c.setUserId(userId);
+            c.setService(service);
+            c.setWebsiteLink(websiteLink);
+            c.setUsernameEncrypted(usernameEnc);
+            c.setUsernameNonce(usernameNonce);
+            c.setPasswordEncrypted(passwordEnc);
+            c.setPasswordNonce(passwordNonce);
+
+            credentials.save(c);
+            return ResponseEntity.ok(PublicCredential.fromCredential(c));
         });
     }
 
@@ -153,15 +148,6 @@ public class CredentialController {
 
     private static String firstNonNull(String a, String b) {
         return a != null ? a : b;
-    }
-
-    private Optional<Credential> tryFindByServiceAndUserId(String service, String userId) {
-        try {
-            return credentials.findByService(service)
-                    .filter(c -> userId.equals(c.getUserId()));
-        } catch (Throwable t) {
-            return Optional.empty();
-        }
     }
 
     private Optional<String> resolveUserId(Authentication authentication) {
