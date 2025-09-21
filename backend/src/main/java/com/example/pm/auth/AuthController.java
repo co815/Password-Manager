@@ -8,22 +8,16 @@ import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-
-    private static final DateTimeFormatter EXPIRES_FORMATTER =
-            DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC);
 
     private final UserRepository users;
     private final JwtService jwt;
@@ -65,9 +59,9 @@ public class AuthController {
                 .<ResponseEntity<?>>map(user -> {
                     String token = jwt.generate(user.getId());
                     var publicUser = PublicUser.fromUser(user);
-                    String cookie = buildAccessTokenCookie(token, jwt.getExpiry());
+                    ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry());
                     return ResponseEntity.ok()
-                            .header(HttpHeaders.SET_COOKIE, renderCookie(cookie))
+                            .header(HttpHeaders.SET_COOKIE, cookie.toString())
                             .body(new LoginResponse(publicUser));
                 })
                 .orElseGet(() -> ResponseEntity.status(401)
@@ -77,62 +71,32 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout() {
-        String cleared = buildAccessTokenCookie("", Duration.ZERO);
+        ResponseCookie cleared = buildAccessTokenCookie("", Duration.ZERO);
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, renderCookie(cleared))
+                .header(HttpHeaders.SET_COOKIE, cleared.toString())
                 .build();
     }
 
-    private String buildAccessTokenCookie(String value, Duration maxAge) {
-        StringBuilder builder = new StringBuilder("accessToken=");
-        builder.append(value != null ? value : "");
-        builder.append("; Path=/");
+    private ResponseCookie buildAccessTokenCookie(String value, Duration maxAge) {
+        ResponseCookie.Builder builder = ResponseCookie.from("accessToken", value != null ? value : "")
+                .path("/")
+                .httpOnly(true)
+                .secure(true);
 
         if (maxAge != null) {
-            long seconds = maxAge.getSeconds();
-            if (seconds <= 0) {
-                builder.append("; Max-Age=0");
-                builder.append("; Expires=").append(EXPIRES_FORMATTER.format(Instant.EPOCH));
+            if (maxAge.isZero() || maxAge.isNegative()) {
+                builder.maxAge(Duration.ZERO);
             } else {
-                builder.append("; Max-Age=").append(seconds);
-                builder.append("; Expires=")
-                        .append(EXPIRES_FORMATTER.format(Instant.now().plusSeconds(seconds)));
+                builder.maxAge(maxAge);
             }
         }
 
-        builder.append("; HttpOnly");
-        builder.append("; Secure");
 
         String sameSite = authCookieProps.getSameSiteAttribute();
         if (sameSite != null && !sameSite.isBlank()) {
-            builder.append("; SameSite=").append(sameSite);
+            builder.sameSite(sameSite);
         }
-
-        return builder.toString();
-    }
-
-    private String renderCookie(String cookie) {
-        if (cookie == null) {
-            return "";
-        }
-        String rendered = cookie;
-        if (!hasSameSite(rendered)) {
-            String sameSite = authCookieProps.getSameSiteAttribute();
-            if (sameSite != null && !sameSite.isBlank()) {
-                rendered = rendered + "; SameSite=" + sameSite;
-            }
-        }
-        if (!rendered.toLowerCase(Locale.ROOT).contains("secure")) {
-            rendered = rendered + "; Secure";
-        }
-        if (!rendered.toLowerCase(Locale.ROOT).contains("httponly")) {
-            rendered = rendered + "; HttpOnly";
-        }
-        return rendered;
-    }
-
-    private boolean hasSameSite(String cookieValue) {
-        return cookieValue.toLowerCase(Locale.ROOT).contains("samesite=");
+        return builder.build();
     }
 
     @GetMapping("/me")
