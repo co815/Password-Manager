@@ -8,16 +8,22 @@ import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final DateTimeFormatter EXPIRES_FORMATTER =
+            DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC);
 
     private final UserRepository users;
     private final JwtService jwt;
@@ -59,13 +65,7 @@ public class AuthController {
                 .<ResponseEntity<?>>map(user -> {
                     String token = jwt.generate(user.getId());
                     var publicUser = PublicUser.fromUser(user);
-                    ResponseCookie cookie = ResponseCookie.from("accessToken", token)
-                            .httpOnly(true)
-                            .secure(true)
-                            .sameSite(authCookieProps.getSameSite())
-                            .path("/")
-                            .maxAge(jwt.getExpiry())
-                            .build();
+                    String cookie = buildAccessTokenCookie(token, jwt.getExpiry());
                     return ResponseEntity.ok()
                             .header(HttpHeaders.SET_COOKIE, renderCookie(cookie))
                             .body(new LoginResponse(publicUser));
@@ -77,23 +77,55 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout() {
-        ResponseCookie cleared = ResponseCookie.from("accessToken", "")
-                .httpOnly(true)
-                .secure(true)
-                .sameSite(authCookieProps.getSameSite())
-                .path("/")
-                .maxAge(0)
-                .build();
+        String cleared = buildAccessTokenCookie("", Duration.ZERO);
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, renderCookie(cleared))
                 .build();
     }
 
-    private String renderCookie(ResponseCookie cookie) {
-        String rendered = cookie.toString();
-        String sameSite = authCookieProps.getSameSiteAttribute();
-        if (sameSite != null && !sameSite.isBlank() && !hasSameSite(rendered)) {
-            rendered = rendered + "; SameSite=" + sameSite;
+    private String buildAccessTokenCookie(String value, Duration maxAge) {
+        StringBuilder builder = new StringBuilder("accessToken=");
+        builder.append(value != null ? value : "");
+        builder.append("; Path=/");
+
+        if (maxAge != null) {
+            long seconds = maxAge.getSeconds();
+            if (seconds <= 0) {
+                builder.append("; Max-Age=0");
+                builder.append("; Expires=").append(EXPIRES_FORMATTER.format(Instant.EPOCH));
+            } else {
+                builder.append("; Max-Age=").append(seconds);
+                builder.append("; Expires=")
+                        .append(EXPIRES_FORMATTER.format(Instant.now().plusSeconds(seconds)));
+            }
+        }
+
+        builder.append("; HttpOnly");
+        builder.append("; Secure");
+
+        if (sameSite != null && !sameSite.isBlank()) {
+            builder.append("; SameSite=").append(sameSite);
+        }
+
+        return builder.toString();
+    }
+
+    private String renderCookie(String cookie) {
+        if (cookie == null) {
+            return "";
+        }
+        String rendered = cookie;
+        if (!hasSameSite(rendered)) {
+            String sameSite = authCookieProps.getSameSiteAttribute();
+            if (sameSite != null && !sameSite.isBlank()) {
+                rendered = rendered + "; SameSite=" + sameSite;
+            }
+        }
+        if (!rendered.toLowerCase(Locale.ROOT).contains("secure")) {
+            rendered = rendered + "; Secure";
+        }
+        if (!rendered.toLowerCase(Locale.ROOT).contains("httponly")) {
+            rendered = rendered + "; HttpOnly";
         }
         return rendered;
     }

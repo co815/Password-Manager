@@ -26,4 +26,4 @@ app:
 
 auth:
   cookie:
-    same-site: None
+    same-site: none
