@@ -1,7 +1,7 @@
 import {useMemo, useState, useEffect} from 'react';
 import {useAuth} from '../auth/AuthContext';
 import {useCrypto} from '../lib/crypto/CryptoContext';
-import {api, type PublicCredential} from '../lib/api';
+import {api, getProfile, type PublicCredential} from '../lib/api';
 import Alert from '@mui/material/Alert';
 import {deriveKEK} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
@@ -27,6 +27,7 @@ async function decryptField(dek: CryptoKey, cipher: string, nonce: string) {
 }
 
 export type Credential = {
+    id: string;
     name: string;
     url?: string;
     username: string;
@@ -124,6 +125,7 @@ export default function Dashboard() {
                 const decrypted: Credential[] = [];
                 for (const enc of encCreds) {
                     const {
+                        credentialId,
                         service,
                         websiteLink,
                         usernameEncrypted,
@@ -134,6 +136,7 @@ export default function Dashboard() {
                     const username = await decryptField(dek, usernameEncrypted, usernameNonce);
                     const password = await decryptField(dek, passwordEncrypted, passwordNonce);
                     decrypted.push({
+                        id: credentialId,
                         name: service,
                         url: websiteLink || undefined,
                         username,
@@ -154,15 +157,14 @@ export default function Dashboard() {
         setUnlockBusy(true);
         setUnlockError(null);
 
-        const raw = localStorage.getItem('profile');
-        if (!raw) {
+        const userProfile = getProfile();
+        if (!userProfile?.id) {
             setUnlockError('Master password invalid');
             setUnlockBusy(false);
             return;
         }
 
         try {
-            const userProfile = JSON.parse(raw);
             const kek = await deriveKEK(unlockPassword, userProfile.saltClient);
             const dekKey = await unwrapDEK(kek, userProfile.dekEncrypted, userProfile.dekNonce);
             setDEK(dekKey);
@@ -184,7 +186,7 @@ export default function Dashboard() {
             const {cipher: usernameCipher, nonce: usernameNonce} = await encryptField(dek, username);
             const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, password);
 
-            await api.createCredential({
+            const created = await api.createCredential({
                 title,
                 url,
                 usernameCipher,
@@ -194,10 +196,11 @@ export default function Dashboard() {
             });
 
             const newCredential: Credential = {
+                id: created.credentialId,
                 name: title.trim(),
                 url: url.trim() || undefined,
                 username: username.trim(),
-                password: password
+                password: password,
             };
 
             setCredentials((prev) => [newCredential, ...prev]);
@@ -278,10 +281,10 @@ export default function Dashboard() {
                                 </ListItem>
                             ) : (
                                 credentials.map((credential) => {
-                                    const active = selected?.name === credential.name;
+                                    const active = selected?.id === credential.id;
                                     return (
                                         <ListItemButton
-                                            key={credential.name}
+                                            key={credential.id}
                                             selected={!!active}
                                             onClick={() => setSelected(credential)}
                                             sx={{

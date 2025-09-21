@@ -3,6 +3,52 @@ const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
 const TOKEN_KEY = 'token';
 const PROFILE_KEY = 'profile';
 
+function normalizeProfile(raw: unknown): PublicUser | null {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const obj = raw as Record<string, unknown> & { userId?: unknown };
+
+    const resolve = (id: unknown) => {
+        if (typeof id !== 'string') return null;
+
+        const { email, saltClient, dekEncrypted, dekNonce } = obj;
+        if (
+            typeof email !== 'string' ||
+            typeof saltClient !== 'string' ||
+            typeof dekEncrypted !== 'string' ||
+            typeof dekNonce !== 'string'
+        ) {
+            return null;
+        }
+
+        const profile: PublicUser = { id, email, saltClient, dekEncrypted, dekNonce };
+        return profile;
+    };
+
+    const normalized = resolve((obj as Record<string, unknown>).id);
+    if (normalized) return normalized;
+
+    const legacy = resolve(obj.userId);
+    if (legacy) {
+        try {
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(legacy));
+        } catch {
+
+        }
+        return legacy;
+    }
+
+    return null;
+}
+
+export interface PublicUser {
+    id: string;
+    email: string;
+    saltClient: string;
+    dekEncrypted: string;
+    dekNonce: string;
+}
+
 export const AUTH_CLEARED_EVENT = 'auth-cleared';
 
 function emitAuthCleared() {
@@ -13,13 +59,17 @@ function emitAuthCleared() {
 function safeJson(s: string) { try { return JSON.parse(s); } catch { return null; } }
 
 export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
-export function getProfile<T = any>(): T | null {
+export function getProfile(): PublicUser | null {
     const raw = localStorage.getItem(PROFILE_KEY);
-    return raw ? (safeJson(raw) as T) : null;
+    if (!raw) return null;
+
+    const parsed = safeJson(raw);
+    return normalizeProfile(parsed);
 }
-export function setAuth(token: string, user: any) {
+export function setAuth(token: string, user: PublicUser) {
+    const normalized = normalizeProfile(user) ?? user;
     localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(user));
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(normalized));
 }
 export function clearAuth() {
     localStorage.removeItem(TOKEN_KEY);
@@ -60,13 +110,6 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     return data as T;
 }
 
-export interface PublicUser {
-    id: string;
-    email: string;
-    saltClient: string;
-    dekEncrypted: string;
-    dekNonce: string;
-}
 export interface RegisterRequest {
     email: string;
     verifier: string;
@@ -137,7 +180,7 @@ export const api = {
         req<{ ok: boolean }>(`/vault/${id}`, { method: 'DELETE' }),
 
     createCredential: (body: CreateCredentialRequest) =>
-        req<{ id: string }>(`/credential`, { method: 'POST', body: JSON.stringify(body) }),
+        req<PublicCredential>(`/credential`, { method: 'POST', body: JSON.stringify(body) }),
 
     fetchCredentials: () => req<GetAllCredentialResponse>(`/credentials`),
 };

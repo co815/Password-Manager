@@ -1,19 +1,20 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import type { PropsWithChildren } from 'react';
-import { AUTH_CLEARED_EVENT, clearAuth } from '../lib/api';
-export type AuthUser = { id: string; email: string; [k: string]: any } | null;
+import { AUTH_CLEARED_EVENT, clearAuth, getProfile } from '../lib/api';
+import type { PublicUser } from '../lib/api';
+export type AuthUser = PublicUser | null;
 
 type AuthCtx = {
     token: string | null;
     user: AuthUser;
-    login: (token: string, user: any) => void;
+    login: (token: string, user: PublicUser) => void;
     logout: () => void;
 };
 
 const Ctx = createContext<AuthCtx>({
     token: null,
     user: null,
-    login: () => {},
+    login: (_token: string, _user: PublicUser) => {},
     logout: () => {},
 });
 
@@ -21,10 +22,7 @@ export const useAuth = () => useContext(Ctx);
 
 export default function AuthProvider({ children }: PropsWithChildren) {
     const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
-    const [user, setUser] = useState<AuthUser>(() => {
-        const raw = localStorage.getItem('profile');
-        return raw ? JSON.parse(raw) : null;
-    });
+    const [user, setUser] = useState<AuthUser>(() => getProfile());
 
     const applyAuthCleared = useCallback(() => {
         setToken(null);
@@ -55,7 +53,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         };
     }, [applyAuthCleared]);
 
-    const login = (t: string, u: any) => {
+    const login = (t: string, u: PublicUser) => {
         setToken(t);
         setUser(u);
         localStorage.setItem('token', t);

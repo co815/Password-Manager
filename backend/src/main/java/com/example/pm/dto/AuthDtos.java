@@ -8,7 +8,7 @@ public class AuthDtos {
 
     // PublicUser - the user object that will interact with the frontend
     public record PublicUser(
-            String userId,
+            String id,
             String email,
             String saltClient,
             String dekEncrypted,
@@ -35,7 +35,7 @@ public class AuthDtos {
     ) {}
 
     public record RegisterResponse(
-            @Id String userId
+            @Id String id
     ) {}
 
     // Login request/response
