@@ -1,5 +1,6 @@
 package com.example.pm.auth;
 
+import com.example.pm.config.AuthCookieProps;
 import com.example.pm.dto.AuthDtos.*;
 import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.User;
@@ -12,16 +13,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final UserRepository users;
     private final JwtService jwt;
+    private final AuthCookieProps authCookieProps;
 
-    public AuthController(UserRepository users, JwtService jwt) {
+    public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps) {
         this.users = users;
         this.jwt = jwt;
+        this.authCookieProps = authCookieProps;
     }
 
     // Register endpoint Handler
@@ -57,12 +62,12 @@ public class AuthController {
                     ResponseCookie cookie = ResponseCookie.from("accessToken", token)
                             .httpOnly(true)
                             .secure(true)
-                            .sameSite("Strict")
+                            .sameSite(authCookieProps.getSameSite())
                             .path("/")
                             .maxAge(jwt.getExpiry())
                             .build();
                     return ResponseEntity.ok()
-                            .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                            .header(HttpHeaders.SET_COOKIE, renderCookie(cookie))
                             .body(new LoginResponse(publicUser));
                 })
                 .orElseGet(() -> ResponseEntity.status(401)
@@ -75,13 +80,26 @@ public class AuthController {
         ResponseCookie cleared = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("Strict")
+                .sameSite(authCookieProps.getSameSite())
                 .path("/")
                 .maxAge(0)
                 .build();
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, cleared.toString())
+                .header(HttpHeaders.SET_COOKIE, renderCookie(cleared))
                 .build();
+    }
+
+    private String renderCookie(ResponseCookie cookie) {
+        String rendered = cookie.toString();
+        String sameSite = authCookieProps.getSameSiteAttribute();
+        if (sameSite != null && !sameSite.isBlank() && !hasSameSite(rendered)) {
+            rendered = rendered + "; SameSite=" + sameSite;
+        }
+        return rendered;
+    }
+
+    private boolean hasSameSite(String cookieValue) {
+        return cookieValue.toLowerCase(Locale.ROOT).contains("samesite=");
     }
 
     @GetMapping("/me")
