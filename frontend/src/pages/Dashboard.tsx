@@ -1,7 +1,7 @@
 import {useMemo, useState, useEffect} from 'react';
 import {useAuth} from '../auth/AuthContext';
 import {useCrypto} from '../lib/crypto/CryptoContext';
-import {api, getProfile, type PublicCredential} from '../lib/api';
+import {api, type PublicCredential} from '../lib/api';
 import Alert from '@mui/material/Alert';
 import {deriveKEK} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
@@ -65,7 +65,7 @@ function scorePassword(p: string) {
 }
 
 export default function Dashboard() {
-    const {user, logout, token} = useAuth();
+    const {user, logout} = useAuth();
     const {dek, locked, setDEK} = useCrypto();
 
     const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -104,14 +104,14 @@ export default function Dashboard() {
     }, [dek, locked]);
 
     useEffect(() => {
-        console.log("useEffect triggered", {dek, token: token});
+        console.log("useEffect triggered", {dek, user});
 
         if (!dek) {
             console.log("No DEK yet → vault still locked");
             return;
         }
-        if (!token) {
-            console.log("No user token → user not logged in");
+        if (!user) {
+            console.log("No authenticated user → not logged in");
             return;
         }
 
@@ -150,14 +150,14 @@ export default function Dashboard() {
                 setToast({type: "error", msg: err?.message || "Failed to load credentials"});
             }
         })();
-    }, [dek, token]);
+    }, [dek, user]);
 
     const handleUnlock = async () => {
         if (!unlockPassword || unlockBusy) return;
         setUnlockBusy(true);
         setUnlockError(null);
 
-        const userProfile = getProfile();
+        const userProfile = user;
         if (!userProfile?.id) {
             setUnlockError('Master password invalid');
             setUnlockBusy(false);
@@ -264,7 +264,7 @@ export default function Dashboard() {
                         }}
                     />
                     <Box display="flex" alignItems="center" gap={2}>
-                        <Button onClick={logout} variant="outlined" size="small">
+                        <Button onClick={() => { void logout(); }} variant="outlined" size="small">
                             Log out
                         </Button>
                         <Avatar alt={user?.email ?? 'User'} src="/avatar.png"/>

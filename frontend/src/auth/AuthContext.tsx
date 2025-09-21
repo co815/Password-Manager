@@ -1,71 +1,87 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import type { PropsWithChildren } from 'react';
-import { AUTH_CLEARED_EVENT, clearAuth, getProfile } from '../lib/api';
-import type { PublicUser } from '../lib/api';
+import {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
+import type {PropsWithChildren} from 'react';
+import {AUTH_CLEARED_EVENT, api} from '../lib/api';
+import type {PublicUser} from '../lib/api';
+
 export type AuthUser = PublicUser | null;
 
 type AuthCtx = {
-    token: string | null;
     user: AuthUser;
-    login: (token: string, user: PublicUser) => void;
-    logout: () => void;
+    loading: boolean;
+    login: (user: PublicUser) => void;
+    logout: () => Promise<void>;
+    refresh: () => Promise<void>;
 };
 
 const Ctx = createContext<AuthCtx>({
-    token: null,
     user: null,
-    login: (_token: string, _user: PublicUser) => {},
-    logout: () => {},
+    loading: true,
+    login: (_user: PublicUser) => {
+    },
+    logout: async () => {
+    },
+    refresh: async () => {
+    },
 });
 
 export const useAuth = () => useContext(Ctx);
 
-export default function AuthProvider({ children }: PropsWithChildren) {
-    const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
-    const [user, setUser] = useState<AuthUser>(() => getProfile());
+export default function AuthProvider({children}: PropsWithChildren) {
+    const [user, setUser] = useState<AuthUser>(null);
+    const [loading, setLoading] = useState(true);
 
     const applyAuthCleared = useCallback(() => {
-        setToken(null);
         setUser(null);
+        setLoading(false);
         sessionStorage.removeItem('pm-had-dek');
     }, []);
 
+    const refresh = useCallback(async () => {
+        try {
+            setLoading(true);
+            const profile = await api.currentUser();
+            setUser(profile);
+        } catch {
+            setUser(null);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
-        const onAuthCleared = (_event: Event) => {
+        refresh();
+    }, [refresh]);
+
+    useEffect(() => {
+        const onAuthCleared = () => {
             applyAuthCleared();
-        };
 
-        const onStorage = (event: StorageEvent) => {
-            if (event.storageArea !== localStorage) return;
-            if (event.key === null || event.key === 'token' || event.key === 'profile') {
-                const hasToken = localStorage.getItem('token');
-                if (!hasToken) {
-                    applyAuthCleared();
-                }
+            window.addEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
+            return () => {
+                window.removeEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
+            };
+        }, [applyAuthCleared]
+    )
+        ;
+        const login = useCallback((u: PublicUser) => {
+            setUser(u);
+            setLoading(false);
+        }, []);
+
+        const logout = useCallback(async () => {
+            try {
+                await api.logout();
+            } catch {
+            } finally {
+                applyAuthCleared();
+                window.location.href = '/';
             }
-        };
+        }, [applyAuthCleared]);
+        const value = useMemo(
+            () => ({user, loading, login, logout, refresh}),
+            [user, loading, login, logout, refresh],
+        );
 
-        window.addEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
-        window.addEventListener('storage', onStorage);
-        return () => {
-            window.removeEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
-            window.removeEventListener('storage', onStorage);
-        };
-    }, [applyAuthCleared]);
 
-    const login = (t: string, u: PublicUser) => {
-        setToken(t);
-        setUser(u);
-        localStorage.setItem('token', t);
-        localStorage.setItem('profile', JSON.stringify(u));
-    };
-
-    const logout = () => {
-        clearAuth();
-        applyAuthCleared();
-        window.location.href = '/';
-    };
-
-    const value = useMemo(() => ({ token, user, login, logout }), [token, user]);
-    return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
+        return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+    }

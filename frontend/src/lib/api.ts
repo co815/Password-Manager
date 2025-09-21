@@ -1,45 +1,5 @@
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
 
-const TOKEN_KEY = 'token';
-const PROFILE_KEY = 'profile';
-
-function normalizeProfile(raw: unknown): PublicUser | null {
-    if (!raw || typeof raw !== 'object') return null;
-
-    const obj = raw as Record<string, unknown> & { userId?: unknown };
-
-    const resolve = (id: unknown) => {
-        if (typeof id !== 'string') return null;
-
-        const { email, saltClient, dekEncrypted, dekNonce } = obj;
-        if (
-            typeof email !== 'string' ||
-            typeof saltClient !== 'string' ||
-            typeof dekEncrypted !== 'string' ||
-            typeof dekNonce !== 'string'
-        ) {
-            return null;
-        }
-
-        const profile: PublicUser = { id, email, saltClient, dekEncrypted, dekNonce };
-        return profile;
-    };
-
-    const normalized = resolve((obj as Record<string, unknown>).id);
-    if (normalized) return normalized;
-
-    const legacy = resolve(obj.userId);
-    if (legacy) {
-        try {
-            localStorage.setItem(PROFILE_KEY, JSON.stringify(legacy));
-        } catch {
-
-        }
-        return legacy;
-    }
-
-    return null;
-}
 
 export interface PublicUser {
     id: string;
@@ -58,32 +18,9 @@ function emitAuthCleared() {
 }
 function safeJson(s: string) { try { return JSON.parse(s); } catch { return null; } }
 
-export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
-export function getProfile(): PublicUser | null {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return null;
-
-    const parsed = safeJson(raw);
-    return normalizeProfile(parsed);
-}
-export function setAuth(token: string, user: PublicUser) {
-    const normalized = normalizeProfile(user) ?? user;
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(normalized));
-}
-export function clearAuth() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(PROFILE_KEY);
-    emitAuthCleared();
-}
-
 function mergeHeaders(init: RequestInit): Headers {
     const h = new Headers(init.headers || {});
     if (!h.has('Content-Type')) h.set('Content-Type', 'application/json');
-    if (!h.has('Authorization')) {
-        const t = getToken();
-        if (t) h.set('Authorization', `Bearer ${t}`);
-    }
     return h;
 }
 
@@ -100,7 +37,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     const data = text ? safeJson(text) : null;
 
     if (!res.ok) {
-        if (res.status === 401) clearAuth();
+        if (res.status === 401) emitAuthCleared();
         const message = (data && (data.error || data.message)) || `HTTP ${res.status}`;
         const err: any = new Error(message);
         err.status = res.status;
@@ -118,7 +55,7 @@ export interface RegisterRequest {
     dekNonce: string;
 }
 export interface LoginRequest { email: string; verifier: string; }
-export interface LoginResponse { accessToken: string; user: PublicUser; }
+export interface LoginResponse { user: PublicUser; }
 
 export interface VaultItem {
     id?: string;
@@ -164,12 +101,8 @@ export const api = {
         req<{ id: string }>(`/auth/register`, { method: 'POST', body: JSON.stringify(body) }),
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
-    loginAndStore: async (body: LoginRequest) => {
-        const data = await req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) });
-        setAuth(data.accessToken, data.user);
-        return data;
-    },
-    logout: () => { clearAuth(); },
+    logout: () => req<void>(`/auth/logout`, { method: 'POST' }),
+    currentUser: () => req<PublicUser>(`/auth/me`),
 
     listVault: () => req<VaultItem[]>(`/vault`),
     createVault: (body: Partial<VaultItem>) =>

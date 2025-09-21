@@ -9,7 +9,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
 
-import { api } from '../../lib/api';
+import { api, type PublicUser } from '../../lib/api';
 import { createAccountMaterial } from '../../lib/crypto/keys';
 import { makeVerifier, deriveKEK } from '../../lib/crypto/argon2';
 import { unwrapDEK } from '../../lib/crypto/unwrap';
@@ -17,7 +17,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useCrypto } from '../../lib/crypto/CryptoContext';
 
 type Mode = 'login' | 'signup';
-type Props = { onSuccess?: (token: string, user: any, mp: string) => void; fixedHeight?: boolean };
+type Props = { onSuccess?: (user: PublicUser, mp: string) => void; fixedHeight?: boolean };
 
 function scorePassword(p: string) {
     let s = 0;
@@ -67,13 +67,13 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                 const verifier = await makeVerifier(normalizedEmail, mp, saltClient);
                 const data = await api.login({ email: normalizedEmail, verifier });
 
-                login(data.accessToken, data.user);
+                login(data.user);
 
                 const kek = await deriveKEK(mp, data.user.saltClient);
                 const dek = await unwrapDEK(kek, data.user.dekEncrypted, data.user.dekNonce);
                 setDEK(dek);
 
-                onSuccess?.(data.accessToken, data.user, mp);
+                onSuccess?.(data.user, mp);
                 await Promise.resolve();
                 navigate('/dashboard', { replace: true });
             }

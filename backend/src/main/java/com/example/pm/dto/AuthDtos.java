@@ -45,7 +45,6 @@ public class AuthDtos {
     ) {}
 
     public record LoginResponse(
-            String accessToken,
             PublicUser user
     ) {}
 

@@ -8,10 +8,11 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { deriveKEK } from '../../lib/crypto/argon2';
 import { unwrapDEK } from '../../lib/crypto/unwrap';
 import { useCrypto } from '../../lib/crypto/CryptoContext';
-import { getProfile } from '../../lib/api';
+import { useAuth } from '../../auth/AuthContext';
 
 export default function UnlockDialog({ open }: { open: boolean }) {
     const { setDEK } = useCrypto();
+    const { user: authUser } = useAuth();
     const [mp, setMp] = useState('');
     const [show, setShow] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -22,16 +23,16 @@ export default function UnlockDialog({ open }: { open: boolean }) {
         setBusy(true);
         setErr(null);
 
-        const user = getProfile();
-        if (!user?.id) {
+        const profile = authUser;
+        if (!profile?.id) {
             setErr('Master password invalid');
             setBusy(false);
             return;
         }
 
         try {
-            const kek = await deriveKEK(mp, user.saltClient);
-            const dek = await unwrapDEK(kek, user.dekEncrypted, user.dekNonce);
+            const kek = await deriveKEK(mp, profile.saltClient);
+            const dek = await unwrapDEK(kek, profile.dekEncrypted, profile.dekNonce);
             setDEK(dek);
             setMp('');
         } catch {
