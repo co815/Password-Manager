@@ -55,33 +55,34 @@ export default function AuthProvider({children}: PropsWithChildren) {
     useEffect(() => {
         const onAuthCleared = () => {
             applyAuthCleared();
+        };
 
-            window.addEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
-            return () => {
-                window.removeEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
-            };
-        }, [applyAuthCleared]
-    )
-        ;
-        const login = useCallback((u: PublicUser) => {
-            setUser(u);
-            setLoading(false);
-        }, []);
+        window.addEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
 
-        const logout = useCallback(async () => {
-            try {
-                await api.logout();
-            } catch {
-            } finally {
-                applyAuthCleared();
-                window.location.href = '/';
-            }
-        }, [applyAuthCleared]);
-        const value = useMemo(
-            () => ({user, loading, login, logout, refresh}),
-            [user, loading, login, logout, refresh],
-        );
+        return () => {
+            window.removeEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
+        };
+    }, [applyAuthCleared]);
 
+    const login = useCallback((u: PublicUser) => {
+        setUser(u);
+        setLoading(false);
+    }, []);
 
-        return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-    }
+    const logout = useCallback(async () => {
+        try {
+            await api.logout();
+        } catch {
+        } finally {
+            applyAuthCleared();
+            window.location.href = '/';
+        }
+    }, [applyAuthCleared]);
+
+    const value = useMemo(
+        () => ({user, loading, login, logout, refresh}),
+        [user, loading, login, logout, refresh],
+    );
+
+    return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
