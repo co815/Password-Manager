@@ -40,23 +40,6 @@ public class AuthCookieProps {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Unknown SameSite mode: " + value));
         }
-
-        public static SameSiteMode from(String value) {
-            if (value == null) {
-                return STRICT;
-            }
-
-            String candidate = value.trim();
-            if (candidate.isEmpty()) {
-                return STRICT;
-            }
-
-            return Arrays.stream(values())
-                    .filter(mode -> mode.name().equalsIgnoreCase(candidate)
-                            || mode.attributeValue.equalsIgnoreCase(candidate))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Unknown SameSite mode: " + value));
-        }
     }
 
     private SameSiteMode sameSite = SameSiteMode.STRICT;

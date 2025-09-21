@@ -103,6 +103,7 @@ public class AuthController {
         builder.append("; HttpOnly");
         builder.append("; Secure");
 
+        String sameSite = authCookieProps.getSameSiteAttribute();
         if (sameSite != null && !sameSite.isBlank()) {
             builder.append("; SameSite=").append(sameSite);
         }
