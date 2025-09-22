@@ -12,7 +12,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -49,37 +48,11 @@ public class CredentialController {
     @PostMapping
     public ResponseEntity<?> addCredential(
             Authentication authentication,
-            @RequestBody Map<String, Object> body
+            @RequestBody @Valid CredentialDtos.AddCredentialRequest addRequest
     ) {
         return requireUser(authentication, userId -> {
-            String service = firstNonNull(
-                    asString(body.get("service")),
-                    asString(body.get("title"))
-            );
-            String websiteLink = firstNonNull(
-                    asString(body.get("websiteLink")),
-                    asString(body.get("url"))
-            );
-            String usernameEnc = firstNonNull(
-                    asString(body.get("usernameEncrypted")),
-                    asString(body.get("usernameCipher"))
-            );
-            String usernameNonce = asString(body.get("usernameNonce"));
-            String passwordEnc = firstNonNull(
-                    asString(body.get("passwordEncrypted")),
-                    asString(body.get("passwordCipher"))
-            );
-            String passwordNonce = asString(body.get("passwordNonce"));
-
-            if (isBlank(service) || isBlank(usernameEnc) || isBlank(usernameNonce)
-                    || isBlank(passwordEnc) || isBlank(passwordNonce)) {
-                return ResponseEntity.badRequest()
-                        .body(new ErrorResponse(400, "BAD_REQUEST",
-                                "Missing required fields (service/title, username*, password*)."));
-            }
-
             Optional<Credential> existingForService =
-                    credentials.findByUserIdAndService(userId, service);
+                    credentials.findByUserIdAndService(userId, addRequest.service());
 
             if (existingForService.isPresent()) {
                 return ResponseEntity.status(409)
@@ -87,14 +60,8 @@ public class CredentialController {
                                 "Credentials for this service already exist"));
             }
 
-            Credential c = new Credential();
+            Credential c = Credential.fromPostRequest(addRequest);
             c.setUserId(userId);
-            c.setService(service);
-            c.setWebsiteLink(websiteLink);
-            c.setUsernameEncrypted(usernameEnc);
-            c.setUsernameNonce(usernameNonce);
-            c.setPasswordEncrypted(passwordEnc);
-            c.setPasswordNonce(passwordNonce);
 
             credentials.save(c);
             return ResponseEntity.ok(PublicCredential.fromCredential(c));
@@ -136,18 +103,6 @@ public class CredentialController {
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(new ErrorResponse(404, "NOT_FOUND",
                                 "The Credentials you want to DELETE were not found!"))));
-    }
-
-    private static String asString(Object o) {
-        return (o instanceof String s) ? s : null;
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
-    }
-
-    private static String firstNonNull(String a, String b) {
-        return a != null ? a : b;
     }
 
     private Optional<String> resolveUserId(Authentication authentication) {

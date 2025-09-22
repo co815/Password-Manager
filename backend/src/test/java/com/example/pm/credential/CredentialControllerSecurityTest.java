@@ -1,8 +1,10 @@
 package com.example.pm.credential;
 
+import com.example.pm.dto.CredentialDtos;
 import com.example.pm.model.Credential;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.security.JwtService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,9 @@ class CredentialControllerSecurityTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @MockBean
     private CredentialRepository credentialRepository;
@@ -132,13 +137,14 @@ class CredentialControllerSecurityTest {
         mockMvc.perform(post("/api/credentials")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"service\":\"Email\"," +
-                                "\"websiteLink\":\"https://mail.example\"," +
-                                "\"usernameEncrypted\":\"usernameEnc\"," +
-                                "\"usernameNonce\":\"usernameNonce\"," +
-                                "\"passwordEncrypted\":\"passwordEnc\"," +
-                                "\"passwordNonce\":\"passwordNonce\"}")
+                        .content(createAddCredentialRequestJson(
+                                "Email",
+                                "https://mail.example",
+                                "usernameEnc",
+                                "usernameNonce",
+                                "passwordEnc",
+                                "passwordNonce"
+                        ))
                         .secure(true))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.service").value("Email"))
@@ -178,13 +184,14 @@ class CredentialControllerSecurityTest {
         mockMvc.perform(post("/api/credentials")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"service\":\"Email\"," +
-                                "\"websiteLink\":\"https://mail.example\"," +
-                                "\"usernameEncrypted\":\"usernameEnc\"," +
-                                "\"usernameNonce\":\"usernameNonce\"," +
-                                "\"passwordEncrypted\":\"passwordEnc\"," +
-                                "\"passwordNonce\":\"passwordNonce\"}")
+                        .content(createAddCredentialRequestJson(
+                                "Email",
+                                "https://mail.example",
+                                "usernameEnc",
+                                "usernameNonce",
+                                "passwordEnc",
+                                "passwordNonce"
+                        ))
                         .secure(true))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("CONFLICT"))
@@ -263,5 +270,22 @@ class CredentialControllerSecurityTest {
                 .andExpect(status().isNoContent());
 
         verify(credentialRepository).delete(argThat(saved -> "cred-1".equals(saved.getId())));
+    }
+
+    private String createAddCredentialRequestJson(String service,
+                                                  String websiteLink,
+                                                  String usernameEncrypted,
+                                                  String usernameNonce,
+                                                  String passwordEncrypted,
+                                                  String passwordNonce) throws Exception {
+        var request = new CredentialDtos.AddCredentialRequest(
+                service,
+                websiteLink,
+                usernameEncrypted,
+                usernameNonce,
+                passwordEncrypted,
+                passwordNonce
+        );
+        return objectMapper.writeValueAsString(request);
     }
 }

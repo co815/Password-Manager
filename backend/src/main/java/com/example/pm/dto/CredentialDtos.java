@@ -1,6 +1,9 @@
 package com.example.pm.dto;
 
 import com.example.pm.model.Credential;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;
 
@@ -30,22 +33,39 @@ public class CredentialDtos {
         }
     }
 
-    // Get credential
     public record GetAllCredentialResponse(
             List<PublicCredential> credentials
     ) {}
 
-    // Add new credential
     public record AddCredentialRequest(
+            @JsonProperty("service")
+            @JsonAlias("title")
+            @NotBlank
             String service,
+
+            @JsonProperty("websiteLink")
+            @JsonAlias("url")
             String websiteLink,
+
+            @JsonProperty("usernameEncrypted")
+            @JsonAlias("usernameCipher")
+            @NotBlank
             String usernameEncrypted,
+
+            @JsonProperty("usernameNonce")
+            @NotBlank
             String usernameNonce,
+
+            @JsonProperty("passwordEncrypted")
+            @JsonAlias("passwordCipher")
+            @NotBlank
             String passwordEncrypted,
+
+            @JsonProperty("passwordNonce")
+            @NotBlank
             String passwordNonce
     ) {}
 
-    // Update a credential
     public record UpdateCredentialRequest(
             String service,
             String websiteLink,
