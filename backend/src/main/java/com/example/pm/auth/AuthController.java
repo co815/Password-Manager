@@ -78,7 +78,7 @@ public class AuthController {
     }
 
     private ResponseCookie buildAccessTokenCookie(String value, Duration maxAge) {
-        ResponseCookie.Builder builder = ResponseCookie.from("accessToken", value != null ? value : "")
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("accessToken", value != null ? value : "")
                 .path("/")
                 .httpOnly(true)
                 .secure(true);

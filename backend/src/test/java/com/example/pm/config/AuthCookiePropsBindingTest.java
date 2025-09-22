@@ -3,7 +3,7 @@ package com.example.pm.config;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
-import org.springframework.boot.context.config.ConfigDataApplicationContextInitializer;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
