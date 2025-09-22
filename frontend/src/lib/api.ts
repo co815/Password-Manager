@@ -24,7 +24,15 @@ function mergeHeaders(init: RequestInit): Headers {
     return h;
 }
 
-async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+interface RequestOptions {
+    suppressAuthCleared?: boolean;
+}
+
+async function req<T>(
+    path: string,
+    init: RequestInit = {},
+    options: RequestOptions = {},
+): Promise<T> {
     const res = await fetch(`${API_ORIGIN}/api${path}`, {
         ...init,
         headers: mergeHeaders(init),
@@ -37,7 +45,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     const data = text ? safeJson(text) : null;
 
     if (!res.ok) {
-        if (res.status === 401) emitAuthCleared();
+        if (res.status === 401 && !options.suppressAuthCleared) emitAuthCleared();
         const message = (data && (data.error || data.message)) || `HTTP ${res.status}`;
         const err: any = new Error(message);
         err.status = res.status;
@@ -102,7 +110,7 @@ export const api = {
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
     logout: () => req<void>(`/auth/logout`, { method: 'POST' }),
-    currentUser: () => req<PublicUser>(`/auth/me`),
+    currentUser: () => req<PublicUser>(`/auth/me`, {}, { suppressAuthCleared: true }),
 
     listVault: () => req<VaultItem[]>(`/vault`),
     createVault: (body: Partial<VaultItem>) =>
