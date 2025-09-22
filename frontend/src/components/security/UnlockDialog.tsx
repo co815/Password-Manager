@@ -103,7 +103,9 @@ export default function UnlockDialog({ open }: { open: boolean }) {
 
             <DialogActions>
                 <Button
-                    onClick={onUnlock}
+                    onClick={() => {
+                        void onUnlock();
+                    }}
                     disabled={!mp || busy}
                     variant="contained"
                     sx={{ fontWeight: 800 }}

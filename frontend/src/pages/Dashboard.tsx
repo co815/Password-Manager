@@ -470,7 +470,9 @@ export default function Dashboard() {
                 <DialogActions sx={{px: 3, pb: 2}}>
                     <Button onClick={() => setOpenAdd(false)} disabled={busy}>Cancel</Button>
                     <Button
-                        onClick={handleAddSave}
+                        onClick={() => {
+                            void handleAddSave();
+                        }}
                         disabled={saveDisabled}
                         variant="contained"
                         sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
@@ -533,7 +535,9 @@ export default function Dashboard() {
                         Cancel
                     </Button>
                     <Button
-                        onClick={handleUnlock}
+                        onClick={() => {
+                            void handleUnlock();
+                        }}
                         disabled={!unlockPassword || unlockBusy}
                         variant="contained"
                         sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
