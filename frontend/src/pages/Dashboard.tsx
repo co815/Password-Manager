@@ -146,8 +146,9 @@ export default function Dashboard() {
 
                 setCredentials(decrypted);
                 setSelected(decrypted[0] ?? null);
-            } catch (err: any) {
-                setToast({type: "error", msg: err?.message || "Failed to load credentials"});
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Failed to load credentials';
+                setToast({type: 'error', msg: message || 'Failed to load credentials'});
             }
         })();
     }, [dek, user]);
@@ -212,8 +213,9 @@ export default function Dashboard() {
             setUrl('');
             setOpenAdd(false);
             setToast({type: 'success', msg: 'Saved to /api/credentials (encrypted).'});
-        } catch (e: any) {
-            setToast({type: 'error', msg: e?.message || 'Failed to save'});
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Failed to save';
+            setToast({type: 'error', msg: message || 'Failed to save'});
         } finally {
             setBusy(false);
         }

@@ -87,7 +87,9 @@ export default function CryptoProvider({
     useEffect(() => {
         if (!dek) return;
 
-        const reset = () => armTimer();
+        const reset: EventListener = () => {
+            armTimer();
+        };
         const events: (keyof WindowEventMap)[] = [
             'mousemove',
             'mousedown',
@@ -98,10 +100,10 @@ export default function CryptoProvider({
             'wheel',
             'click',
         ];
-        events.forEach((e) =>
-            window.addEventListener(e, reset, {
+        events.forEach((eventName) =>
+            window.addEventListener(eventName, reset, {
                 passive: true,
-            } as AddEventListenerOptions)
+            })
         );
 
         const onVisibilityChange = () => {
@@ -114,7 +116,7 @@ export default function CryptoProvider({
         armTimer();
 
         return () => {
-            events.forEach((e) => window.removeEventListener(e, reset as any));
+            events.forEach((eventName) => window.removeEventListener(eventName, reset));
             document.removeEventListener('visibilitychange', onVisibilityChange);
             window.removeEventListener('blur', onBlur);
             clearTimer();

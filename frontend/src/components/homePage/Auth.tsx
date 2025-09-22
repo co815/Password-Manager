@@ -77,8 +77,9 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                 await Promise.resolve();
                 navigate('/dashboard', { replace: true });
             }
-        } catch (e: any) {
-            setMsg({ type: 'error', text: e?.message || 'Something went wrong' });
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Something went wrong';
+            setMsg({ type: 'error', text: message || 'Something went wrong' });
         } finally {
             setBusy(false);
         }

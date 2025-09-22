@@ -24,12 +24,11 @@ type AuthCtx = {
 const Ctx = createContext<AuthCtx>({
     user: null,
     loading: true,
-    login: (_user: PublicUser) => {
+    login: () => {
+        throw new Error('AuthContext login called outside of provider');
     },
-    logout: async () => {
-    },
-    refresh: async () => {
-    },
+    logout: () => Promise.resolve(),
+    refresh: () => Promise.resolve(),
 });
 
 export const useAuth = () => useContext(Ctx);
@@ -94,7 +93,10 @@ export default function AuthProvider({children}: PropsWithChildren) {
     const logout = useCallback(async () => {
         try {
             await api.logout();
-        } catch {
+        } catch (error) {
+            if (import.meta.env.DEV) {
+                console.error('Failed to logout user', error);
+            }
         } finally {
             applyAuthCleared();
             window.location.href = '/';

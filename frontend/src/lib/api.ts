@@ -28,6 +28,18 @@ interface RequestOptions {
     suppressAuthCleared?: boolean;
 }
 
+export class ApiError extends Error {
+    status: number;
+    data: unknown;
+
+    constructor(message: string, status: number, data: unknown) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.data = data;
+    }
+}
+
 async function req<T>(
     path: string,
     init: RequestInit = {},
@@ -46,11 +58,8 @@ async function req<T>(
 
     if (!res.ok) {
         if (res.status === 401 && !options.suppressAuthCleared) emitAuthCleared();
-        const message = (data && (data.error || data.message)) || `HTTP ${res.status}`;
-        const err: any = new Error(message);
-        err.status = res.status;
-        err.data = data;
-        throw err;
+        const message = (data && (data.error || (data as { message?: string }).message)) || `HTTP ${res.status}`;
+        throw new ApiError(message, res.status, data);
     }
     return data as T;
 }
