@@ -6,6 +6,10 @@ import ProtectedRoute from './auth/ProtectedRoute';
 import CryptoGuard from './components/security/CryptoGuard';
 import LockButton from './components/security/LockButton';
 
+function NotFound() {
+    return <div>404: Page not found</div>;
+}
+
 function GlobalChrome() {
     const { pathname } = useLocation();
     return (
@@ -26,7 +30,7 @@ export default function App() {
                     <Route element={<ProtectedRoute />}>
                         <Route path="/dashboard" element={<Dashboard />} />
                     </Route>
-                    <Route path="*" element={<Home />} />
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
             </Container>
         </Router>
