@@ -261,12 +261,14 @@ export default function Dashboard() {
                         placeholder="Search"
                         size="small"
                         sx={{maxWidth: 420}}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <Search fontSize="small"/>
-                                </InputAdornment>
-                            ),
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search fontSize="small"/>
+                                    </InputAdornment>
+                                ),
+                            },
                         }}
                     />
                     <Box display="flex" alignItems="center" gap={2}>
@@ -441,14 +443,16 @@ export default function Dashboard() {
                                 fullWidth
                                 size="small"
                                 type={showPwd ? 'text' : 'password'}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <IconButton onClick={() => setShowPwd((s) => !s)} edge="end">
-                                                {showPwd ? <VisibilityOff/> : <Visibility/>}
-                                            </IconButton>
-                                        </InputAdornment>
-                                    ),
+                                slotProps={{
+                                    input: {
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton onClick={() => setShowPwd((s) => !s)} edge="end">
+                                                    {showPwd ? <VisibilityOff/> : <Visibility/>}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    },
                                 }}
                             />
                             <LinearProgress
@@ -516,17 +520,19 @@ export default function Dashboard() {
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') handleUnlock();
                         }}
-                        InputProps={{
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <IconButton
-                                        onClick={() => setShowUnlockPwd(!showUnlockPwd)}
-                                        edge="end"
-                                    >
-                                        {showUnlockPwd ? <VisibilityOff/> : <Visibility/>}
-                                    </IconButton>
-                                </InputAdornment>
-                            ),
+                        slotProps={{
+                            input: {
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            onClick={() => setShowUnlockPwd(!showUnlockPwd)}
+                                            edge="end"
+                                        >
+                                            {showUnlockPwd ? <VisibilityOff/> : <Visibility/>}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            },
                         }}
                     />
                 </DialogContent>
