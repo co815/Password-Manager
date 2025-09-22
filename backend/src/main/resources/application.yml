@@ -16,6 +16,9 @@ spring:
       database: pm
 
 app:
+  auth:
+    cookie:
+      same-site: none
   jwt:
     secret: ${APP_JWT_SECRET}
     expiryMinutes: 15
@@ -23,7 +26,3 @@ app:
     origins:
       - http://localhost:5173
       - https://localhost:5173
-
-auth:
-  cookie:
-    same-site: none
