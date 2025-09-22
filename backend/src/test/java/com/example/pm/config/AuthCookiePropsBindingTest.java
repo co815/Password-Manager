@@ -7,7 +7,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.support.TestPropertySourceUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,8 +14,7 @@ class AuthCookiePropsBindingTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
-            .withInitializer(context -> TestPropertySourceUtils
-                    .addPropertiesFilesToEnvironment(context, "classpath:application.yml"))
+            .withPropertyValues("app.auth.cookie.same-site=none")
             .withUserConfiguration(TestConfig.class);
 
     @Test
