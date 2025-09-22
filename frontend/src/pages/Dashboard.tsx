@@ -230,12 +230,14 @@ export default function Dashboard() {
             <Drawer
                 variant="permanent"
                 anchor="left"
-                PaperProps={{
-                    sx: {
-                        width: 260,
-                        borderRight: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: 'background.paper',
+                slotProps={{
+                    paper: {
+                        sx: {
+                            width: 260,
+                            borderRight: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper',
+                        },
                     },
                 }}
             >
@@ -412,8 +414,10 @@ export default function Dashboard() {
                 onClose={() => (!busy ? setOpenAdd(false) : undefined)}
                 fullWidth
                 maxWidth="sm"
-                slotProps={{backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}}}}
-                PaperProps={{sx: {borderRadius: 4, backgroundImage: 'none'}}}
+                slotProps={{
+                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
+                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                }}
             >
                 <DialogTitle sx={{fontWeight: 800}}>Add credential</DialogTitle>
                 <DialogContent>
@@ -499,8 +503,10 @@ export default function Dashboard() {
                 onClose={() => setShowUnlockForAdd(false)}
                 fullWidth
                 maxWidth="xs"
-                slotProps={{backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}}}}
-                PaperProps={{sx: {borderRadius: 4, backgroundImage: 'none'}}}
+                slotProps={{
+                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
+                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                }}
             >
                 <DialogTitle sx={{fontWeight: 800}}>Unlock Vault to Add Credential</DialogTitle>
                 <DialogContent>
