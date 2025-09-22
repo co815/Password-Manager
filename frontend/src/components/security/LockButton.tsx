@@ -1,6 +1,6 @@
 import { IconButton, Tooltip } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
-import { useCrypto } from '../../lib/crypto/CryptoContext';
+import { useCrypto } from '../../lib/crypto/crypto-context';
 
 export default function LockButton() {
     const { lockNow } = useCrypto();

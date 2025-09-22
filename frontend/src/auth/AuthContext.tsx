@@ -1,37 +1,8 @@
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
-import type {PropsWithChildren} from 'react';
-import {AUTH_CLEARED_EVENT, api} from '../lib/api';
-import type {PublicUser} from '../lib/api';
-
-export type AuthUser = PublicUser | null;
-
-type AuthCtx = {
-    user: AuthUser;
-    loading: boolean;
-    login: (user: PublicUser) => void;
-    logout: () => Promise<void>;
-    refresh: () => Promise<void>;
-};
-
-const Ctx = createContext<AuthCtx>({
-    user: null,
-    loading: true,
-    login: () => {
-        throw new Error('AuthContext login called outside of provider');
-    },
-    logout: () => Promise.resolve(),
-    refresh: () => Promise.resolve(),
-});
-
-export const useAuth = () => useContext(Ctx);
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PropsWithChildren } from 'react';
+import { AUTH_CLEARED_EVENT, api } from '../lib/api';
+import type { PublicUser } from '../lib/api';
+import { AuthContext, type AuthContextValue, type AuthUser } from './auth-context';
 
 export default function AuthProvider({children}: PropsWithChildren) {
     const [user, setUser] = useState<AuthUser>(null);
@@ -103,10 +74,10 @@ export default function AuthProvider({children}: PropsWithChildren) {
         }
     }, [applyAuthCleared]);
 
-    const value = useMemo(
+    const value = useMemo<AuthContextValue>(
         () => ({user, loading, login, logout, refresh}),
         [user, loading, login, logout, refresh],
     );
 
-    return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

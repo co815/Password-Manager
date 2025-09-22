@@ -13,8 +13,8 @@ import { api, type PublicUser } from '../../lib/api';
 import { createAccountMaterial } from '../../lib/crypto/keys';
 import { makeVerifier, deriveKEK } from '../../lib/crypto/argon2';
 import { unwrapDEK } from '../../lib/crypto/unwrap';
-import { useAuth } from '../../auth/AuthContext';
-import { useCrypto } from '../../lib/crypto/CryptoContext';
+import { useAuth } from '../../auth/auth-context';
+import { useCrypto } from '../../lib/crypto/crypto-context';
 
 type Mode = 'login' | 'signup';
 type Props = { onSuccess?: (user: PublicUser, mp: string) => void; fixedHeight?: boolean };

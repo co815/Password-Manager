@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
-import { useAuth } from '../../auth/AuthContext';
-import { useCrypto } from '../../lib/crypto/CryptoContext';
+import { useAuth } from '../../auth/auth-context';
+import { useCrypto } from '../../lib/crypto/crypto-context';
 import UnlockDialog from './UnlockDialog';
 
 export default function CryptoGuard() {

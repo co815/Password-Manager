@@ -1,34 +1,10 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
-
-type Ctx = {
-    dek: CryptoKey | null;
-    locked: boolean;
-    hadDek: boolean;
-    setDEK: (k: CryptoKey | null) => void;
-    lockNow: () => void;
-    disarm: () => void;
-};
-
-const CryptoCtx = createContext<Ctx>({
-    dek: null,
-    locked: true,
-    hadDek: false,
-    setDEK: () => {},
-    lockNow: () => {},
-    disarm: () => {},
-});
-export const useCrypto = () => useContext(CryptoCtx);
-
-const DEFAULT_IDLE_MS = Number(import.meta.env.VITE_IDLE_MS ?? 10 * 60 * 1000);
-const HAD_DEK_FLAG = 'pm-had-dek';
+    CryptoContext,
+    DEFAULT_IDLE_MS,
+    HAD_DEK_FLAG,
+    type CryptoContextValue,
+} from './crypto-context';
 
 export default function CryptoProvider({
                                            children,
@@ -123,7 +99,7 @@ export default function CryptoProvider({
         };
     }, [dek, armTimer, clearTimer]);
 
-    const value = useMemo(
+    const value = useMemo<CryptoContextValue>(
         () => ({
             dek,
             locked,
@@ -135,5 +111,5 @@ export default function CryptoProvider({
         [dek, locked, hadDek, setDEK, lockNow, disarm]
     );
 
-    return <CryptoCtx.Provider value={value}>{children}</CryptoCtx.Provider>;
+    return <CryptoContext.Provider value={value}>{children}</CryptoContext.Provider>;
 }

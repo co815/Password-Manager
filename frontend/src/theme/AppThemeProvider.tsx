@@ -1,21 +1,15 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { createTheme, responsiveFontSizes, ThemeProvider } from '@mui/material/styles';
 import type { PaletteMode, ThemeOptions } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 
-type TColorMode = { mode: PaletteMode; toggle: () => void };
-const ColorModeCtx = createContext<TColorMode>({ mode: 'light', toggle: () => {} });
-export const useColorMode = () => useContext(ColorModeCtx);
-
-const STORAGE_KEY = 'pm-ui-mode';
-
-function getInitialMode(): PaletteMode {
-    if (typeof window === 'undefined') return 'light';
-    const saved = localStorage.getItem(STORAGE_KEY) as PaletteMode | null;
-    if (saved === 'light' || saved === 'dark') return saved;
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
+import {
+    ColorModeContext,
+    getInitialMode,
+    STORAGE_KEY,
+    type ColorModeContextValue,
+} from './color-mode-context';
 
 function getDesignTokens(mode: PaletteMode): ThemeOptions {
     const isDark = mode === 'dark';
@@ -86,17 +80,17 @@ export default function AppThemeProvider({ children }: PropsWithChildren) {
         [mode]
     );
 
-    const value = useMemo<TColorMode>(
+    const value = useMemo<ColorModeContextValue>(
         () => ({ mode, toggle: () => setMode(m => (m === 'light' ? 'dark' : 'light')) }),
         [mode]
     );
 
     return (
-        <ColorModeCtx.Provider value={value}>
+        <ColorModeContext.Provider value={value}>
             <ThemeProvider theme={theme}>
                 <CssBaseline />
                 {children}
             </ThemeProvider>
-        </ColorModeCtx.Provider>
+        </ColorModeContext.Provider>
     );
 }

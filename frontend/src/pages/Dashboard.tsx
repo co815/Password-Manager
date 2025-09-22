@@ -1,6 +1,6 @@
 import {useMemo, useState, useEffect} from 'react';
-import {useAuth} from '../auth/AuthContext';
-import {useCrypto} from '../lib/crypto/CryptoContext';
+import {useAuth} from '../auth/auth-context';
+import {useCrypto} from '../lib/crypto/crypto-context';
 import {api, type PublicCredential} from '../lib/api';
 import Alert from '@mui/material/Alert';
 import {deriveKEK} from '../lib/crypto/argon2';

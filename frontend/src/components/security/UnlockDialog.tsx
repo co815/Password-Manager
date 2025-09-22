@@ -7,8 +7,8 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { deriveKEK } from '../../lib/crypto/argon2';
 import { unwrapDEK } from '../../lib/crypto/unwrap';
-import { useCrypto } from '../../lib/crypto/CryptoContext';
-import { useAuth } from '../../auth/AuthContext';
+import { useCrypto } from '../../lib/crypto/crypto-context';
+import { useAuth } from '../../auth/auth-context';
 
 export default function UnlockDialog({ open }: { open: boolean }) {
     const { setDEK } = useCrypto();

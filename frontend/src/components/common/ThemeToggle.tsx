@@ -1,8 +1,7 @@
-// src/components/common/ThemeToggle.tsx
 import { IconButton, Tooltip, useTheme } from '@mui/material';
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
-import { useColorMode } from '../../theme/AppThemeProvider';
+import { useColorMode } from '../../theme/color-mode-context';
 
 export default function ThemeToggle() {
     const { toggle } = useColorMode();
