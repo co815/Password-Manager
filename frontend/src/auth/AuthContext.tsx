@@ -1,4 +1,12 @@
-import {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import type {PropsWithChildren} from 'react';
 import {AUTH_CLEARED_EVENT, api} from '../lib/api';
 import type {PublicUser} from '../lib/api';
@@ -29,22 +37,35 @@ export const useAuth = () => useContext(Ctx);
 export default function AuthProvider({children}: PropsWithChildren) {
     const [user, setUser] = useState<AuthUser>(null);
     const [loading, setLoading] = useState(true);
+    const refreshEpochRef = useRef(0);
 
     const applyAuthCleared = useCallback(() => {
+        refreshEpochRef.current += 1;
         setUser(null);
         setLoading(false);
         sessionStorage.removeItem('pm-had-dek');
     }, []);
 
     const refresh = useCallback(async () => {
-        try {
+        const token = ++refreshEpochRef.current;
+        const isLatest = () => refreshEpochRef.current === token;
+
+        if (isLatest()) {
             setLoading(true);
+        }
+        try {
             const profile = await api.currentUser();
-            setUser(profile);
+            if (isLatest()) {
+                setUser(profile);
+            }
         } catch {
-            setUser(null);
+            if (isLatest()) {
+                setUser(null);
+            }
         } finally {
-            setLoading(false);
+            if (isLatest()) {
+                setLoading(false);
+            }
         }
     }, []);
 
@@ -65,6 +86,7 @@ export default function AuthProvider({children}: PropsWithChildren) {
     }, [applyAuthCleared]);
 
     const login = useCallback((u: PublicUser) => {
+        refreshEpochRef.current += 1;
         setUser(u);
         setLoading(false);
     }, []);
