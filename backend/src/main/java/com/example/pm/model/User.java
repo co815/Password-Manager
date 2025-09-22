@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.Locale;
 
 @Data @Builder @AllArgsConstructor @NoArgsConstructor
 @Document("users")
@@ -19,7 +20,7 @@ public class User {
 
     @Indexed(unique = true) @NotBlank @Email
     private String email;
-    @NotBlank @Size(min = 4)
+    @Indexed(unique = true) @NotBlank @Size(min = 4)
     private String username;
 
     private String verifier;
@@ -30,9 +31,12 @@ public class User {
     private Instant createdAt;
 
     public static User fromRegisterRequest(AuthDtos.RegisterRequest req) {
+        String normalizedEmail = req.email() != null ? req.email().trim().toLowerCase(Locale.ROOT) : null;
+        String normalizedUsername = req.username() != null ? req.username().trim() : null;
+
         return User.builder()
-                .email(req.email())
-                .username(req.username())
+                .email(normalizedEmail)
+                .username(normalizedUsername)
                 .verifier(req.verifier())
                 .saltClient(req.saltClient())
                 .dekEncrypted(req.dekEncrypted())

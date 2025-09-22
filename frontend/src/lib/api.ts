@@ -75,6 +75,7 @@ export interface RegisterRequest {
 }
 export interface LoginRequest { email: string; verifier: string; }
 export interface LoginResponse { user: PublicUser; }
+export interface SaltResponse { email: string; saltClient: string; }
 
 export interface VaultItem {
     id?: string;
@@ -114,8 +115,8 @@ export type GetAllCredentialResponse = {
 export const api = {
     health: () => req<{ ok: boolean }>(`/health`),
 
-    getSalt: (email: string) =>
-        req<{ saltClient: string }>(`/auth/salt?email=${encodeURIComponent(email)}`),
+    getSalt: (identifier: string) =>
+        req<SaltResponse>(`/auth/salt?identifier=${encodeURIComponent(identifier)}`),
     register: (body: RegisterRequest) =>
         req<{ id: string }>(`/auth/register`, { method: 'POST', body: JSON.stringify(body) }),
     login: (body: LoginRequest) =>

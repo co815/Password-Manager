@@ -2,7 +2,7 @@ server:
   port: 8443
   ssl:
     key-store: classpath:pass-man-keystore.p12
-    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:password}
     key-store-type: PKCS12
     key-alias: PasswordManager
     enabled-protocols: TLSv1.3
@@ -20,7 +20,7 @@ app:
     cookie:
       same-site: none
   jwt:
-    secret: ${APP_JWT_SECRET}
+    secret: ${APP_JWT_SECRET:dev-secret-please-change}
     expiryMinutes: 15
   cors:
     origins:

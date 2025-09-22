@@ -50,6 +50,7 @@ public class AuthDtos {
     ) {}
 
     public record SaltResponse(
+            String email,
             String saltClient
     ) {}
 

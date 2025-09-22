@@ -32,7 +32,7 @@ function scorePassword(p: string) {
 
 export default function Auth({ onSuccess, fixedHeight }: Props) {
     const [mode, setMode] = useState<Mode>('login');
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [username, setUsername] = useState('');
     const [mp, setMp] = useState('');
     const [mp2, setMp2] = useState('');
@@ -45,21 +45,25 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
     const navigate = useNavigate();
 
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
+    const trimmedIdentifier = identifier.trim();
     const trimmedUsername = username.trim();
     const usernameError = mode === 'signup' && !!username && trimmedUsername.length < 4;
     const disabled = busy
-        || !email
+        || !trimmedIdentifier
         || !mp
         || (mode === 'signup' && (trimmedUsername.length < 4 || mp !== mp2));
+    const identifierLabel = mode === 'login' ? 'Email or Username *' : 'Email *';
+    const identifierType = mode === 'login' ? 'text' : 'email';
     const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
     async function handleSubmit() {
         setMsg(null);
         setBusy(true);
         try {
-            const normalizedEmail = email.trim().toLowerCase();
+            const trimmedInput = identifier.trim();
 
             if (mode === 'signup') {
+                const normalizedEmail = trimmedInput.toLowerCase();
                 const { saltClient, dekEncrypted, dekNonce } = await createAccountMaterial(mp);
                 const verifier = await makeVerifier(normalizedEmail, mp, saltClient);
                 const normalizedUsername = username.trim();
@@ -79,9 +83,9 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
             } else {
                 disarm();
 
-                const { saltClient } = await api.getSalt(normalizedEmail);
-                const verifier = await makeVerifier(normalizedEmail, mp, saltClient);
-                const data = await api.login({ email: normalizedEmail, verifier });
+                const { saltClient, email: canonicalEmail } = await api.getSalt(trimmedInput);
+                const verifier = await makeVerifier(canonicalEmail, mp, saltClient);
+                const data = await api.login({ email: canonicalEmail, verifier });
 
                 login(data.user);
 
@@ -127,19 +131,19 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
 
             <Stack spacing={2} sx={{ minHeight: fixedHeight ? 340 : 'auto' }}>
                 <FormControl fullWidth variant="outlined">
-                    <InputLabel htmlFor="email">Email *</InputLabel>
+                    <InputLabel htmlFor="identifier">{identifierLabel}</InputLabel>
                     <OutlinedInput
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        id="identifier"
+                        type={identifierType}
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
                         onKeyDown={submitOnEnter}
                         startAdornment={
                             <InputAdornment position="start">
                                 <EmailOutlined fontSize="small" />
                             </InputAdornment>
                         }
-                        label="Email *"
+                        label={identifierLabel}
                     />
                 </FormControl>
 
