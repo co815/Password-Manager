@@ -293,7 +293,7 @@ export default function Dashboard() {
                                     return (
                                         <ListItemButton
                                             key={credential.id}
-                                            selected={!!active}
+                                            selected={active}
                                             onClick={() => setSelected(credential)}
                                             sx={{
                                                 '&.Mui-selected': {
