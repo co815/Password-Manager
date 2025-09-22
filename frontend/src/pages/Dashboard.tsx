@@ -119,7 +119,7 @@ export default function Dashboard() {
             console.log("Calling /api/credentials");
             try {
                 console.log("trying to fetch credentials");
-                const {credentials: encCreds}: {credentials: PublicCredential[]} =
+                const {credentials: encCreds}: { credentials: PublicCredential[] } =
                     await api.fetchCredentials();
 
                 const decrypted: Credential[] = [];
@@ -180,9 +180,13 @@ export default function Dashboard() {
     };
 
     async function handleAddSave() {
+        if (!dek) {
+            setToast({type: 'error', msg: 'Session not ready. Unlock vault and try again.'});
+            return;
+        }
+
+        setBusy(true);
         try {
-            if (!dek) throw new Error('Session not ready. Unlock vault and try again.');
-            setBusy(true);
 
             const {cipher: usernameCipher, nonce: usernameNonce} = await encryptField(dek, username);
             const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, password);
@@ -266,7 +270,9 @@ export default function Dashboard() {
                         }}
                     />
                     <Box display="flex" alignItems="center" gap={2}>
-                        <Button onClick={() => { void logout(); }} variant="outlined" size="small">
+                        <Button onClick={() => {
+                            void logout();
+                        }} variant="outlined" size="small">
                             Log out
                         </Button>
                         <Avatar alt={user?.email ?? 'User'} src="/avatar.png"/>
@@ -310,7 +316,8 @@ export default function Dashboard() {
                     <Card sx={{minHeight: 420}}>
                         <CardContent>
                             {locked ? (
-                                <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight={360} textAlign="center" gap={1}>
+                                <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center"
+                                     minHeight={360} textAlign="center" gap={1}>
                                     <Typography variant="h6" fontWeight={700}>Vault locked</Typography>
                                     <Typography variant="body2" color="text.secondary">
                                         Unlock your vault to view credential details.
