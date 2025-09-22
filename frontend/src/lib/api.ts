@@ -4,6 +4,7 @@ const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
 export interface PublicUser {
     id: string;
     email: string;
+    username: string;
     saltClient: string;
     dekEncrypted: string;
     dekNonce: string;
@@ -66,6 +67,7 @@ async function req<T>(
 
 export interface RegisterRequest {
     email: string;
+    username: string;
     verifier: string;
     saltClient: string;
     dekEncrypted: string;

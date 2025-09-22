@@ -28,6 +28,7 @@ class AuthControllerTest {
         User user = new User();
         user.setId("user-1");
         user.setEmail("user@example.com");
+        user.setUsername("user-name");
         user.setVerifier("verifier");
         user.setSaltClient("salt");
         user.setDekEncrypted("dek");

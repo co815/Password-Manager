@@ -17,22 +17,22 @@ import java.time.Instant;
 public class User {
     @Id private String id;
 
-    @Indexed(unique = true) @NotBlank @Email   // ensures the string is a well-formed address
+    @Indexed(unique = true) @NotBlank @Email
     private String email;
     @NotBlank @Size(min = 4)
     private String username;
 
-    private String verifier;            // hashed password from frontend
-    private String saltClient;          // client-generated salt
-    private String dekEncrypted;        // encrypted data encryption key
+    private String verifier;
+    private String saltClient;
+    private String dekEncrypted;
     private String dekNonce;
-    // nonce for DEK
-    @CreatedDate                // sets the creation data automatically (needs the "@EnableMongoAuditing" from MongoConfig.java class)
-    private Instant createdAt;        // the date when the object was created
+    @CreatedDate
+    private Instant createdAt;
 
     public static User fromRegisterRequest(AuthDtos.RegisterRequest req) {
         return User.builder()
                 .email(req.email())
+                .username(req.username())
                 .verifier(req.verifier())
                 .saltClient(req.saltClient())
                 .dekEncrypted(req.dekEncrypted())

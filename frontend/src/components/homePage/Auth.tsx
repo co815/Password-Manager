@@ -4,6 +4,7 @@ import {
     LinearProgress, FormControl, InputLabel, OutlinedInput, InputAdornment, FormHelperText,
 } from '@mui/material';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
+import PersonOutline from '@mui/icons-material/PersonOutline';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -32,6 +33,7 @@ function scorePassword(p: string) {
 export default function Auth({ onSuccess, fixedHeight }: Props) {
     const [mode, setMode] = useState<Mode>('login');
     const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [mp, setMp] = useState('');
     const [mp2, setMp2] = useState('');
     const [show, setShow] = useState(false);
@@ -43,7 +45,12 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
     const navigate = useNavigate();
 
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
-    const disabled = busy || !email || !mp || (mode === 'signup' && mp !== mp2);
+    const trimmedUsername = username.trim();
+    const usernameError = mode === 'signup' && !!username && trimmedUsername.length < 4;
+    const disabled = busy
+        || !email
+        || !mp
+        || (mode === 'signup' && (trimmedUsername.length < 4 || mp !== mp2));
     const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
     async function handleSubmit() {
@@ -55,9 +62,18 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
             if (mode === 'signup') {
                 const { saltClient, dekEncrypted, dekNonce } = await createAccountMaterial(mp);
                 const verifier = await makeVerifier(normalizedEmail, mp, saltClient);
-                await api.register({ email: normalizedEmail, verifier, saltClient, dekEncrypted, dekNonce });
+                const normalizedUsername = username.trim();
+                await api.register({
+                    email: normalizedEmail,
+                    username: normalizedUsername,
+                    verifier,
+                    saltClient,
+                    dekEncrypted,
+                    dekNonce,
+                });
                 setMsg({ type: 'success', text: 'Account created. You can log in now.' });
                 setMode('login');
+                setUsername('');
                 setMp('');
                 setMp2('');
             } else {
@@ -126,6 +142,36 @@ export default function Auth({ onSuccess, fixedHeight }: Props) {
                         label="Email *"
                     />
                 </FormControl>
+
+                {mode === 'signup' ? (
+                    <FormControl fullWidth variant="outlined" error={usernameError}>
+                        <InputLabel htmlFor="username">Username *</InputLabel>
+                        <OutlinedInput
+                            id="username"
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            onKeyDown={submitOnEnter}
+                            startAdornment={
+                                <InputAdornment position="start">
+                                    <PersonOutline fontSize="small" />
+                                </InputAdornment>
+                            }
+                            label="Username *"
+                        />
+                        <FormHelperText>
+                            {usernameError ? 'Username must be at least 4 characters long' : ' '}
+                        </FormHelperText>
+                    </FormControl>
+                ) : (
+                    fixedHeight && (
+                        <FormControl fullWidth variant="outlined" sx={{ opacity: 0 }}>
+                            <InputLabel htmlFor="username-hidden">Username *</InputLabel>
+                            <OutlinedInput id="username-hidden" label="Username *" />
+                            <FormHelperText> </FormHelperText>
+                        </FormControl>
+                    )
+                )}
 
                 <FormControl fullWidth variant="outlined">
                     <InputLabel htmlFor="password">Password *</InputLabel>
