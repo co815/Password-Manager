@@ -92,6 +92,22 @@ export default function Dashboard() {
     const [deleteBusy, setDeleteBusy] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<Credential | null>(null);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+    const [avatarError, setAvatarError] = useState(false);
+
+    const avatarInitials = useMemo(() => {
+        const email = user?.email ?? '';
+        if (!email) return 'U';
+        const [localPart] = email.split('@');
+        if (!localPart) return email.slice(0, 2).toUpperCase();
+        const segments = localPart.split(/[.\-_]/).filter(Boolean);
+        if (segments.length === 0) {
+            return localPart.slice(0, 2).toUpperCase();
+        }
+        if (segments.length === 1) {
+            return segments[0].slice(0, 2).toUpperCase();
+        }
+        return `${segments[0][0] ?? ''}${segments[segments.length - 1][0] ?? ''}`.toUpperCase();
+    }, [user?.email]);
 
     const pwdScore = useMemo(() => scorePassword(password), [password]);
     const saveDisabled = busy || !title.trim() || !username.trim() || !password;
@@ -168,6 +184,10 @@ export default function Dashboard() {
             }
         })();
     }, [dek, user]);
+
+    useEffect(() => {
+        setAvatarError(false);
+    }, [user?.email]);
 
     const resetFormFields = () => {
         setTitle('');
@@ -427,7 +447,13 @@ export default function Dashboard() {
                         }} variant="outlined" size="small">
                             Log out
                         </Button>
-                        <Avatar alt={user?.email ?? 'User'} src="/avatar.png"/>
+                        <Avatar
+                            alt={user?.email ?? 'User'}
+                            src={avatarError ? undefined : '/avatar.png'}
+                            slotProps={{ img: { onError: () => setAvatarError(true) } }}
+                        >
+                            {avatarInitials}
+                        </Avatar>
                         <Typography variant="body2">{user?.email ?? 'No user email found'}</Typography>
                     </Box>
                 </Box>
