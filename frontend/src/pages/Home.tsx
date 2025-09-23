@@ -1,8 +1,5 @@
 import { useState } from 'react';
 import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-
-import Info from '../components/homePage/Info';
 
 import LoginCard from '../components/homePage/LoginCard';
 import SignupCard from '../components/homePage/SignupCard';
@@ -47,20 +44,26 @@ export default function Home() {
                 }}
             />
 
-            <Paper
-                elevation={8}
+            <Box
                 sx={(theme) => ({
                     position: 'relative',
                     width: '100%',
-                    maxWidth: { xs: 520, md: 1100 },
-                    minWidth: { md: 850 },
-                    height: { xs: 'auto', md: 560 },
+                    maxWidth: { xs: 520, md: 560 },
+                    minHeight: { xs: 'auto', md: 560 },
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    px: { xs: 2.5, sm: 4 },
+                    py: { xs: 2.5, sm: 4, md: 5 },
                     borderRadius: 4,
                     overflow: 'hidden',
-                    backdropFilter: 'blur(4px)',
-                    border: '1px solid rgba(255,255,255,.5)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255,255,255,.35)',
                     boxShadow: '0 10px 40px rgba(31,41,55,.10)',
-                    transition: 'max-width .3s ease, height .3s ease',
+                    background:
+                        theme.palette.mode === 'dark'
+                            ? 'linear-gradient(135deg, rgba(15,23,42,0.86) 0%, rgba(30,41,59,0.78) 100%)'
+                            : 'linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(224,242,254,0.88) 100%)',
                     '&::after': {
                         content: '""',
                         position: 'absolute',
@@ -69,50 +72,24 @@ export default function Home() {
                         background:
                             theme.palette.mode === 'dark'
                                 ? 'radial-gradient(90% 80% at 80% 18%, rgba(99,102,241,0.22), transparent 62%)'
-                                : 'radial-gradient(90% 80% at 82% 20%, rgba(99,102,241,0.14), transparent 62%)',
-                        mixBlendMode: theme.palette.mode === 'dark' ? 'screen' : 'normal',
+                                : 'radial-gradient(90% 80% at 82% 20%, rgba(99,102,241,0.12), transparent 62%)',
+                        mixBlendMode: theme.palette.mode === 'dark' ? 'screen' : 'multiply',
+                        opacity: theme.palette.mode === 'dark' ? 1 : 0.85,
                         zIndex: 0,
                     },
                     '& > *': {
                         position: 'relative',
                         zIndex: 1,
+                        width: '100%',
                     },
                 })}
             >
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                        alignItems: 'stretch',
-                        rowGap: { xs: 3, md: 0 },
-                        '& > .col': {
-                            p: { xs: 4, md: 5 },
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            height: '100%',
-                        },
-                    }}
-                >
-                    <Box
-                        className="col"
-                        sx={{
-                            background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)',
-                            color: '#fff',
-                        }}
-                    >
-                        <Info />
-                    </Box>
-
-                    <Box className="col">
-                        {mode === 'login' ? (
-                            <LoginCard onSwitchToSignup={() => setMode('signup')} />
-                        ) : (
-                            <SignupCard onSwitchToLogin={() => setMode('login')} />
-                        )}
-                    </Box>
-                </Box>
-            </Paper>
+                {mode === 'login' ? (
+                    <LoginCard onSwitchToSignup={() => setMode('signup')} />
+                ) : (
+                    <SignupCard onSwitchToLogin={() => setMode('login')} />
+                )}
+            </Box>
         </Box>
     );
 }
