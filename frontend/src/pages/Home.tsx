@@ -1,10 +1,18 @@
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
+
 import Info from '../components/homePage/Info';
-import Auth from '../components/homePage/Auth';
+
+import LoginCard from '../components/homePage/LoginCard';
+import SignupCard from '../components/homePage/SignupCard';
 import ThemeToggle from '../components/common/ThemeToggle';
 
+type Mode = 'login' | 'signup';
+
 export default function Home() {
+    const [mode, setMode] = useState<Mode>('login');
+
     return (
         <Box
             sx={(theme) => ({
@@ -97,7 +105,11 @@ export default function Home() {
                     </Box>
 
                     <Box className="col">
-                        <Auth fixedHeight />
+                        {mode === 'login' ? (
+                            <LoginCard onSwitchToSignup={() => setMode('signup')} />
+                        ) : (
+                            <SignupCard onSwitchToLogin={() => setMode('login')} />
+                        )}
                     </Box>
                 </Box>
             </Paper>
