@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AUTH_CLEARED_EVENT } from '../api';
 import {
     CryptoContext,
     DEFAULT_IDLE_MS,
@@ -59,6 +60,19 @@ export default function CryptoProvider({
         setHadDek(false);
         sessionStorage.removeItem(HAD_DEK_FLAG);
     }, []);
+
+    useEffect(() => {
+        const onAuthCleared = () => {
+            lockNow();
+            disarm();
+        };
+
+        window.addEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
+
+        return () => {
+            window.removeEventListener(AUTH_CLEARED_EVENT, onAuthCleared);
+        };
+    }, [disarm, lockNow]);
 
     useEffect(() => {
         if (!dek) return;

@@ -86,7 +86,7 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const { login } = useAuth();
-    const { setDEK, disarm } = useCrypto();
+    const { setDEK, disarm, lockNow } = useCrypto();
     const navigate = useNavigate();
 
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
@@ -97,6 +97,7 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
         setMsg(null);
         setBusy(true);
         try {
+            lockNow();
             disarm();
 
             const { saltClient, email: canonicalEmail } = await api.getSalt(trimmedIdentifier);
