@@ -128,7 +128,7 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
         <Box
             sx={(theme) => ({
                 width: '100%',
-                maxWidth: 420,
+                maxWidth: { xs: 460, sm: 520 },
                 mx: 'auto',
                 p: { xs: 3, sm: 4 },
                 borderRadius: 4,
