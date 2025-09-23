@@ -8,6 +8,7 @@ export interface PublicUser {
     saltClient: string;
     dekEncrypted: string;
     dekNonce: string;
+    avatarData: string | null;
 }
 
 export const AUTH_CLEARED_EVENT = 'auth-cleared';
@@ -72,6 +73,7 @@ export interface RegisterRequest {
     saltClient: string;
     dekEncrypted: string;
     dekNonce: string;
+    avatarData?: string | null;
 }
 export interface LoginRequest { email: string; verifier: string; }
 export interface LoginResponse { user: PublicUser; }
@@ -132,7 +134,11 @@ export const api = {
         req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
     logout: () => req<void>(`/auth/logout`, { method: 'POST' }),
     currentUser: () => req<PublicUser>(`/auth/me`, {}, { suppressAuthCleared: true }),
-
+    updateAvatar: (avatarData: string | null) =>
+        req<PublicUser>(`/auth/profile/avatar`, {
+            method: 'PUT',
+            body: JSON.stringify({ avatarData }),
+        }),
     listVault: () => req<VaultItem[]>(`/vault`),
     createVault: (body: Partial<VaultItem>) =>
         req<VaultItem>(`/vault`, { method: 'POST', body: JSON.stringify(body) }),

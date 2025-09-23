@@ -14,7 +14,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,6 +27,12 @@ public class AuthController {
     private final JwtService jwt;
     private final AuthCookieProps authCookieProps;
 
+    private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
+            "^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final int MAX_AVATAR_BYTES = 256 * 1024;
+
     public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps) {
         this.users = users;
         this.jwt = jwt;
@@ -32,8 +41,16 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        String normalizedAvatar;
+        try {
+            normalizedAvatar = normalizeAvatarData(registerRequest.avatarData());
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse(400, "INVALID_AVATAR", ex.getMessage()));
+        }
         User newUser = User.fromRegisterRequest(registerRequest);
 
+        newUser.setAvatarData(normalizedAvatar);
         if (users.findByEmail(newUser.getEmail()).isPresent())
             return ResponseEntity.status(409).body(new ErrorResponse(409, "CONFLICT", "Email already exists"));
 
@@ -125,5 +142,68 @@ public class AuthController {
                 .<ResponseEntity<?>>map(user -> ResponseEntity.ok(PublicUser.fromUser(user)))
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    @PutMapping("/profile/avatar")
+    public ResponseEntity<?> updateAvatar(Authentication authentication,
+                                          @RequestBody AvatarUploadRequest request) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+
+        String userId = (String) authentication.getPrincipal();
+        return users.findById(userId)
+                .<ResponseEntity<?>>map(user -> {
+                    String normalized;
+                    try {
+                        normalized = normalizeAvatarData(request.avatarData());
+                    } catch (IllegalArgumentException ex) {
+                        return ResponseEntity.badRequest()
+                                .body(new ErrorResponse(400, "INVALID_AVATAR", ex.getMessage()));
+                    }
+
+                    user.setAvatarData(normalized);
+                    users.save(user);
+                    return ResponseEntity.ok(PublicUser.fromUser(user));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    private String normalizeAvatarData(String avatarData) {
+        if (avatarData == null) {
+            return null;
+        }
+
+        String trimmed = avatarData.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+
+        Matcher matcher = AVATAR_DATA_URL_PATTERN.matcher(trimmed);
+        if (!matcher.matches()) {
+            throw new IllegalArgumentException("Avatar must be a PNG, JPEG, or WebP data URL.");
+        }
+
+        String mediaType = matcher.group(1).toLowerCase(Locale.ROOT);
+        if ("image/jpg".equals(mediaType)) {
+            mediaType = "image/jpeg";
+        }
+
+        String base64 = matcher.group(2).replaceAll("\\s", "");
+        byte[] decoded;
+        try {
+            decoded = Base64.getDecoder().decode(base64);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Avatar data is not valid base64.");
+        }
+
+        if (decoded.length > MAX_AVATAR_BYTES) {
+            throw new IllegalArgumentException("Avatar must be 256 KB or smaller.");
+        }
+
+        String normalizedBase64 = Base64.getEncoder().encodeToString(decoded);
+        return "data:" + mediaType + ";base64," + normalizedBase64;
     }
 }

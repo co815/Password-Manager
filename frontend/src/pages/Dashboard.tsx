@@ -1,4 +1,5 @@
 import {useMemo, useState, useEffect} from 'react';
+import type {ChangeEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
 import {useCrypto} from '../lib/crypto/crypto-context';
 import {api, type PublicCredential} from '../lib/api';
@@ -14,7 +15,7 @@ import {
 
 import {
     Search, AccountBox, CreditCard, Note, Wifi, Key, Assignment, Star, Edit, Delete,
-    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon,
+    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline,
 } from '@mui/icons-material';
 
 const td = new TextDecoder();
@@ -48,6 +49,9 @@ const toB64 = (buf: ArrayBuffer | Uint8Array) =>
     btoa(String.fromCharCode(...new Uint8Array(buf instanceof ArrayBuffer ? buf : buf.buffer)));
 const randIv = (len = 12) => crypto.getRandomValues(new Uint8Array(len));
 
+const ALLOWED_AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_AVATAR_SIZE = 256 * 1024;
+
 async function encryptField(dek: CryptoKey, text: string) {
     const iv = randIv();
     const ct = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, dek, te.encode(text ?? ''));
@@ -65,7 +69,7 @@ function scorePassword(p: string) {
 }
 
 export default function Dashboard() {
-    const {user, logout} = useAuth();
+    const {user, logout, login} = useAuth();
     const {dek, locked, setDEK} = useCrypto();
 
     const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -92,22 +96,32 @@ export default function Dashboard() {
     const [deleteBusy, setDeleteBusy] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<Credential | null>(null);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-    const [avatarError, setAvatarError] = useState(false);
+    const [avatarLoadError, setAvatarLoadError] = useState(false);
+    const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [avatarDialogError, setAvatarDialogError] = useState<string | null>(null);
+    const [avatarSaving, setAvatarSaving] = useState(false);
 
     const avatarInitials = useMemo(() => {
-        const email = user?.email ?? '';
-        if (!email) return 'U';
-        const [localPart] = email.split('@');
-        if (!localPart) return email.slice(0, 2).toUpperCase();
-        const segments = localPart.split(/[.\-_]/).filter(Boolean);
+        const preferred = user?.username || user?.email || '';
+        if (!preferred) return 'U';
+        const identifier = preferred.includes('@') ? preferred.split('@')[0] ?? preferred : preferred;
+        const sanitized = identifier.trim();
+        if (!sanitized) {
+            return (user?.email || user?.username || 'U').slice(0, 2).toUpperCase();
+        }
+        const segments = sanitized.split(/[.\-_\s]/).filter(Boolean);
         if (segments.length === 0) {
-            return localPart.slice(0, 2).toUpperCase();
+            return sanitized.slice(0, 2).toUpperCase();
         }
         if (segments.length === 1) {
             return segments[0].slice(0, 2).toUpperCase();
         }
         return `${segments[0][0] ?? ''}${segments[segments.length - 1][0] ?? ''}`.toUpperCase();
-    }, [user?.email]);
+    }, [user?.email, user?.username]);
+
+    const avatarSrc = user?.avatarData ?? null;
+    const avatarChanged = avatarPreview !== avatarSrc;
 
     const pwdScore = useMemo(() => scorePassword(password), [password]);
     const saveDisabled = busy || !title.trim() || !username.trim() || !password;
@@ -186,8 +200,8 @@ export default function Dashboard() {
     }, [dek, user]);
 
     useEffect(() => {
-        setAvatarError(false);
-    }, [user?.email]);
+        setAvatarLoadError(false);
+    }, [user?.avatarData, user?.email]);
 
     const resetFormFields = () => {
         setTitle('');
@@ -197,6 +211,75 @@ export default function Dashboard() {
         setShowPwd(false);
     };
 
+    const handleProfileDialogOpen = () => {
+        setAvatarPreview(user?.avatarData ?? null);
+        setAvatarDialogError(null);
+        setProfileDialogOpen(true);
+    };
+
+    const handleProfileDialogClose = () => {
+        if (avatarSaving) return;
+        setProfileDialogOpen(false);
+        setAvatarPreview(null);
+        setAvatarDialogError(null);
+    };
+
+    const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+            setAvatarDialogError('Only PNG, JPEG, or WebP images are supported.');
+            return;
+        }
+
+        if (file.size > MAX_AVATAR_SIZE) {
+            setAvatarDialogError('Avatar must be 256 KB or smaller.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setAvatarDialogError(null);
+            setAvatarPreview(typeof reader.result === 'string' ? reader.result : null);
+        };
+        reader.onerror = () => {
+            setAvatarDialogError('Failed to read image file.');
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleAvatarRemove = () => {
+        setAvatarPreview(null);
+        setAvatarDialogError(null);
+    };
+
+    const handleAvatarSave = async () => {
+        if (!avatarChanged) {
+            handleProfileDialogClose();
+            return;
+        }
+
+        setAvatarDialogError(null);
+        setAvatarSaving(true);
+        try {
+            const updatedUser = await api.updateAvatar(avatarPreview ?? null);
+            login(updatedUser);
+            setAvatarLoadError(false);
+            setToast({
+                type: 'success',
+                msg: avatarPreview ? 'Avatar updated successfully.' : 'Avatar removed.',
+            });
+            setProfileDialogOpen(false);
+            setAvatarPreview(null);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to update avatar';
+            setAvatarDialogError(message || 'Failed to update avatar');
+        } finally {
+            setAvatarSaving(false);
+        }
+    };
     const openAddDialog = () => {
         resetFormFields();
         setDialogMode('add');
@@ -442,6 +525,14 @@ export default function Dashboard() {
                         }}
                     />
                     <Box display="flex" alignItems="center" gap={2}>
+                        <Button
+                            onClick={handleProfileDialogOpen}
+                            variant="outlined"
+                            size="small"
+                            startIcon={<Settings fontSize="small"/>}
+                        >
+                            Settings
+                        </Button>
                         <Button onClick={() => {
                             void logout();
                         }} variant="outlined" size="small">
@@ -449,8 +540,8 @@ export default function Dashboard() {
                         </Button>
                         <Avatar
                             alt={user?.email ?? 'User'}
-                            src={avatarError ? undefined : '/avatar.png'}
-                            slotProps={{ img: { onError: () => setAvatarError(true) } }}
+                            src={avatarLoadError ? undefined : avatarSrc ?? undefined}
+                            slotProps={{ img: { onError: () => setAvatarLoadError(true) } }}
                         >
                             {avatarInitials}
                         </Avatar>
@@ -589,6 +680,80 @@ export default function Dashboard() {
                     </Card>
                 </Box>
             </Box>
+
+
+            {/* Profile settings dialog */}
+            <Dialog
+                open={profileDialogOpen}
+                onClose={(_, reason) => {
+                    if (avatarSaving && (reason === 'backdropClick' || reason === 'escapeKeyDown')) {
+                        return;
+                    }
+                    handleProfileDialogClose();
+                }}
+                fullWidth
+                maxWidth="xs"
+                slotProps={{
+                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
+                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                }}
+            >
+                <DialogTitle sx={{fontWeight: 800}}>Profile settings</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2}>
+                        <DialogContentText>
+                            Upload a square PNG, JPEG, or WebP image up to 256 KB. We'll store it securely with your
+                            account and fall back to your initials if the upload fails.
+                        </DialogContentText>
+                        {avatarDialogError ? <Alert severity="error">{avatarDialogError}</Alert> : null}
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <Avatar
+                                alt={user?.email ?? user?.username ?? 'User avatar'}
+                                src={avatarPreview ?? avatarSrc ?? undefined}
+                                sx={{width: 80, height: 80, fontSize: 28}}
+                            >
+                                {avatarInitials}
+                            </Avatar>
+                            <Stack spacing={1}>
+                                <Button
+                                    component="label"
+                                    variant="outlined"
+                                    startIcon={<Upload fontSize="small"/>}
+                                >
+                                    Choose image
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept={ALLOWED_AVATAR_TYPES.join(',')}
+                                        onChange={handleAvatarFileChange}
+                                    />
+                                </Button>
+                                <Button
+                                    onClick={handleAvatarRemove}
+                                    disabled={!avatarPreview && !avatarSrc}
+                                    color="inherit"
+                                    startIcon={<DeleteOutline fontSize="small"/>}
+                                >
+                                    Remove avatar
+                                </Button>
+                            </Stack>
+                        </Stack>
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{px: 3, pb: 2}}>
+                    <Button onClick={handleProfileDialogClose} disabled={avatarSaving}>Cancel</Button>
+                    <Button
+                        onClick={() => {
+                            void handleAvatarSave();
+                        }}
+                        disabled={avatarSaving || !avatarChanged}
+                        variant="contained"
+                        sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
+                    >
+                        {avatarSaving ? 'Saving…' : 'Save'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Add Credential Dialog */}
             <Dialog

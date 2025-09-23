@@ -27,6 +27,7 @@ public class User {
     private String saltClient;
     private String dekEncrypted;
     private String dekNonce;
+    private String avatarData;
     @CreatedDate
     private Instant createdAt;
 

@@ -13,7 +13,8 @@ public class AuthDtos {
             String username,
             String saltClient,
             String dekEncrypted,
-            String dekNonce
+            String dekNonce,
+            String avatarData
     ) {
         public static PublicUser fromUser(User user) {
             return new PublicUser(
@@ -22,7 +23,8 @@ public class AuthDtos {
                     user.getUsername(),
                     user.getSaltClient(),
                     user.getDekEncrypted(),
-                    user.getDekNonce()
+                    user.getDekNonce(),
+                    user.getAvatarData()
             );
         }
     }
@@ -33,7 +35,8 @@ public class AuthDtos {
             @NotBlank String verifier,
             @NotBlank String saltClient,
             @NotBlank String dekEncrypted,
-            @NotBlank String dekNonce
+            @NotBlank String dekNonce,
+            String avatarData
     ) {}
 
     public record RegisterResponse(
@@ -54,4 +57,7 @@ public class AuthDtos {
             String saltClient
     ) {}
 
+    public record AvatarUploadRequest(
+            String avatarData
+    ) {}
 }
