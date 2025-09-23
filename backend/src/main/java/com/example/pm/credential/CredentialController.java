@@ -9,6 +9,7 @@ import com.example.pm.repo.CredentialRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -77,12 +78,29 @@ public class CredentialController {
         return requireUser(authentication, userId -> credentials.findById(id)
                 .filter(credential -> userId.equals(credential.getUserId()))
                 .<ResponseEntity<?>>map(existing -> {
-                    existing.setService(updateRequest.service());
-                    existing.setWebsiteLink(updateRequest.websiteLink());
-                    existing.setUsernameEncrypted(updateRequest.usernameEncrypted());
-                    existing.setUsernameNonce(updateRequest.usernameNonce());
-                    existing.setPasswordEncrypted(updateRequest.passwordEncrypted());
-                    existing.setPasswordNonce(updateRequest.passwordNonce());
+                    var validationError = validateUpdatePayload(updateRequest);
+                    if (validationError.isPresent()) {
+                        return validationError.get();
+                    }
+
+                    if (StringUtils.hasText(updateRequest.service())) {
+                        existing.setService(updateRequest.service());
+                    }
+                    if (StringUtils.hasText(updateRequest.websiteLink())) {
+                        existing.setWebsiteLink(updateRequest.websiteLink());
+                    }
+                    if (StringUtils.hasText(updateRequest.usernameEncrypted())) {
+                        existing.setUsernameEncrypted(updateRequest.usernameEncrypted());
+                    }
+                    if (StringUtils.hasText(updateRequest.usernameNonce())) {
+                        existing.setUsernameNonce(updateRequest.usernameNonce());
+                    }
+                    if (StringUtils.hasText(updateRequest.passwordEncrypted())) {
+                        existing.setPasswordEncrypted(updateRequest.passwordEncrypted());
+                    }
+                    if (StringUtils.hasText(updateRequest.passwordNonce())) {
+                        existing.setPasswordNonce(updateRequest.passwordNonce());
+                    }
 
                     credentials.save(existing);
                     return ResponseEntity.ok(PublicCredential.fromCredential(existing));
@@ -129,5 +147,32 @@ public class CredentialController {
             return unauthorizedResponse();
         }
         return handler.apply(userIdOpt.get());
+    }
+
+    private Optional<ResponseEntity<?>> validateUpdatePayload(CredentialDtos.UpdateCredentialRequest updateRequest) {
+        if (updateRequest == null) {
+            return Optional.of(badRequest("Missing request body"));
+        }
+        if (updateRequest.service() != null && !StringUtils.hasText(updateRequest.service())) {
+            return Optional.of(badRequest("Service must not be blank"));
+        }
+        if (updateRequest.usernameEncrypted() != null && !StringUtils.hasText(updateRequest.usernameEncrypted())) {
+            return Optional.of(badRequest("Username must not be blank"));
+        }
+        if (updateRequest.usernameNonce() != null && !StringUtils.hasText(updateRequest.usernameNonce())) {
+            return Optional.of(badRequest("Username nonce must not be blank"));
+        }
+        if (updateRequest.passwordEncrypted() != null && !StringUtils.hasText(updateRequest.passwordEncrypted())) {
+            return Optional.of(badRequest("Password must not be blank"));
+        }
+        if (updateRequest.passwordNonce() != null && !StringUtils.hasText(updateRequest.passwordNonce())) {
+            return Optional.of(badRequest("Password nonce must not be blank"));
+        }
+        return Optional.empty();
+    }
+
+    private ResponseEntity<ErrorResponse> badRequest(String message) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse(400, "BAD_REQUEST", message));
     }
 }

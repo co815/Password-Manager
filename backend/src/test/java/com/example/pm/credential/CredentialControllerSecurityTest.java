@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -245,6 +246,74 @@ class CredentialControllerSecurityTest {
         verify(credentialRepository).save(argThat(saved ->
                 "New Service".equals(saved.getService()) &&
                         "newPasswordEnc".equals(saved.getPasswordEncrypted())));
+    }
+
+    @Test
+    void updateCredentialWithPartialPayloadUpdatesOnlyProvidedFields() throws Exception {
+        var credential = new Credential();
+        credential.setId("cred-1");
+        credential.setUserId("user-123");
+        credential.setService("Email");
+        credential.setWebsiteLink("https://mail.example");
+        credential.setUsernameEncrypted("usernameEnc");
+        credential.setUsernameNonce("usernameNonce");
+        credential.setPasswordEncrypted("passwordEnc");
+        credential.setPasswordNonce("passwordNonce");
+
+        when(credentialRepository.findById("cred-1"))
+                .thenReturn(Optional.of(credential));
+        when(credentialRepository.save(any(Credential.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        String token = jwtService.generate("user-123");
+
+        mockMvc.perform(put("/api/credentials/cred-1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"passwordEncrypted\":\"newPasswordEnc\"," +
+                                "\"passwordNonce\":\"newPasswordNonce\"}")
+                        .secure(true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.service").value("Email"))
+                .andExpect(jsonPath("$.websiteLink").value("https://mail.example"))
+                .andExpect(jsonPath("$.usernameEncrypted").value("usernameEnc"))
+                .andExpect(jsonPath("$.passwordEncrypted").value("newPasswordEnc"))
+                .andExpect(jsonPath("$.passwordNonce").value("newPasswordNonce"));
+
+        verify(credentialRepository).save(argThat(saved ->
+                "Email".equals(saved.getService()) &&
+                        "https://mail.example".equals(saved.getWebsiteLink()) &&
+                        "usernameEnc".equals(saved.getUsernameEncrypted()) &&
+                        "usernameNonce".equals(saved.getUsernameNonce()) &&
+                        "newPasswordEnc".equals(saved.getPasswordEncrypted()) &&
+                        "newPasswordNonce".equals(saved.getPasswordNonce())));
+    }
+
+    @Test
+    void updateCredentialWithBlankMandatoryFieldReturnsBadRequest() throws Exception {
+        var credential = new Credential();
+        credential.setId("cred-1");
+        credential.setUserId("user-123");
+        credential.setService("Email");
+
+        when(credentialRepository.findById("cred-1"))
+                .thenReturn(Optional.of(credential));
+
+        String token = jwtService.generate("user-123");
+
+        mockMvc.perform(put("/api/credentials/cred-1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"service\":\"   \"}")
+                        .secure(true))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.type").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Service must not be blank"));
+
+        verify(credentialRepository, never()).save(any(Credential.class));
     }
 
     @Test
