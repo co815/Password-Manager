@@ -249,6 +249,40 @@ class CredentialControllerSecurityTest {
     }
 
     @Test
+    void updateCredentialWithExistingServiceReturnsConflict() throws Exception {
+        var credential = new Credential();
+        credential.setId("cred-1");
+        credential.setUserId("user-123");
+        credential.setService("Bank");
+
+        var conflictingCredential = new Credential();
+        conflictingCredential.setId("cred-2");
+        conflictingCredential.setUserId("user-123");
+        conflictingCredential.setService("Email");
+
+        when(credentialRepository.findById("cred-1"))
+                .thenReturn(Optional.of(credential));
+        when(credentialRepository.findByUserIdAndService("user-123", "Email"))
+                .thenReturn(Optional.of(conflictingCredential));
+
+        String token = jwtService.generate("user-123");
+
+        mockMvc.perform(put("/api/credentials/cred-1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"service\":\"Email\"}")
+                        .secure(true))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.type").value("CONFLICT"))
+                .andExpect(jsonPath("$.message")
+                        .value("Credentials for this service already exist"));
+
+        verify(credentialRepository, never()).save(any(Credential.class));
+    }
+
+    @Test
     void updateCredentialWithPartialPayloadUpdatesOnlyProvidedFields() throws Exception {
         var credential = new Credential();
         credential.setId("cred-1");

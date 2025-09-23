@@ -83,6 +83,22 @@ public class CredentialController {
                         return validationError.get();
                     }
 
+                    String serviceToCheck = existing.getService();
+                    if (StringUtils.hasText(updateRequest.service())) {
+                        serviceToCheck = updateRequest.service();
+                    }
+
+                    if (StringUtils.hasText(serviceToCheck)) {
+                        var conflictingCredential = credentials.findByUserIdAndService(userId, serviceToCheck)
+                                .filter(credential -> !credential.getId().equals(existing.getId()));
+
+                        if (conflictingCredential.isPresent()) {
+                            return ResponseEntity.status(409)
+                                    .body(new ErrorResponse(409, "CONFLICT",
+                                            "Credentials for this service already exist"));
+                        }
+                    }
+
                     if (StringUtils.hasText(updateRequest.service())) {
                         existing.setService(updateRequest.service());
                     }
