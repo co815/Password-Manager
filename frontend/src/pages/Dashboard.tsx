@@ -9,11 +9,11 @@ import {unwrapDEK} from '../lib/crypto/unwrap';
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
     Avatar, TextField, IconButton, Card, CardContent, Button, InputAdornment,
-    Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Stack, LinearProgress,
+    Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Snackbar, Stack, LinearProgress,
 } from '@mui/material';
 
 import {
-    Search, AccountBox, CreditCard, Note, Wifi, Key, Assignment, Star, Edit,
+    Search, AccountBox, CreditCard, Note, Wifi, Key, Assignment, Star, Edit, Delete,
     Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon,
 } from '@mui/icons-material';
 
@@ -71,8 +71,13 @@ export default function Dashboard() {
     const [credentials, setCredentials] = useState<Credential[]>([]);
     const [selected, setSelected] = useState<Credential | null>(null);
 
-    const [openAdd, setOpenAdd] = useState(false);
-    const [showUnlockForAdd, setShowUnlockForAdd] = useState(false);
+    const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
+    const [editingTarget, setEditingTarget] = useState<Credential | null>(null);
+    const [pendingDialogMode, setPendingDialogMode] = useState<'add' | 'edit' | null>(null);
+    const [pendingEditTarget, setPendingEditTarget] = useState<Credential | null>(null);
+    const openDialog = dialogMode !== null;
+
+    const [showUnlockDialog, setShowUnlockDialog] = useState(false);
     const [unlockPassword, setUnlockPassword] = useState('');
     const [showUnlockPwd, setShowUnlockPwd] = useState(false);
     const [unlockBusy, setUnlockBusy] = useState(false);
@@ -84,23 +89,34 @@ export default function Dashboard() {
     const [url, setUrl] = useState('');
     const [showPwd, setShowPwd] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [deleteBusy, setDeleteBusy] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<Credential | null>(null);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
     const pwdScore = useMemo(() => scorePassword(password), [password]);
     const saveDisabled = busy || !title.trim() || !username.trim() || !password;
 
-    // Reset UI when vault is locked or DEK changes to a locked state
     useEffect(() => {
         if (!locked && dek) return;
 
         setCredentials([]);
         setSelected(null);
-        setOpenAdd(false);
-        setShowUnlockForAdd(false);
+        setDialogMode(null);
+        setEditingTarget(null);
+        setPendingDialogMode(null);
+        setPendingEditTarget(null);
+        setShowUnlockDialog(false);
+        setUnlockPassword('');
+        setUnlockError(null);
+        setShowUnlockPwd(false);
         setTitle('');
         setUsername('');
         setPassword('');
         setUrl('');
+        setShowPwd(false);
+        setBusy(false);
+        setDeleteBusy(false);
+        setDeleteTarget(null);
     }, [dek, locked]);
 
     useEffect(() => {
@@ -153,6 +169,73 @@ export default function Dashboard() {
         })();
     }, [dek, user]);
 
+    const resetFormFields = () => {
+        setTitle('');
+        setUsername('');
+        setPassword('');
+        setUrl('');
+        setShowPwd(false);
+    };
+
+    const openAddDialog = () => {
+        resetFormFields();
+        setDialogMode('add');
+        setEditingTarget(null);
+    };
+
+    const openEditDialog = (credential: Credential) => {
+        setDialogMode('edit');
+        setEditingTarget(credential);
+        setTitle(credential.name);
+        setUsername(credential.username);
+        setPassword(credential.password);
+        setUrl(credential.url ?? '');
+        setShowPwd(false);
+    };
+
+    const handleDialogClose = () => {
+        if (busy) return;
+        setDialogMode(null);
+        setEditingTarget(null);
+        resetFormFields();
+    };
+
+    const handleAddClick = () => {
+        if (!dek || locked) {
+            setPendingDialogMode('add');
+            setPendingEditTarget(null);
+            setShowUnlockDialog(true);
+            return;
+        }
+        openAddDialog();
+    };
+
+    const handleEditClick = () => {
+        if (!selected) return;
+        if (!dek || locked) {
+            setPendingDialogMode('edit');
+            setPendingEditTarget(selected);
+            setShowUnlockDialog(true);
+            return;
+        }
+        openEditDialog(selected);
+    };
+
+    const handleDeleteClick = () => {
+        if (!selected) return;
+        setDeleteTarget(selected);
+    };
+
+    const closeUnlockDialog = () => {
+        if (unlockBusy) return;
+        setShowUnlockDialog(false);
+        setUnlockPassword('');
+        setUnlockError(null);
+        setShowUnlockPwd(false);
+        setPendingDialogMode(null);
+        setPendingEditTarget(null);
+    };
+
     const handleUnlock = async () => {
         if (!unlockPassword || unlockBusy) return;
         setUnlockBusy(true);
@@ -169,9 +252,17 @@ export default function Dashboard() {
             const kek = await deriveKEK(unlockPassword, userProfile.saltClient);
             const dekKey = await unwrapDEK(kek, userProfile.dekEncrypted, userProfile.dekNonce);
             setDEK(dekKey);
+            const nextMode = pendingDialogMode;
+            const nextEditTarget = pendingEditTarget;
+            setPendingDialogMode(null);
+            setPendingEditTarget(null);
             setUnlockPassword('');
-            setShowUnlockForAdd(false);
-            setOpenAdd(true);
+            setShowUnlockDialog(false);
+            if (nextMode === 'add') {
+                openAddDialog();
+            } else if (nextMode === 'edit' && nextEditTarget) {
+                openEditDialog(nextEditTarget);
+            }
         } catch {
             setUnlockError('Master password invalid');
         } finally {
@@ -179,44 +270,74 @@ export default function Dashboard() {
         }
     };
 
-    async function handleAddSave() {
-        if (!dek) {
+    async function handleSave() {
+        if (!dek || !dialogMode) {
             setToast({type: 'error', msg: 'Session not ready. Unlock vault and try again.'});
             return;
         }
 
         setBusy(true);
         try {
-
             const {cipher: usernameCipher, nonce: usernameNonce} = await encryptField(dek, username);
             const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, password);
 
-            const created = await api.createCredential({
-                title,
-                url,
-                usernameCipher,
-                usernameNonce,
-                passwordCipher,
-                passwordNonce,
-            });
+            const trimmedTitle = title.trim();
+            const trimmedUrl = url.trim();
+            const trimmedUsername = username.trim();
 
-            const newCredential: Credential = {
-                id: created.credentialId,
-                name: title.trim(),
-                url: url.trim() || undefined,
-                username: username.trim(),
-                password: password,
-            };
+            if (dialogMode === 'add') {
+                const created = await api.createCredential({
+                    title,
+                    url,
+                    usernameCipher,
+                    usernameNonce,
+                    passwordCipher,
+                    passwordNonce,
+                });
 
-            setCredentials((prev) => [newCredential, ...prev]);
-            setSelected(newCredential);
+                const newCredential: Credential = {
+                    id: created.credentialId,
+                    name: trimmedTitle,
+                    url: trimmedUrl || undefined,
+                    username: trimmedUsername,
+                    password: password,
+                };
 
-            setTitle('');
-            setUsername('');
-            setPassword('');
-            setUrl('');
-            setOpenAdd(false);
-            setToast({type: 'success', msg: 'Saved to /api/credentials (encrypted).'});
+                setCredentials((prev) => [newCredential, ...prev]);
+                setSelected(newCredential);
+                setToast({type: 'success', msg: 'Saved to /api/credentials (encrypted).'});
+            } else if (dialogMode === 'edit' && editingTarget) {
+                await api.updateCredential(editingTarget.id, {
+                    service: title,
+                    websiteLink: trimmedUrl || undefined,
+                    usernameEncrypted: usernameCipher,
+                    usernameNonce,
+                    passwordEncrypted: passwordCipher,
+                    passwordNonce,
+                });
+
+                const updatedCredential: Credential = {
+                    id: editingTarget.id,
+                    name: trimmedTitle,
+                    url: trimmedUrl || undefined,
+                    username: trimmedUsername,
+                    password: password,
+                };
+
+                setCredentials((prev) =>
+                    prev.map((cred) => (cred.id === editingTarget.id ? updatedCredential : cred)),
+                );
+                setSelected((prevSelected) =>
+                    prevSelected && prevSelected.id === editingTarget.id ? updatedCredential : prevSelected,
+                );
+                setToast({type: 'success', msg: 'Credential updated.'});
+            }
+
+            setDialogMode(null);
+            setEditingTarget(null);
+            setPendingDialogMode(null);
+            setPendingEditTarget(null);
+            resetFormFields();
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to save';
             setToast({type: 'error', msg: message || 'Failed to save'});
@@ -224,6 +345,33 @@ export default function Dashboard() {
             setBusy(false);
         }
     }
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteTarget) return;
+        setDeleteBusy(true);
+        try {
+            await api.deleteCredential(deleteTarget.id);
+            setCredentials((prev) => {
+                const next = prev.filter((cred) => cred.id !== deleteTarget.id);
+                if (selected?.id === deleteTarget.id) {
+                    setSelected(next[0] ?? null);
+                }
+                return next;
+            });
+            setToast({type: 'success', msg: 'Credential deleted.'});
+            setDeleteTarget(null);
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Failed to delete credential';
+            setToast({type: 'error', msg: message || 'Failed to delete credential'});
+        } finally {
+            setDeleteBusy(false);
+        }
+    };
+
+    const handleDeleteDialogClose = () => {
+        if (deleteBusy) return;
+        setDeleteTarget(null);
+    };
 
     return (
         <Box display="flex" minHeight="100vh" sx={{bgcolor: 'background.default'}}>
@@ -336,13 +484,7 @@ export default function Dashboard() {
                                         <Box>
                                             <IconButton
                                                 size="small"
-                                                onClick={() => {
-                                                    if (!dek || locked) {
-                                                        setShowUnlockForAdd(true);
-                                                        return;
-                                                    }
-                                                    setOpenAdd(true);
-                                                }}
+                                                onClick={handleAddClick}
                                                 title="Add credential"
                                             >
                                                 <AddIcon/>
@@ -350,8 +492,22 @@ export default function Dashboard() {
                                             <IconButton size="small">
                                                 <Star color="warning"/>
                                             </IconButton>
-                                            <IconButton size="small">
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleEditClick}
+                                                disabled={!selected}
+                                                title="Edit credential"
+                                            >
                                                 <Edit/>
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleDeleteClick}
+                                                disabled={!selected}
+                                                title="Delete credential"
+                                                color="error"
+                                            >
+                                                <Delete/>
                                             </IconButton>
                                         </Box>
                                     </Box>
@@ -410,8 +566,8 @@ export default function Dashboard() {
 
             {/* Add Credential Dialog */}
             <Dialog
-                open={openAdd}
-                onClose={() => (!busy ? setOpenAdd(false) : undefined)}
+                open={openDialog}
+                onClose={handleDialogClose}
                 fullWidth
                 maxWidth="sm"
                 slotProps={{
@@ -419,7 +575,9 @@ export default function Dashboard() {
                     paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
                 }}
             >
-                <DialogTitle sx={{fontWeight: 800}}>Add credential</DialogTitle>
+                <DialogTitle sx={{fontWeight: 800}}>
+                    {dialogMode === 'edit' ? 'Edit credential' : 'Add credential'}
+                </DialogTitle>
                 <DialogContent>
                     <Stack spacing={1.5} mt={0.5}>
                         <TextField
@@ -483,24 +641,24 @@ export default function Dashboard() {
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{px: 3, pb: 2}}>
-                    <Button onClick={() => setOpenAdd(false)} disabled={busy}>Cancel</Button>
+                    <Button onClick={handleDialogClose} disabled={busy}>Cancel</Button>
                     <Button
                         onClick={() => {
-                            void handleAddSave();
+                            void handleSave();
                         }}
                         disabled={saveDisabled}
                         variant="contained"
                         sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
                     >
-                        {busy ? 'Saving…' : 'Save'}
+                        {busy ? 'Saving…' : dialogMode === 'edit' ? 'Save changes' : 'Save'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Unlock Dialog */}
             <Dialog
-                open={showUnlockForAdd}
-                onClose={() => setShowUnlockForAdd(false)}
+                open={showUnlockDialog}
+                onClose={closeUnlockDialog}
                 fullWidth
                 maxWidth="xs"
                 slotProps={{
@@ -544,11 +702,7 @@ export default function Dashboard() {
                 </DialogContent>
                 <DialogActions sx={{px: 3, pb: 2}}>
                     <Button
-                        onClick={() => {
-                            setShowUnlockForAdd(false);
-                            setUnlockPassword('');
-                            setUnlockError(null);
-                        }}
+                        onClick={closeUnlockDialog}
                         disabled={unlockBusy}
                     >
                         Cancel
@@ -562,6 +716,39 @@ export default function Dashboard() {
                         sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
                     >
                         {unlockBusy ? 'Unlocking…' : 'Unlock'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete confirmation */}
+            <Dialog
+                open={!!deleteTarget}
+                onClose={handleDeleteDialogClose}
+                fullWidth
+                maxWidth="xs"
+                slotProps={{
+                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
+                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                }}
+            >
+                <DialogTitle sx={{fontWeight: 800}}>Delete credential</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Are you sure you want to delete "{deleteTarget?.name}"? This action cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{px: 3, pb: 2}}>
+                    <Button onClick={handleDeleteDialogClose} disabled={deleteBusy}>Cancel</Button>
+                    <Button
+                        onClick={() => {
+                            void handleDeleteConfirm();
+                        }}
+                        disabled={deleteBusy}
+                        color="error"
+                        variant="contained"
+                        sx={{fontWeight: 800}}
+                    >
+                        {deleteBusy ? 'Deleting…' : 'Delete'}
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -98,6 +98,15 @@ export type CreateCredentialRequest = {
     notes?: string;
 };
 
+export type UpdateCredentialRequest = {
+    service?: string;
+    websiteLink?: string;
+    usernameEncrypted?: string;
+    usernameNonce?: string;
+    passwordEncrypted?: string;
+    passwordNonce?: string;
+};
+
 export type PublicCredential = {
     credentialId: string;
     service: string;
@@ -134,6 +143,11 @@ export const api = {
 
     createCredential: (body: CreateCredentialRequest) =>
         req<PublicCredential>(`/credential`, { method: 'POST', body: JSON.stringify(body) }),
+
+    updateCredential: (id: string, body: UpdateCredentialRequest) =>
+        req<PublicCredential>(`/credential/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteCredential: (id: string) =>
+        req<void>(`/credential/${id}`, { method: 'DELETE' }),
 
     fetchCredentials: () => req<GetAllCredentialResponse>(`/credentials`),
 };
