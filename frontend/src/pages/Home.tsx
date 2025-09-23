@@ -3,7 +3,6 @@ import Box from '@mui/material/Box';
 
 import LoginCard from '../components/homePage/LoginCard';
 import SignupCard from '../components/homePage/SignupCard';
-import ThemeToggle from '../components/common/ThemeToggle';
 
 type Mode = 'login' | 'signup';
 
@@ -29,8 +28,6 @@ export default function Home() {
                         : 'linear-gradient(135deg, #eef2ff 0%, #f0fdfa 100%)',
             })}
         >
-            <ThemeToggle />
-
             <Box
                 sx={{
                     position: 'absolute',

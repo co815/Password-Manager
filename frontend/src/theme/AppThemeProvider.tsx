@@ -1,15 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { PropsWithChildren } from 'react';
 import { createTheme, responsiveFontSizes, ThemeProvider } from '@mui/material/styles';
 import type { PaletteMode, ThemeOptions } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 
-import {
-    ColorModeContext,
-    getInitialMode,
-    STORAGE_KEY,
-    type ColorModeContextValue,
-} from './color-mode-context';
+import { ColorModeContext, type ColorModeContextValue } from './color-mode-context';
 
 function getDesignTokens(mode: PaletteMode): ThemeOptions {
     const isDark = mode === 'dark';
@@ -71,18 +66,15 @@ function getDesignTokens(mode: PaletteMode): ThemeOptions {
 }
 
 export default function AppThemeProvider({ children }: PropsWithChildren) {
-    const [mode, setMode] = useState<PaletteMode>(getInitialMode);
-
-    useEffect(() => { localStorage.setItem(STORAGE_KEY, mode); }, [mode]);
 
     const theme = useMemo(
-        () => responsiveFontSizes(createTheme(getDesignTokens(mode))),
-        [mode]
+        () => responsiveFontSizes(createTheme(getDesignTokens('dark'))),
+        []
     );
 
     const value = useMemo<ColorModeContextValue>(
-        () => ({ mode, toggle: () => setMode(m => (m === 'light' ? 'dark' : 'light')) }),
-        [mode]
+        () => ({ mode: 'dark', toggle: () => {} }),
+        []
     );
 
     return (
