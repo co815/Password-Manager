@@ -41,25 +41,42 @@ export default function Home() {
 
             <Paper
                 elevation={8}
-                sx={{
+                sx={(theme) => ({
                     position: 'relative',
                     width: '100%',
-                    maxWidth: 1100,
-                    minWidth: 850,
-                    height: 560,
+                    maxWidth: { xs: 520, md: 1100 },
+                    minWidth: { md: 850 },
+                    height: { xs: 'auto', md: 560 },
                     borderRadius: 4,
                     overflow: 'hidden',
                     backdropFilter: 'blur(4px)',
                     border: '1px solid rgba(255,255,255,.5)',
                     boxShadow: '0 10px 40px rgba(31,41,55,.10)',
-                }}
+                    transition: 'max-width .3s ease, height .3s ease',
+                    '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        inset: 0,
+                        pointerEvents: 'none',
+                        background:
+                            theme.palette.mode === 'dark'
+                                ? 'radial-gradient(90% 80% at 80% 18%, rgba(99,102,241,0.22), transparent 62%)'
+                                : 'radial-gradient(90% 80% at 82% 20%, rgba(99,102,241,0.14), transparent 62%)',
+                        mixBlendMode: theme.palette.mode === 'dark' ? 'screen' : 'normal',
+                        zIndex: 0,
+                    },
+                    '& > *': {
+                        position: 'relative',
+                        zIndex: 1,
+                    },
+                })}
             >
                 <Box
                     sx={{
                         display: 'grid',
                         gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
                         alignItems: 'stretch',
-                        height: '100%',
+                        rowGap: { xs: 3, md: 0 },
                         '& > .col': {
                             p: { xs: 4, md: 5 },
                             display: 'flex',
