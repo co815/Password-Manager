@@ -235,8 +235,11 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
                         </Alert>
                     )}
 
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                        <Typography variant="body2" sx={{ opacity: 0.85 }}>
+                    <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                        <Typography
+                            variant="body2"
+                            sx={{ opacity: 0.85, display: 'flex', alignItems: 'center' }}
+                        >
                             Need an account?
                         </Typography>
                         <Button
