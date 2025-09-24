@@ -169,7 +169,39 @@ public class AuthController {
             return false;
         }
 
+        if (forwardedProtoIsHttp(request)) {
+            return false;
+        }
+
         return request.isSecure();
+    }
+
+    private boolean forwardedProtoIsHttp(HttpServletRequest request) {
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        if (forwardedProto != null) {
+            for (String proto : forwardedProto.split(",")) {
+                if ("http".equalsIgnoreCase(proto.trim())) {
+                    return true;
+                }
+            }
+        }
+
+        String forwarded = request.getHeader("Forwarded");
+        if (forwarded != null) {
+            for (String segment : forwarded.split(",")) {
+                for (String part : segment.split(";")) {
+                    String trimmed = part.trim();
+                    if (trimmed.regionMatches(true, 0, "proto=", 0, 6)) {
+                        String value = trimmed.substring(6).trim();
+                        if ("http".equalsIgnoreCase(value)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     private static String fakeSalt() {
