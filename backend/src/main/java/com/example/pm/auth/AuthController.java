@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
@@ -34,6 +35,8 @@ public class AuthController {
             Pattern.CASE_INSENSITIVE
     );
     private static final int MAX_AVATAR_BYTES = 256 * 1024;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
                           @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
@@ -73,11 +76,18 @@ public class AuthController {
                     .body(new ErrorResponse(404, "NOT FOUND", "Invalid identifier - User not found"));
         }
 
-        return users.findByEmail(trimmed.toLowerCase(Locale.ROOT))
-                .or(() -> users.findByUsername(trimmed))
-                .<ResponseEntity<?>>map(user -> ResponseEntity.ok(new SaltResponse(user.getEmail(), user.getSaltClient())))
-                .orElseGet(() -> ResponseEntity.status(404)
-                        .body(new ErrorResponse(404, "NOT FOUND", "Invalid identifier - User not found")));
+        String normalizedEmail = trimmed.contains("@") ? trimmed.toLowerCase(Locale.ROOT) : null;
+
+        var user = normalizedEmail != null
+                ? users.findByEmail(normalizedEmail)
+                : users.findByUsername(trimmed);
+
+        return user
+                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new SaltResponse(u.getEmail(), u.getSaltClient())))
+                .orElseGet(() -> ResponseEntity.ok(new SaltResponse(
+                        normalizedEmail != null ? normalizedEmail : placeholderEmailFor(trimmed),
+                        fakeSalt()
+                )));
     }
 
     @PostMapping("/login")
@@ -126,16 +136,32 @@ public class AuthController {
             }
         }
 
-
         String sameSite = authCookieProps.getSameSiteAttribute();
         if (!sslEnabled && sameSite != null && sameSite.equalsIgnoreCase("None")) {
-            // Browsers require Secure for SameSite=None; fall back to Lax in HTTP dev
             sameSite = "Lax";
         }
         if (sameSite != null && !sameSite.isBlank()) {
             builder.sameSite(sameSite);
         }
         return builder.build();
+    }
+
+    private static String fakeSalt() {
+        byte[] saltBytes = new byte[16];
+        SECURE_RANDOM.nextBytes(saltBytes);
+        return Base64.getEncoder().encodeToString(saltBytes);
+    }
+
+    private static String placeholderEmailFor(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            return "invalid@example.invalid";
+        }
+
+        String normalized = identifier.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "");
+        if (normalized.isBlank()) {
+            normalized = "user";
+        }
+        return normalized + "@example.invalid";
     }
 
     @GetMapping("/me")
