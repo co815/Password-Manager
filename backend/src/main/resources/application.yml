@@ -31,3 +31,5 @@ app:
     origins:
       - http://localhost:5173
       - https://localhost:5173
+  audit:
+    admin-emails: ${APP_AUDIT_ADMIN_EMAILS:}

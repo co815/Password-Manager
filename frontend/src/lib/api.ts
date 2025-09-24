@@ -123,6 +123,26 @@ export type GetAllCredentialResponse = {
     credentials: PublicCredential[];
 };
 
+export interface AuditLogActor {
+    id: string;
+    email: string | null;
+    username: string | null;
+}
+
+export interface AuditLogEntry {
+    id: string;
+    createdDate: string | null;
+    action: string;
+    targetType: string;
+    targetId: string | null;
+    details: string | null;
+    actor: AuditLogActor | null;
+}
+
+export interface AuditLogListResponse {
+    logs: AuditLogEntry[];
+}
+
 export const api = {
     health: () => req<{ ok: boolean }>(`/health`),
 
@@ -156,4 +176,7 @@ export const api = {
         req<void>(`/credential/${id}`, { method: 'DELETE' }),
 
     fetchCredentials: () => req<GetAllCredentialResponse>(`/credentials`),
+
+    listAuditLogs: (limit = 100) =>
+        req<AuditLogListResponse>(`/audit-logs?limit=${encodeURIComponent(limit)}`),
 };

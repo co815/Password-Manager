@@ -1,8 +1,10 @@
 import {useMemo, useState, useEffect} from 'react';
+import {useNavigate} from 'react-router-dom';
 import type {ChangeEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
 import {useCrypto} from '../lib/crypto/crypto-context';
 import {api, type PublicCredential} from '../lib/api';
+import {isAuditAdminEmail} from '../lib/accessControl';
 import Alert from '@mui/material/Alert';
 import {deriveKEK} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
@@ -15,7 +17,7 @@ import {
 
 import {
     Search, AccountBox, CreditCard, Note, Wifi, Key, Assignment, Star, Edit, Delete,
-    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline,
+    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline, ListAlt,
 } from '@mui/icons-material';
 
 const td = new TextDecoder();
@@ -71,6 +73,7 @@ function scorePassword(p: string) {
 export default function Dashboard() {
     const {user, logout, login} = useAuth();
     const {dek, locked, setDEK} = useCrypto();
+    const navigate = useNavigate();
 
     const [credentials, setCredentials] = useState<Credential[]>([]);
     const [selected, setSelected] = useState<Credential | null>(null);
@@ -101,6 +104,8 @@ export default function Dashboard() {
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarDialogError, setAvatarDialogError] = useState<string | null>(null);
     const [avatarSaving, setAvatarSaving] = useState(false);
+
+    const isAuditAdmin = useMemo(() => isAuditAdminEmail(user?.email ?? null), [user?.email]);
 
     const avatarInitials = useMemo(() => {
         const preferred = user?.username || user?.email || '';
@@ -525,6 +530,17 @@ export default function Dashboard() {
                         }}
                     />
                     <Box display="flex" alignItems="center" gap={2}>
+                        {isAuditAdmin && (
+                            <Button
+                                onClick={() => navigate('/audit-log')}
+                                variant="contained"
+                                size="small"
+                                startIcon={<ListAlt fontSize="small"/>}
+                                color="secondary"
+                            >
+                                Audit log
+                            </Button>
+                        )}
                         <Button
                             onClick={handleProfileDialogOpen}
                             variant="outlined"

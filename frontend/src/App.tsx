@@ -2,7 +2,9 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import { Container } from '@mui/material';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
+import AuditLog from './pages/AuditLog';
 import ProtectedRoute from './auth/ProtectedRoute';
+import AuditLogRoute from './auth/AuditLogRoute';
 import CryptoGuard from './components/security/CryptoGuard';
 import LockButton from './components/security/LockButton';
 
@@ -29,6 +31,9 @@ export default function App() {
                     <Route path="/" element={<Home />} />
                     <Route element={<ProtectedRoute />}>
                         <Route path="/dashboard" element={<Dashboard />} />
+                        <Route element={<AuditLogRoute />}>
+                            <Route path="/audit-log" element={<AuditLog />} />
+                        </Route>
                     </Route>
                     <Route path="*" element={<NotFound />} />
                 </Routes>
