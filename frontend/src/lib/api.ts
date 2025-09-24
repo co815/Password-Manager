@@ -5,6 +5,19 @@ const API_BASE = RAW_API_ORIGIN
 const CSRF_COOKIE = 'XSRF-TOKEN';
 const CSRF_HEADER = 'X-XSRF-TOKEN';
 const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+const CSRF_FETCH_CREDENTIALS: RequestCredentials = RAW_API_ORIGIN ? 'include' : 'same-origin';
+
+export class ApiError extends Error {
+    status: number;
+    data: unknown;
+
+    constructor(message: string, status: number, data: unknown) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.data = data;
+    }
+}
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -17,18 +30,22 @@ function getCookie(name: string): string | null {
 }
 
 async function ensureCsrfToken(method: string): Promise<string | null> {
-    if (SAFE_HTTP_METHODS.has(method)) return null;
+    if (SAFE_HTTP_METHODS.has(method) || typeof document === 'undefined') {
+        return null;
+    }
     let token = getCookie(CSRF_COOKIE);
-    if (token || typeof window === 'undefined') {
-        return token;
+    if (!token) {
+        try {
+            await fetch(`${API_BASE}/health`, { credentials: CSRF_FETCH_CREDENTIALS });
+        } catch {
+            // Ignore network errors here; the main request will surface failures to the caller.
+        }
+        token = getCookie(CSRF_COOKIE);
     }
 
-    try {
-        await fetch(`${API_BASE}/health`, { credentials: 'same-origin' });
-    } catch {
-        // Ignore network errors here; the main request will surface failures to the caller.
+    if (!token) {
+        throw new ApiError('Missing CSRF token', 0, null);
     }
-    token = getCookie(CSRF_COOKIE);
     return token;
 }
 
@@ -64,18 +81,6 @@ function mergeHeaders(init: RequestInit, extras?: Record<string, string | null |
 
 interface RequestOptions {
     suppressAuthCleared?: boolean;
-}
-
-export class ApiError extends Error {
-    status: number;
-    data: unknown;
-
-    constructor(message: string, status: number, data: unknown) {
-        super(message);
-        this.name = 'ApiError';
-        this.status = status;
-        this.data = data;
-    }
 }
 
 async function req<T>(
