@@ -2,6 +2,7 @@ package com.example.pm.credential;
 
 import com.example.pm.dto.CredentialDtos;
 import com.example.pm.model.Credential;
+import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,6 +51,9 @@ class CredentialControllerSecurityTest {
 
     @MockBean
     private CredentialRepository credentialRepository;
+
+    @MockBean
+    private AuditLogRepository auditLogRepository;
 
     @BeforeEach
     void setUp() {

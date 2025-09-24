@@ -31,6 +31,9 @@ class CorsIntegrationTest {
     @MockBean
     private CredentialRepository credentialRepository;
 
+    @MockBean
+    private AuditLogRepository auditLogRepository;
+
     @Test
     void disallowedOriginDoesNotReceiveAllowOriginHeader() throws Exception {
         mockMvc.perform(get("/api/health")
