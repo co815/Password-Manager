@@ -6,6 +6,7 @@ import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -91,7 +92,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest,
+                                   HttpServletRequest request) {
 
         String normalizedEmail = loginRequest.email() == null ? null : loginRequest.email().trim().toLowerCase(Locale.ROOT);
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
@@ -104,7 +106,8 @@ public class AuthController {
                 .<ResponseEntity<?>>map(user -> {
                     String token = jwt.generate(user.getId());
                     var publicUser = PublicUser.fromUser(user);
-                    ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry());
+                    ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry(),
+                            shouldUseSecureCookie(request));
                     return ResponseEntity.ok()
                             .header(HttpHeaders.SET_COOKIE, cookie.toString())
                             .body(new LoginResponse(publicUser));
@@ -115,18 +118,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
-        ResponseCookie cleared = buildAccessTokenCookie("", Duration.ZERO);
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        ResponseCookie cleared = buildAccessTokenCookie("", Duration.ZERO,
+                shouldUseSecureCookie(request));
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cleared.toString())
                 .build();
     }
 
-    private ResponseCookie buildAccessTokenCookie(String value, Duration maxAge) {
+    private ResponseCookie buildAccessTokenCookie(String value, Duration maxAge, boolean secure) {
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("accessToken", value != null ? value : "")
                 .path("/")
                 .httpOnly(true)
-                .secure(sslEnabled);
+                .secure(secure);
 
         if (maxAge != null) {
             if (maxAge.isZero() || maxAge.isNegative()) {
@@ -137,13 +141,35 @@ public class AuthController {
         }
 
         String sameSite = authCookieProps.getSameSiteAttribute();
-        if (!sslEnabled && sameSite != null && sameSite.equalsIgnoreCase("None")) {
+        if (!secure && sameSite != null && sameSite.equalsIgnoreCase("None")) {
             sameSite = "Lax";
         }
         if (sameSite != null && !sameSite.isBlank()) {
             builder.sameSite(sameSite);
         }
         return builder.build();
+    }
+
+    private boolean shouldUseSecureCookie(HttpServletRequest request) {
+        if (!sslEnabled) {
+            return false;
+        }
+
+        if (request == null) {
+            return true;
+        }
+
+        String origin = request.getHeader("Origin");
+        if (origin != null && origin.toLowerCase(Locale.ROOT).startsWith("http://")) {
+            return false;
+        }
+
+        String referer = request.getHeader("Referer");
+        if (referer != null && referer.toLowerCase(Locale.ROOT).startsWith("http://")) {
+            return false;
+        }
+
+        return request.isSecure();
     }
 
     private static String fakeSalt() {
