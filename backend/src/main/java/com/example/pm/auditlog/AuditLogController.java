@@ -43,12 +43,12 @@ public class AuditLogController {
     @GetMapping
     public ResponseEntity<?> listAuditLogs(Authentication authentication,
                                            @RequestParam(name = "limit", defaultValue = "100") int limit) {
-        if (authentication == null || authentication.getPrincipal() == null) {
+        String userId = resolveUserId(authentication);
+        if (userId == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid credentials"));
         }
 
-        String userId = (String) authentication.getPrincipal();
         User currentUser = users.findById(userId).orElse(null);
         if (currentUser == null) {
             return ResponseEntity.status(401)
@@ -62,7 +62,7 @@ public class AuditLogController {
 
         int pageSize = Math.max(1, Math.min(limit, 200));
         PageRequest pageRequest = PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "createdDate"));
-        List<AuditLog> logs = auditLogs.findAll(pageRequest).getContent();
+        List<AuditLog> logs = auditLogs.findAllByOrderByCreatedDateDesc(pageRequest).getContent();
         if (logs.isEmpty()) {
             return ResponseEntity.ok(new AuditLogDtos.ListResponse(Collections.emptyList()));
         }
@@ -84,5 +84,15 @@ public class AuditLogController {
                 .toList();
 
         return ResponseEntity.ok(new AuditLogDtos.ListResponse(payload));
+    }
+    private String resolveUserId(Authentication authentication) {
+        if (authentication == null) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof String s && !s.isBlank()) {
+            return s;
+        }
+        return null;
     }
 }
