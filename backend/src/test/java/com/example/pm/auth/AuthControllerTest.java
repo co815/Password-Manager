@@ -13,32 +13,33 @@ import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class AuthControllerTest {
 
     @Test
-    void loginSetsSecureSameSiteCookie() {
+    void loginSetsSecureHttpOnlyCookieWithSameSite() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite(AuthCookieProps.SameSiteMode.NONE);
 
         User user = new User();
-        user.setId("user-1");
+        user.setId("user-123");
         user.setEmail("user@example.com");
-        user.setUsername("user-name");
+        user.setUsername("john");
         user.setVerifier("verifier");
         user.setSaltClient("salt");
         user.setDekEncrypted("dek");
         user.setDekNonce("nonce");
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-1")).thenReturn("token-value");
+        when(jwt.generate("user-123")).thenReturn("token-value");
         when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
 
+        AuthCookieProps props = new AuthCookieProps();
+        props.setSameSite("None");
+
         AuthController controller = new AuthController(users, jwt, props, true);
+
         ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier"));
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);

@@ -14,8 +14,8 @@ class AuthCookiePropsBindingTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
-            .withPropertyValues("app.auth.cookie.same-site=none")
-            .withUserConfiguration(TestConfig.class);
+            .withUserConfiguration(TestConfig.class)
+            .withPropertyValues("app.auth.cookie.sameSite=None");
 
     @Test
     void bindsSameSiteModeFromApplicationYaml() {
@@ -30,6 +30,5 @@ class AuthCookiePropsBindingTest {
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties(AuthCookieProps.class)
     @Import(SameSiteModeConverter.class)
-    static class TestConfig {
-    }
+    static class TestConfig { }
 }
