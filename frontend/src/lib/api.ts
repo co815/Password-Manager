@@ -1,4 +1,7 @@
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
+const RAW_API_ORIGIN = import.meta.env.VITE_API_ORIGIN;
+const API_BASE = RAW_API_ORIGIN
+    ? `${RAW_API_ORIGIN.replace(/\/$/, '')}/api`
+    : '/api';
 const CSRF_COOKIE = 'XSRF-TOKEN';
 const CSRF_HEADER = 'X-XSRF-TOKEN';
 const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
@@ -21,7 +24,7 @@ async function ensureCsrfToken(method: string): Promise<string | null> {
     }
 
     try {
-        await fetch(`${API_ORIGIN}/api/health`, { credentials: 'include' });
+        await fetch(`${API_BASE}/health`, { credentials: 'same-origin' });
     } catch {
         // Ignore network errors here; the main request will surface failures to the caller.
     }
@@ -82,11 +85,11 @@ async function req<T>(
 ): Promise<T> {
     const method = (init.method ?? 'GET').toUpperCase();
     const csrfToken = await ensureCsrfToken(method);
-    const res = await fetch(`${API_ORIGIN}/api${path}`, {
+    const res = await fetch(`${API_BASE}${path}`, {
         ...init,
         method,
         headers: mergeHeaders(init, { [CSRF_HEADER]: csrfToken }),
-        credentials: 'include',
+        credentials: init.credentials ?? 'same-origin',
     });
 
     if (res.status === 204) return undefined as unknown as T;
