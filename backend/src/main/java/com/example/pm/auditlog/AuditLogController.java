@@ -73,7 +73,12 @@ public class AuditLogController {
                 .collect(Collectors.toSet());
 
         Map<String, User> actors = users.findAllById(actorIds).stream()
-                .collect(Collectors.toMap(User::getId, Function.identity()));
+                .filter(user -> user.getId() != null && !user.getId().isBlank())
+                .collect(Collectors.toMap(
+                        User::getId,
+                        Function.identity(),
+                        (existing, duplicate) -> existing
+                ));
 
         List<AuditLogDtos.AuditLogEntry> payload = logs.stream()
                 .map(log -> {
