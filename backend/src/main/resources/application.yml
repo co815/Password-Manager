@@ -6,6 +6,11 @@ server:
     key-store-type: PKCS12
     key-alias: PasswordManager
     enabled-protocols: TLSv1.3
+  servlet:
+    session:
+      cookie:
+        secure: true
+        http-only: true
 
 spring:
   config:
