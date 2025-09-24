@@ -81,6 +81,7 @@ function mergeHeaders(init: RequestInit, extras?: Record<string, string | null |
 
 interface RequestOptions {
     suppressAuthCleared?: boolean;
+    skipCsrf?: boolean;
 }
 
 async function req<T>(
@@ -89,7 +90,7 @@ async function req<T>(
     options: RequestOptions = {},
 ): Promise<T> {
     const method = (init.method ?? 'GET').toUpperCase();
-    const csrfToken = await ensureCsrfToken(method);
+    const csrfToken = options.skipCsrf ? null : await ensureCsrfToken(method);
     const res = await fetch(`${API_BASE}${path}`, {
         ...init,
         method,
@@ -196,7 +197,7 @@ export const api = {
         req<{ id: string }>(`/auth/register`, { method: 'POST', body: JSON.stringify(body) }),
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
-    logout: () => req<void>(`/auth/logout`, { method: 'POST' }),
+    logout: () => req<void>(`/auth/logout`, { method: 'POST' }, { skipCsrf: true }),
     currentUser: () => req<PublicUser>(`/auth/me`, {}, { suppressAuthCleared: true }),
     updateAvatar: (avatarData: string | null) =>
         req<PublicUser>(`/auth/profile/avatar`, {
