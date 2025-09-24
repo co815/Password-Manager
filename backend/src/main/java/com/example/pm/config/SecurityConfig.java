@@ -8,12 +8,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -48,26 +49,37 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfTokenRepository))
+                        .csrfTokenRepository(csrfTokenRepository)
+                        .ignoringRequestMatchers(
+                                new AntPathRequestMatcher("/api/auth/login", "POST"),
+                                new AntPathRequestMatcher("/api/auth/register", "POST"),
+                                new AntPathRequestMatcher("/api/auth/logout", "POST")
+                        )
+                )
                 .cors(cors -> cors.configurationSource(corsSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(rc -> rc.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health",
+                        .requestMatchers(
+                                "/api/health",
                                 "/api/auth/register",
                                 "/api/auth/login",
-                                "/api/auth/salt").permitAll()
+                                "/api/auth/salt"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .headers(h -> {
-                        if (sslEnabled) {
-                            h.httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000));
-                        } else {
-                            h.httpStrictTransportSecurity(hsts -> hsts.disable());
-                        }
-                        h.frameOptions(f -> f.deny());
+                    if (sslEnabled) {
+                        h.httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)
+                        );
+                    } else {
+                        h.httpStrictTransportSecurity(hsts -> hsts.disable());
+                    }
+                    h.frameOptions(f -> f.deny());
                 })
                 .httpBasic(b -> b.disable())
                 .formLogin(f -> f.disable())
@@ -93,7 +105,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(corsProps.getOrigins());
+        config.setAllowedOrigins(corsProps.getOrigins()); // evită "*" când allowCredentials=true
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
         config.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
