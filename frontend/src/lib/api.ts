@@ -1,4 +1,33 @@
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'https://localhost:8443';
+const CSRF_COOKIE = 'XSRF-TOKEN';
+const CSRF_HEADER = 'X-XSRF-TOKEN';
+const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+
+function getCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(`${name}=`));
+    if (!match) return null;
+    return decodeURIComponent(match.substring(name.length + 1));
+}
+
+async function ensureCsrfToken(method: string): Promise<string | null> {
+    if (SAFE_HTTP_METHODS.has(method)) return null;
+    let token = getCookie(CSRF_COOKIE);
+    if (token || typeof window === 'undefined') {
+        return token;
+    }
+
+    try {
+        await fetch(`${API_ORIGIN}/api/health`, { credentials: 'include' });
+    } catch {
+        // Ignore network errors here; the main request will surface failures to the caller.
+    }
+    token = getCookie(CSRF_COOKIE);
+    return token;
+}
 
 
 export interface PublicUser {
@@ -19,10 +48,14 @@ function emitAuthCleared() {
     }
 }
 function safeJson(s: string) { try { return JSON.parse(s); } catch { return null; } }
-
-function mergeHeaders(init: RequestInit): Headers {
+function mergeHeaders(init: RequestInit, extras?: Record<string, string | null | undefined>): Headers {
     const h = new Headers(init.headers || {});
     if (!h.has('Content-Type')) h.set('Content-Type', 'application/json');
+    if (extras) {
+        Object.entries(extras).forEach(([key, value]) => {
+            if (value) h.set(key, value);
+        });
+    }
     return h;
 }
 
@@ -47,9 +80,12 @@ async function req<T>(
     init: RequestInit = {},
     options: RequestOptions = {},
 ): Promise<T> {
+    const method = (init.method ?? 'GET').toUpperCase();
+    const csrfToken = await ensureCsrfToken(method);
     const res = await fetch(`${API_ORIGIN}/api${path}`, {
         ...init,
-        headers: mergeHeaders(init),
+        method,
+        headers: mergeHeaders(init, { [CSRF_HEADER]: csrfToken }),
         credentials: 'include',
     });
 
