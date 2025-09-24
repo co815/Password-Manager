@@ -89,7 +89,7 @@ async function req<T>(
         ...init,
         method,
         headers: mergeHeaders(init, { [CSRF_HEADER]: csrfToken }),
-        credentials: init.credentials ?? 'same-origin',
+        credentials: init.credentials ?? 'include',
     });
 
     if (res.status === 204) return undefined as unknown as T;
