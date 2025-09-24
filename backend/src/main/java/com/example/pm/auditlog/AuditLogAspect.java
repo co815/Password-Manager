@@ -70,7 +70,11 @@ public class AuditLogAspect {
         if (isAuditLogListing(joinPoint)) {
             return null;
         }
-        return result != null ? result.toString() : null;
+        String resultType = result != null ? result.getClass().getSimpleName() : "null";
+        return String.format("Invoked %s.%s (result=%s)",
+                joinPoint.getTarget().getClass().getSimpleName(),
+                joinPoint.getSignature().getName(),
+                resultType);
     }
 
     private boolean isAuditLogListing(JoinPoint joinPoint) {
