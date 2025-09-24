@@ -20,7 +20,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration,org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration",
         "server.ssl.enabled=false",
-        "app.jwt.secret=test_secret_key_with_more_than_32_chars!!"
+        "app.jwt.secret=test_secret_key_with_more_than_32_chars!!",
+        "spring.data.mongodb.repositories.enabled=false"
 })
 @AutoConfigureMockMvc
 class CorsIntegrationTest {

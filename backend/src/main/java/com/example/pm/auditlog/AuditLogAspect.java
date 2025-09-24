@@ -20,7 +20,6 @@ public class AuditLogAspect {
 
     private final AuditLogRepository auditLogRepo;
 
-    // Pointcut for all public methods in your controllers
     @Pointcut("execution(public * com.example.pm.*.*Controller.*(..))")
     public void controllerMethods() {}
 
@@ -38,7 +37,7 @@ public class AuditLogAspect {
                 .action(action)
                 .targetType(targetType)
                 .targetId(targetId)
-                .details(result != null ? result.toString() : null)
+                .details(resolveDetails(joinPoint, result))
                 .createdDate(Instant.now())
                 .build();
 
@@ -65,5 +64,17 @@ public class AuditLogAspect {
             }
         }
         return null;
+    }
+
+    private String resolveDetails(JoinPoint joinPoint, Object result) {
+        if (isAuditLogListing(joinPoint)) {
+            return null;
+        }
+        return result != null ? result.toString() : null;
+    }
+
+    private boolean isAuditLogListing(JoinPoint joinPoint) {
+        return "LISTAUDITLOGS".equalsIgnoreCase(joinPoint.getSignature().getName())
+                && "AuditLogController".equals(joinPoint.getTarget().getClass().getSimpleName());
     }
 }
