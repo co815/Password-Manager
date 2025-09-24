@@ -3,6 +3,7 @@ package com.example.pm.security;
 import com.example.pm.config.CorsProps;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,9 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper;
     private final CorsProps corsProps;
 
+    @Value("${server.ssl.enabled:true}")
+    private boolean sslEnabled;
+
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, ObjectMapper objectMapper, CorsProps corsProps) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.objectMapper = objectMapper;
@@ -48,11 +52,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .requiresChannel(ch -> ch.anyRequest().requiresSecure())
-                .headers(h -> h
-                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
-                        .frameOptions(f -> f.deny())
-                )
+                .headers(h -> {
+                        if (sslEnabled) {
+                            h.httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000));
+                        } else {
+                            h.httpStrictTransportSecurity(hsts -> hsts.disable());
+                        }
+                        h.frameOptions(f -> f.deny());
+                })
                 .httpBasic(b -> b.disable())
                 .formLogin(f -> f.disable())
                 .logout(l -> l.disable())
@@ -65,6 +72,10 @@ public class SecurityConfig {
                                 writeError(response, HttpServletResponse.SC_FORBIDDEN,
                                         "FORBIDDEN", "Nu ai permisiunea necesara"))
                 );
+
+        if (sslEnabled) {
+            http.requiresChannel(ch -> ch.anyRequest().requiresSecure());
+        }
 
         return http.build();
     }

@@ -12,6 +12,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Duration;
 import java.util.Base64;
@@ -26,6 +27,7 @@ public class AuthController {
     private final UserRepository users;
     private final JwtService jwt;
     private final AuthCookieProps authCookieProps;
+    private final boolean sslEnabled;
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
             "^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$",
@@ -33,10 +35,12 @@ public class AuthController {
     );
     private static final int MAX_AVATAR_BYTES = 256 * 1024;
 
-    public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps) {
+    public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
+                          @Value("${server.ssl.enabled:false}") boolean sslEnabled) {
         this.users = users;
         this.jwt = jwt;
         this.authCookieProps = authCookieProps;
+        this.sslEnabled = sslEnabled;
     }
 
     @PostMapping("/register")
@@ -112,7 +116,7 @@ public class AuthController {
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("accessToken", value != null ? value : "")
                 .path("/")
                 .httpOnly(true)
-                .secure(true);
+                .secure(sslEnabled);
 
         if (maxAge != null) {
             if (maxAge.isZero() || maxAge.isNegative()) {
@@ -124,6 +128,10 @@ public class AuthController {
 
 
         String sameSite = authCookieProps.getSameSiteAttribute();
+        if (!sslEnabled && sameSite != null && sameSite.equalsIgnoreCase("None")) {
+            // Browsers require Secure for SameSite=None; fall back to Lax in HTTP dev
+            sameSite = "Lax";
+        }
         if (sameSite != null && !sameSite.isBlank()) {
             builder.sameSite(sameSite);
         }

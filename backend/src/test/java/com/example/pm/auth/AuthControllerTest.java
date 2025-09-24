@@ -38,7 +38,7 @@ class AuthControllerTest {
         when(jwt.generate("user-1")).thenReturn("token-value");
         when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
 
-        AuthController controller = new AuthController(users, jwt, props);
+        AuthController controller = new AuthController(users, jwt, props, true);
         ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier"));
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
