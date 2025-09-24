@@ -2,6 +2,7 @@ package com.example.pm.security;
 
 import com.example.pm.auditlog.AuditLogAspect;
 import com.example.pm.auditlog.AuditLogController;
+import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
 import org.junit.jupiter.api.Test;
