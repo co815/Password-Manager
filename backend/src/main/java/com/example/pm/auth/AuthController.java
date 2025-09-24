@@ -36,7 +36,7 @@ public class AuthController {
     private static final int MAX_AVATAR_BYTES = 256 * 1024;
 
     public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
-                          @Value("${server.ssl.enabled:false}") boolean sslEnabled) {
+                          @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
         this.users = users;
         this.jwt = jwt;
         this.authCookieProps = authCookieProps;
