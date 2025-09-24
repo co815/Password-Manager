@@ -68,7 +68,7 @@ public class AuditLogAspect {
 
     private String resolveDetails(JoinPoint joinPoint, Object result) {
         if (isAuditLogListing(joinPoint)) {
-            return null;
+            return formatAuditLogListingDetails(joinPoint, result);
         }
         String resultType = result != null ? result.getClass().getSimpleName() : "null";
         return String.format("Invoked %s.%s (result=%s)",
@@ -80,5 +80,21 @@ public class AuditLogAspect {
     private boolean isAuditLogListing(JoinPoint joinPoint) {
         return "LISTAUDITLOGS".equalsIgnoreCase(joinPoint.getSignature().getName())
                 && "AuditLogController".equals(joinPoint.getTarget().getClass().getSimpleName());
+    }
+
+    private String formatAuditLogListingDetails(JoinPoint joinPoint, Object result) {
+        Integer limit = null;
+        for (Object arg : joinPoint.getArgs()) {
+            if (arg instanceof Integer intArg) {
+                limit = intArg;
+                break;
+            }
+        }
+        String base = "Viewed audit log entries";
+        if (limit != null) {
+            base = base + " (limit=" + limit + ")";
+        }
+        String resultType = result != null ? result.getClass().getSimpleName() : "null";
+        return String.format("%s (result=%s)", base, resultType);
     }
 }

@@ -159,16 +159,6 @@ public class AuthController {
             return true;
         }
 
-        String origin = request.getHeader("Origin");
-        if (origin != null && origin.toLowerCase(Locale.ROOT).startsWith("http://")) {
-            return false;
-        }
-
-        String referer = request.getHeader("Referer");
-        if (referer != null && referer.toLowerCase(Locale.ROOT).startsWith("http://")) {
-            return false;
-        }
-
         if (forwardedProtoIsHttp(request)) {
             return false;
         }
