@@ -1,5 +1,7 @@
 package com.example.pm.vault;
 
+import com.example.pm.auditlog.AuditLogAspect;
+import com.example.pm.auditlog.AuditLogController;
 import com.example.pm.model.VaultItem;
 import com.example.pm.repo.VaultItemRepository;
 import com.example.pm.security.JwtService;
@@ -45,6 +47,12 @@ class VaultControllerSecurityTest {
 
     @MockBean
     private VaultItemRepository vaultItemRepository;
+
+    @MockBean
+    private AuditLogController auditLogController;
+
+    @MockBean
+    private AuditLogAspect auditLogAspect;
 
     @BeforeEach
     void setUp() {

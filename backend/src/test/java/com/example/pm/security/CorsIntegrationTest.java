@@ -1,5 +1,7 @@
 package com.example.pm.security;
 
+import com.example.pm.auditlog.AuditLogAspect;
+import com.example.pm.auditlog.AuditLogController;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,12 @@ class CorsIntegrationTest {
 
     @MockBean
     private CredentialRepository credentialRepository;
+
+    @MockBean
+    private AuditLogController auditLogController;
+
+    @MockBean
+    private AuditLogAspect auditLogAspect;
 
     @MockBean
     private AuditLogRepository auditLogRepository;

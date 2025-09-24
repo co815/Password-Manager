@@ -1,5 +1,7 @@
 package com.example.pm.credential;
 
+import com.example.pm.auditlog.AuditLogAspect;
+import com.example.pm.auditlog.AuditLogController;
 import com.example.pm.dto.CredentialDtos;
 import com.example.pm.model.Credential;
 import com.example.pm.repo.AuditLogRepository;
@@ -51,6 +53,12 @@ class CredentialControllerSecurityTest {
 
     @MockBean
     private CredentialRepository credentialRepository;
+
+    @MockBean
+    private AuditLogController auditLogController;
+
+    @MockBean
+    private AuditLogAspect auditLogAspect;
 
     @MockBean
     private AuditLogRepository auditLogRepository;
