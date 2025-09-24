@@ -33,7 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "app.jwt.secret=test_secret_key_with_more_than_32_chars!!",
-        "server.ssl.enabled=false"
+        "server.ssl.enabled=false",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration,org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration"
 })
 @AutoConfigureMockMvc
 class CredentialControllerSecurityTest {
