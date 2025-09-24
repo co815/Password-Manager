@@ -1,13 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 
 import LoginCard from '../components/homePage/LoginCard';
 import SignupCard from '../components/homePage/SignupCard';
+import { useAuth } from '../auth/auth-context';
 
 type Mode = 'login' | 'signup';
 
 export default function Home() {
     const [mode, setMode] = useState<Mode>('login');
+    const { user, loading } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (!loading && user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [loading, navigate, user]);
 
     return (
         <Box
