@@ -50,7 +50,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
         "security.salt.rate-limit.requests=2",
-        "security.salt.rate-limit.window-seconds=3600"
+        "security.salt.rate-limit.window-seconds=3600",
+        "app.cors.origins[0]=http://localhost:5173",
+        "app.cors.origins[1]=https://localhost:5173"
 })
 @Import(TestSupportConfig.class)
 class SecurityIntegrationTests {
@@ -120,6 +122,22 @@ class SecurityIntegrationTests {
 
         assertThat(xsrfCookieHeader).doesNotContain("HttpOnly");
         assertThat(xsrfCookieHeader).contains("SameSite=Strict");
+    }
+
+    @Test
+    void csrfCookieUsesNoneWhenOriginSchemeDiffers() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/health")
+                        .secure(true)
+                        .header("Origin", "http://localhost:5173"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String xsrfCookieHeader = result.getResponse().getHeaders("Set-Cookie").stream()
+                .filter(headerValue -> headerValue.startsWith("XSRF-TOKEN="))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(xsrfCookieHeader).contains("SameSite=None");
     }
 
     @Test

@@ -10,6 +10,8 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.Locale;
 
@@ -49,10 +51,12 @@ class StrictCookieCsrfTokenRepository implements CsrfTokenRepository {
             @Override
             public void addCookie(Cookie cookie) {
                 if (cookie != null && "XSRF-TOKEN".equals(cookie.getName())) {
-                    ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(cookie.getName(), cookie.getValue() != null ? cookie.getValue() : "")
-                            .path(cookie.getPath() != null ? cookie.getPath() : "/")
+                    ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(
+                                    cookie.getName(),
+                                    cookie.getValue() != null ? cookie.getValue() : ""
+                            )
                             .httpOnly(false)
-                            .sameSite("Strict");
+                            .sameSite(determineSameSite(request));
                     if (cookie.getDomain() != null && !cookie.getDomain().isBlank()) {
                         builder.domain(cookie.getDomain());
                     }
@@ -109,5 +113,66 @@ class StrictCookieCsrfTokenRepository implements CsrfTokenRepository {
             }
         }
         return false;
-    }
+        private String determineSameSite(HttpServletRequest request) {
+            if (request == null) {
+                return "Strict";
+            }
+
+            String origin = request.getHeader("Origin");
+            if (origin == null || origin.isBlank()) {
+                return "Strict";
+            }
+
+            try {
+                URI originUri = new URI(origin);
+                String originHost = originUri.getHost();
+                if (originHost == null) {
+                    return "None";
+                }
+
+                String requestHost = request.getServerName();
+                if (!originHost.equalsIgnoreCase(requestHost)) {
+                    return "None";
+                }
+
+                String originScheme = originUri.getScheme();
+                String requestScheme = resolveScheme(request);
+                if (originScheme != null && originScheme.equalsIgnoreCase(requestScheme)) {
+                    return "Strict";
+                }
+            } catch (URISyntaxException ignored) {
+                return "None";
+            }
+
+            return "None";
+        }
+
+        private String resolveScheme(HttpServletRequest request) {
+            if (request.isSecure()) {
+                return "https";
+            }
+
+            String forwardedProto = request.getHeader("X-Forwarded-Proto");
+            if (forwardedProto != null) {
+                for (String proto : forwardedProto.split(",")) {
+                    if (!proto.isBlank()) {
+                        return proto.trim().toLowerCase(Locale.ROOT);
+                    }
+                }
+            }
+
+            String forwarded = request.getHeader("Forwarded");
+            if (forwarded != null) {
+                for (String segment : forwarded.split(",")) {
+                    for (String part : segment.split(";")) {
+                        String trimmed = part.trim();
+                        if (trimmed.regionMatches(true, 0, "proto=", 0, 6)) {
+                            return trimmed.substring(6).trim().toLowerCase(Locale.ROOT);
+                        }
+                    }
+                }
+            }
+
+            return request.getScheme();
+        }
 }
