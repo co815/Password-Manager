@@ -6,6 +6,7 @@ import com.example.pm.dto.AuthDtos.SaltResponse;
 import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
+import com.example.pm.security.RateLimiterService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ class AuthControllerTest {
     void loginSetsSecureHttpOnlyCookieWithSameSite() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -40,7 +42,9 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         props.setSameSite("None");
 
-        AuthController controller = new AuthController(users, jwt, props, true);
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
+
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -63,6 +67,7 @@ class AuthControllerTest {
     void loginKeepsSecureCookieEvenWhenOriginIsHttp() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -80,7 +85,9 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         props.setSameSite("None");
 
-        AuthController controller = new AuthController(users, jwt, props, true);
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
+
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -103,6 +110,7 @@ class AuthControllerTest {
     void loginDowngradesToNonSecureCookieWhenForwardedProtoIsHttp() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -120,7 +128,9 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         props.setSameSite("None");
 
-        AuthController controller = new AuthController(users, jwt, props, true);
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
+
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -144,6 +154,7 @@ class AuthControllerTest {
     void saltReturnsStoredSaltForKnownEmail() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
 
         User user = new User();
         user.setEmail("user@example.com");
@@ -152,9 +163,13 @@ class AuthControllerTest {
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
 
         AuthCookieProps props = new AuthCookieProps();
-        AuthController controller = new AuthController(users, jwt, props, true);
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        ResponseEntity<?> response = controller.salt("User@Example.com");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        ResponseEntity<?> response = controller.salt("User@Example.com", request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).isInstanceOf(SaltResponse.class);
@@ -167,14 +182,19 @@ class AuthControllerTest {
     void saltHidesWhetherUsernameExists() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
 
         when(users.findByUsername("unknown_user"))
                 .thenReturn(Optional.empty());
 
         AuthCookieProps props = new AuthCookieProps();
-        AuthController controller = new AuthController(users, jwt, props, true);
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        ResponseEntity<?> response = controller.salt("Unknown_User!!!");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        ResponseEntity<?> response = controller.salt("Unknown_User!!!", request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).isInstanceOf(SaltResponse.class);
@@ -187,14 +207,19 @@ class AuthControllerTest {
     void saltReturnsDifferentFakeValuesForUnknownEmail() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
 
         when(users.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
 
         AuthCookieProps props = new AuthCookieProps();
-        AuthController controller = new AuthController(users, jwt, props, true);
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        ResponseEntity<?> firstResponse = controller.salt("ghost@example.com");
-        ResponseEntity<?> secondResponse = controller.salt("ghost@example.com");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        ResponseEntity<?> firstResponse = controller.salt("ghost@example.com", request);
+        ResponseEntity<?> secondResponse = controller.salt("ghost@example.com", request);
 
         assertThat(firstResponse.getBody()).isInstanceOf(SaltResponse.class);
         assertThat(secondResponse.getBody()).isInstanceOf(SaltResponse.class);

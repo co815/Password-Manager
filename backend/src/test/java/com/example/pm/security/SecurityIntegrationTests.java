@@ -1,5 +1,6 @@
 package com.example.pm.security;
 
+import com.example.pm.model.AuditLog;
 import com.example.pm.model.User;
 import com.example.pm.model.VaultItem;
 import com.example.pm.repo.AuditLogRepository;
@@ -84,7 +85,7 @@ class SecurityIntegrationTests {
                     }
                     return item;
                 });
-        lenient().when(auditLogRepository.save(any()))
+        lenient().when(auditLogRepository.save(any(AuditLog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
