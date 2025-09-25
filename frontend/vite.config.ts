@@ -1,7 +1,10 @@
-import {defineConfig} from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import type { UserConfig as VitestUserConfig } from 'vitest/config';
 
-export default defineConfig({
+type ViteWithVitestConfig = UserConfig & { test: VitestUserConfig['test'] };
+
+const config = {
     plugins: [react()],
     server: {
         proxy: {
@@ -16,4 +19,6 @@ export default defineConfig({
         environment: 'jsdom',
         setupFiles: ['./src/test/setup.ts'],
     },
-});
+} satisfies ViteWithVitestConfig;
+
+export default defineConfig(config);
