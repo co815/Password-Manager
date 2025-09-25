@@ -51,7 +51,7 @@ class StrictCookieCsrfTokenRepository implements CsrfTokenRepository {
                 if (cookie != null && "XSRF-TOKEN".equals(cookie.getName())) {
                     ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(cookie.getName(), cookie.getValue() != null ? cookie.getValue() : "")
                             .path(cookie.getPath() != null ? cookie.getPath() : "/")
-                            .httpOnly(true)
+                            .httpOnly(false)
                             .sameSite("Strict");
                     if (cookie.getDomain() != null && !cookie.getDomain().isBlank()) {
                         builder.domain(cookie.getDomain());

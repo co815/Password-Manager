@@ -44,7 +44,7 @@ public class SecurityConfig {
         StrictCookieCsrfTokenRepository csrfTokenRepository = new StrictCookieCsrfTokenRepository(sslEnabled);
         csrfTokenRepository.setCookieName("XSRF-TOKEN");
         csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
-        csrfTokenRepository.setCookieHttpOnly(true);
+        csrfTokenRepository.setCookieHttpOnly(false);
         csrfTokenRepository.setCookiePath("/");
         http
                 .csrf(csrf -> csrf

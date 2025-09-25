@@ -118,7 +118,7 @@ class SecurityIntegrationTests {
                 .findFirst()
                 .orElseThrow();
 
-        assertThat(xsrfCookieHeader).contains("HttpOnly");
+        assertThat(xsrfCookieHeader).doesNotContain("HttpOnly");
         assertThat(xsrfCookieHeader).contains("SameSite=Strict");
     }
 
@@ -160,14 +160,11 @@ class SecurityIntegrationTests {
                         .saltClient("real-salt")
                         .build()));
 
-        // prima cerere: allow -> 200; a doua: deny -> 429
         when(rateLimiterService.isAllowed(anyString())).thenReturn(true, false);
 
-        // 1) prima cerere: 200 OK
         mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
                 .andExpect(status().isOk());
 
-        // 2) a doua cerere: 429 Too Many Requests + payload de eroare
         mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error").value("TOO_MANY_REQUESTS"));
@@ -182,7 +179,7 @@ class SecurityIntegrationTests {
 
     private Cookie buildCsrfCookie(String token) {
         Cookie cookie = new Cookie("XSRF-TOKEN", token);
-        cookie.setHttpOnly(true);
+        cookie.setHttpOnly(false);
         cookie.setPath("/");
         return cookie;
     }
