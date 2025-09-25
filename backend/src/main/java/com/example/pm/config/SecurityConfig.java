@@ -42,11 +42,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
         csrfTokenRepository.setCookieCustomizer(cookie -> cookie
                 .path("/")
                 .secure(sslEnabled)
-                .sameSite("Lax"));
-
+                .sameSite("Strict")
+                .httpOnly(true));
         http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
@@ -107,8 +108,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(corsProps.getOrigins()); // evită "*" când allowCredentials=true
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
-        config.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-CSRF-TOKEN"));
+        config.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-CSRF-TOKEN"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

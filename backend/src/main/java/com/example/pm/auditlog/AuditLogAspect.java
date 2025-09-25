@@ -11,7 +11,13 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+import org.springframework.http.ResponseEntity;
+
+import java.lang.reflect.Array;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Map;
+import java.util.StringJoiner;
 
 @Aspect
 @Component
@@ -70,11 +76,11 @@ public class AuditLogAspect {
         if (isAuditLogListing(joinPoint)) {
             return formatAuditLogListingDetails(joinPoint, result);
         }
-        String resultType = result != null ? result.getClass().getSimpleName() : "null";
-        return String.format("Invoked %s.%s (result=%s)",
+        return String.format("Invoked %s.%s %s -> %s",
                 joinPoint.getTarget().getClass().getSimpleName(),
                 joinPoint.getSignature().getName(),
-                resultType);
+                summarizeArguments(joinPoint.getArgs()),
+                summarizeResult(result));
     }
 
     private boolean isAuditLogListing(JoinPoint joinPoint) {
@@ -94,7 +100,81 @@ public class AuditLogAspect {
         if (limit != null) {
             base = base + " (limit=" + limit + ")";
         }
-        String resultType = result != null ? result.getClass().getSimpleName() : "null";
-        return String.format("%s (result=%s)", base, resultType);
+        return String.format("%s -> %s", base, summarizeResult(result));
+    }
+
+    private String summarizeArguments(Object[] args) {
+        if (args == null || args.length == 0) {
+            return "args=[]";
+        }
+
+        StringJoiner joiner = new StringJoiner(", ", "args=[", "]");
+        for (Object arg : args) {
+            joiner.add(summarizeArgument(arg));
+        }
+        return joiner.toString();
+    }
+
+    private String summarizeArgument(Object arg) {
+        if (arg == null) {
+            return "null";
+        }
+        if (arg instanceof String s) {
+            return "String(len=" + s.length() + ")";
+        }
+        if (arg instanceof Number || arg instanceof Enum<?>) {
+            return arg.getClass().getSimpleName();
+        }
+        if (arg instanceof Collection<?> collection) {
+            return collection.getClass().getSimpleName() + "(size=" + collection.size() + ")";
+        }
+        if (arg instanceof Map<?, ?> map) {
+            return map.getClass().getSimpleName() + "(size=" + map.size() + ")";
+        }
+        if (arg.getClass().isArray()) {
+            return "Array(type=" + arg.getClass().getComponentType().getSimpleName()
+                    + ",len=" + Array.getLength(arg) + ")";
+        }
+        return arg.getClass().getSimpleName();
+    }
+
+    private String summarizeResult(Object result) {
+        if (result == null) {
+            return "result=null";
+        }
+        if (result instanceof ResponseEntity<?> response) {
+            return "result=ResponseEntity(status=" + response.getStatusCode()
+                    + ",body=" + summarizeBody(response.getBody()) + ")";
+        }
+        if (result instanceof Collection<?> collection) {
+            return "result=" + collection.getClass().getSimpleName()
+                    + "(size=" + collection.size() + ")";
+        }
+        if (result instanceof Map<?, ?> map) {
+            return "result=" + map.getClass().getSimpleName()
+                    + "(size=" + map.size() + ")";
+        }
+        if (result.getClass().isArray()) {
+            return "result=Array(type=" + result.getClass().getComponentType().getSimpleName()
+                    + ",len=" + Array.getLength(result) + ")";
+        }
+        return "result=" + result.getClass().getSimpleName();
+    }
+
+    private String summarizeBody(Object body) {
+        if (body == null) {
+            return "null";
+        }
+        if (body instanceof Collection<?> collection) {
+            return collection.getClass().getSimpleName() + "(size=" + collection.size() + ")";
+        }
+        if (body instanceof Map<?, ?> map) {
+            return map.getClass().getSimpleName() + "(size=" + map.size() + ")";
+        }
+        if (body.getClass().isArray()) {
+            return "Array(type=" + body.getClass().getComponentType().getSimpleName()
+                    + ",len=" + Array.getLength(body) + ")";
+        }
+        return body.getClass().getSimpleName();
     }
 }

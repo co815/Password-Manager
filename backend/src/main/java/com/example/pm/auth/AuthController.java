@@ -6,6 +6,7 @@ import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
+import com.example.pm.security.RateLimiterService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -29,6 +30,7 @@ public class AuthController {
     private final UserRepository users;
     private final JwtService jwt;
     private final AuthCookieProps authCookieProps;
+    private final RateLimiterService rateLimiterService;
     private final boolean sslEnabled;
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
@@ -40,10 +42,12 @@ public class AuthController {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
+                          RateLimiterService rateLimiterService,
                           @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
         this.users = users;
         this.jwt = jwt;
         this.authCookieProps = authCookieProps;
+        this.rateLimiterService = rateLimiterService;
         this.sslEnabled = sslEnabled;
     }
 
@@ -70,11 +74,20 @@ public class AuthController {
     }
 
     @GetMapping("/salt")
-    public ResponseEntity<?> salt(@RequestParam String identifier) {
+    public ResponseEntity<?> salt(@RequestParam String identifier, HttpServletRequest request) {
         String trimmed = identifier == null ? "" : identifier.trim();
+
+        if (!rateLimiterService.isAllowed(buildSaltRateLimitKey(request, trimmed))) {
+            return ResponseEntity.status(429)
+                    .body(new ErrorResponse(429, "TOO_MANY_REQUESTS",
+                            "Too many attempts. Please try again later."));
+        }
+
         if (trimmed.isEmpty()) {
-            return ResponseEntity.status(404)
-                    .body(new ErrorResponse(404, "NOT FOUND", "Invalid identifier - User not found"));
+            return ResponseEntity.ok(new SaltResponse(
+                    placeholderEmailFor(trimmed),
+                    fakeSalt()
+            ));
         }
 
         String normalizedEmail = trimmed.contains("@") ? trimmed.toLowerCase(Locale.ROOT) : null;
@@ -198,6 +211,15 @@ public class AuthController {
         byte[] saltBytes = new byte[16];
         SECURE_RANDOM.nextBytes(saltBytes);
         return Base64.getEncoder().encodeToString(saltBytes);
+    }
+
+    private String buildSaltRateLimitKey(HttpServletRequest request, String identifier) {
+        String remoteAddr = request != null && request.getRemoteAddr() != null
+                ? request.getRemoteAddr()
+                : "unknown";
+        String normalized = identifier == null ? "" : identifier.trim().toLowerCase(Locale.ROOT);
+        int identifierHash = normalized.isEmpty() ? 0 : normalized.hashCode();
+        return remoteAddr + ":" + Integer.toHexString(identifierHash);
     }
 
     private static String placeholderEmailFor(String identifier) {
