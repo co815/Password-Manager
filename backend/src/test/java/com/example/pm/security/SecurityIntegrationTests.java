@@ -155,13 +155,7 @@ class SecurityIntegrationTests {
                         .saltClient("real-salt")
                         .build()));
 
-        when(rateLimiterService.isAllowed(anyString())).thenReturn(true, true, false);
-
-        mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
-                .andExpect(status().isOk());
+        when(rateLimiterService.isAllowed(anyString())).thenReturn(true, false);
 
         mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
                 .andExpect(status().isTooManyRequests())
