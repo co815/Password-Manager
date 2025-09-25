@@ -105,6 +105,22 @@ class CredentialControllerSecurityTest {
     }
 
     @Test
+    void createCredentialWithoutCsrfTokenReturns403() throws Exception {
+        String token = jwtService.generate("user-123");
+
+        var req = new CredentialDtos.AddCredentialRequest(
+                "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce"
+        );
+
+        mockMvc.perform(post("/api/credentials")
+                        .secure(true)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void createCredentialDuplicateServiceReturns409() throws Exception {
         String token = jwtService.generate("user-123");
         when(credentialRepository.findByUserIdAndService("user-123", "Email"))
