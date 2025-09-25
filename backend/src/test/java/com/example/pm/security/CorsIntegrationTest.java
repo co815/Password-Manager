@@ -1,5 +1,6 @@
 package com.example.pm.security;
 
+import com.example.pm.TestSupportConfig;
 import com.example.pm.auditlog.AuditLogAspect;
 import com.example.pm.auditlog.AuditLogController;
 import com.example.pm.config.TestMongoConfig;
@@ -32,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.data.mongodb.repositories.enabled=false"
 })
 @AutoConfigureMockMvc
-@Import(TestMongoConfig.class)
+@Import({TestMongoConfig.class, TestSupportConfig.class})
 class CorsIntegrationTest {
 
     @Autowired MockMvc mockMvc;

@@ -1,5 +1,6 @@
 package com.example.pm.auth;
 
+import com.example.pm.TestSupportConfig;
 import com.example.pm.config.AuthCookieProps;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
@@ -20,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @WebMvcTest(controllers = AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(AuthCookieProps.class)
+@Import({AuthCookieProps.class, TestSupportConfig.class})
 class AuthControllerValidationTest {
 
     @Autowired MockMvc mockMvc;
