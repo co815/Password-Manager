@@ -23,10 +23,15 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.Mockito.lenient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -155,8 +160,14 @@ class SecurityIntegrationTests {
                         .saltClient("real-salt")
                         .build()));
 
+        // prima cerere: allow -> 200; a doua: deny -> 429
         when(rateLimiterService.isAllowed(anyString())).thenReturn(true, false);
 
+        // 1) prima cerere: 200 OK
+        mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
+                .andExpect(status().isOk());
+
+        // 2) a doua cerere: 429 Too Many Requests + payload de eroare
         mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error").value("TOO_MANY_REQUESTS"));

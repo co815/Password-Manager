@@ -12,15 +12,16 @@ import java.io.IOException;
 public class CsrfCookieFilter extends OncePerRequestFilter {
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
             throws ServletException, IOException {
+
         CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
         if (token != null) {
-            String value = token.getToken();
-            if (value != null) {
-                response.setHeader("X-CSRF-TOKEN", value);
-            }
+            response.setHeader("X-CSRF-TOKEN", token.getToken());
         }
+
         filterChain.doFilter(request, response);
     }
 }
