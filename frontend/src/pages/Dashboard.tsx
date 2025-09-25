@@ -1,6 +1,6 @@
 import {useMemo, useState, useEffect} from 'react';
 import {useNavigate} from 'react-router-dom';
-import type {ChangeEvent} from 'react';
+import type {ChangeEvent, MouseEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
 import {useCrypto} from '../lib/crypto/crypto-context';
 import {api, type PublicCredential} from '../lib/api';
@@ -11,14 +11,16 @@ import {unwrapDEK} from '../lib/crypto/unwrap';
 
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
-    Avatar, TextField, IconButton, Card, CardContent, Button, InputAdornment,
+    Avatar, TextField, IconButton, Card, CardContent, Button, InputAdornment, Tooltip,
     Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Snackbar, Stack, LinearProgress,
+    Menu, MenuItem
 } from '@mui/material';
 
 import {
     Search, Note, Key, Star, StarBorder, Edit, Delete,
-    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline, ListAlt, ContentCopy,
+    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline, ListAlt, ContentCopy, AutoFixHigh,
 } from '@mui/icons-material';
+import {passwordTemplates} from '../lib/passwordTemplates';
 
 const td = new TextDecoder();
 
@@ -134,6 +136,8 @@ export default function Dashboard() {
     const [password, setPassword] = useState('');
     const [url, setUrl] = useState('');
     const [showPwd, setShowPwd] = useState(false);
+    const [generatorAnchorEl, setGeneratorAnchorEl] = useState<null | HTMLElement>(null);
+    const generatorMenuOpen = Boolean(generatorAnchorEl);
     const [busy, setBusy] = useState(false);
     const [deleteBusy, setDeleteBusy] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<Credential | null>(null);
@@ -657,6 +661,23 @@ export default function Dashboard() {
         }
     };
 
+    const handleGeneratorMenuClose = () => {
+        setGeneratorAnchorEl(null);
+    };
+
+    const handleGeneratorMenuOpen = (event: MouseEvent<HTMLButtonElement>) => {
+        setGeneratorAnchorEl(event.currentTarget);
+    };
+
+    const handleSelectTemplate = (templateId: string) => {
+        const template = passwordTemplates.find((item) => item.id === templateId);
+        if (template) {
+            setPassword(template.generate());
+            setShowPwd(true);
+        }
+        handleGeneratorMenuClose();
+    };
+
     return (
         <Box display="flex" minHeight="100vh" sx={{bgcolor: 'background.default'}}>
             <Drawer
@@ -1054,9 +1075,26 @@ export default function Dashboard() {
                                     input: {
                                         endAdornment: (
                                             <InputAdornment position="end">
-                                                <IconButton onClick={() => setShowPwd((s) => !s)} edge="end">
-                                                    {showPwd ? <VisibilityOff/> : <Visibility/>}
-                                                </IconButton>
+                                                <Tooltip title="Generate password">
+                                                    <IconButton
+                                                        onClick={handleGeneratorMenuOpen}
+                                                        edge="end"
+                                                        size="small"
+                                                        aria-label="Generate password"
+                                                    >
+                                                        <AutoFixHigh fontSize="small"/>
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title={showPwd ? 'Hide password' : 'Show password'}>
+                                                    <IconButton
+                                                        onClick={() => setShowPwd((s) => !s)}
+                                                        edge="end"
+                                                        size="small"
+                                                        aria-label={showPwd ? 'Hide password' : 'Show password'}
+                                                    >
+                                                        {showPwd ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}
+                                                    </IconButton>
+                                                </Tooltip>
                                             </InputAdornment>
                                         ),
                                     },
@@ -1085,6 +1123,24 @@ export default function Dashboard() {
                         />
                     </Stack>
                 </DialogContent>
+                <Menu
+                    anchorEl={generatorAnchorEl}
+                    open={generatorMenuOpen}
+                    onClose={handleGeneratorMenuClose}
+                    anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
+                    transformOrigin={{vertical: 'top', horizontal: 'right'}}
+                >
+                    {passwordTemplates.map((template) => (
+                        <MenuItem key={template.id} onClick={() => handleSelectTemplate(template.id)}>
+                            <ListItemText
+                                primary={template.label}
+                                secondary={template.description}
+                                primaryTypographyProps={{fontWeight: 600}}
+                                secondaryTypographyProps={{variant: 'caption', color: 'text.secondary'}}
+                            />
+                        </MenuItem>
+                    ))}
+                </Menu>
                 <DialogActions sx={{px: 3, pb: 2}}>
                     <Button onClick={handleDialogClose} disabled={busy}>Cancel</Button>
                     <Button
