@@ -8,6 +8,7 @@ import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.repo.VaultItemRepository;
+import com.example.pm.security.RateLimiterService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,12 +30,12 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -71,9 +72,12 @@ class SecurityIntegrationTests {
     @MockBean
     private CredentialRepository credentialRepository;
 
+    @MockBean
+    private RateLimiterService rateLimiterService;
+
     @BeforeEach
     void setUpMocks() {
-        reset(vaultItemRepository, auditLogRepository, userRepository, credentialRepository);
+        reset(vaultItemRepository, auditLogRepository, userRepository, credentialRepository, rateLimiterService);
         lenient().when(vaultItemRepository.save(any(VaultItem.class)))
                 .thenAnswer(invocation -> {
                     VaultItem item = invocation.getArgument(0);
@@ -134,6 +138,7 @@ class SecurityIntegrationTests {
         mockMvc.perform(post("/api/vault")
                         .cookie(csrfCookie)
                         .with(authentication(authenticatedUser()))
+                        .with(user("tester").roles("USER"))
                         .header("X-CSRF-TOKEN", token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_VAULT_PAYLOAD))
@@ -149,6 +154,8 @@ class SecurityIntegrationTests {
                         .username("known")
                         .saltClient("real-salt")
                         .build()));
+
+        when(rateLimiterService.isAllowed(anyString())).thenReturn(true, true, false);
 
         mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
                 .andExpect(status().isOk());
@@ -175,9 +182,7 @@ class SecurityIntegrationTests {
         return cookie;
     }
 
-    private TestingAuthenticationToken authenticatedUser() {
-        TestingAuthenticationToken authenticationToken = new TestingAuthenticationToken("user-1", null);
-        authenticationToken.setAuthenticated(true);
-        return authenticationToken;
+    private UsernamePasswordAuthenticationToken authenticatedUser() {
+        return new UsernamePasswordAuthenticationToken("user-1", null, List.of());
     }
 }

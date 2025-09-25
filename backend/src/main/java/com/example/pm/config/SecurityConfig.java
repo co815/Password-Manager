@@ -14,6 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -44,13 +45,14 @@ public class SecurityConfig {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
         csrfTokenRepository.setCookieCustomizer(cookie -> cookie
-                .path("/")
-                .secure(sslEnabled)
                 .sameSite("Strict")
-                .httpOnly(true));
+                .httpOnly(true)
+                .path("/")
+                .secure(sslEnabled));
         http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         .ignoringRequestMatchers(
                                 new AntPathRequestMatcher("/api/auth/login", "POST"),
                                 new AntPathRequestMatcher("/api/auth/register", "POST"),
