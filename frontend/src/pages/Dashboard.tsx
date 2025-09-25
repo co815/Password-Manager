@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 
 import {
-    Search, AccountBox, CreditCard, Note, Wifi, Key, Assignment, Star, Edit, Delete,
+    Search, Note, Key, Star, Edit, Delete,
     Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline, ListAlt,
 } from '@mui/icons-material';
 
@@ -37,14 +37,37 @@ export type Credential = {
     password: string;
 }
 
-const categories = [
-    {text: 'Logins', icon: <Key/>},
-    {text: 'Secure Notes', icon: <Note/>},
-    {text: 'Credit Cards', icon: <CreditCard/>},
-    {text: 'Identities', icon: <AccountBox/>},
-    {text: 'Software Licenses', icon: <Assignment/>},
-    {text: 'Wireless Routers', icon: <Wifi/>},
-];
+const ALL_CATEGORY_ID = '__all__';
+const UNCATEGORIZED_LABEL = 'Uncategorized';
+
+type CategoryItem = {
+    id: string;
+    label: string;
+    count: number;
+};
+
+function inferCategory(credential: Credential): string {
+    const url = credential.url?.trim();
+    if (url) {
+        try {
+            const normalized = url.includes('://') ? url : `https://${url}`;
+            const parsed = new URL(normalized);
+            const hostname = parsed.hostname.replace(/^www\./i, '').trim();
+            if (hostname) {
+                return hostname;
+            }
+        } catch {
+            // ignore parsing errors and fall back to other strategies
+        }
+    }
+
+    const name = credential.name.trim();
+    if (name) {
+        return name;
+    }
+
+    return UNCATEGORIZED_LABEL;
+}
 
 const te = new TextEncoder();
 const toB64 = (buf: ArrayBuffer | Uint8Array) =>
@@ -104,6 +127,8 @@ export default function Dashboard() {
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarDialogError, setAvatarDialogError] = useState<string | null>(null);
     const [avatarSaving, setAvatarSaving] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY_ID);
 
     const isAuditAdmin = useMemo(() => isAuditAdminEmail(user?.email ?? null), [user?.email]);
 
@@ -152,6 +177,8 @@ export default function Dashboard() {
         setBusy(false);
         setDeleteBusy(false);
         setDeleteTarget(null);
+        setSearchQuery('');
+        setSelectedCategory(ALL_CATEGORY_ID);
     }, [dek, locked]);
 
     useEffect(() => {
@@ -207,6 +234,85 @@ export default function Dashboard() {
     useEffect(() => {
         setAvatarLoadError(false);
     }, [user?.avatarData, user?.email]);
+
+    const categoryItems = useMemo<CategoryItem[]>(() => {
+        const counts = new Map<string, number>();
+        for (const credential of credentials) {
+            const category = inferCategory(credential);
+            counts.set(category, (counts.get(category) ?? 0) + 1);
+        }
+
+        const dynamic = Array.from(counts.entries())
+            .sort((a, b) => a[0].localeCompare(b[0], undefined, {sensitivity: 'base'}))
+            .map<CategoryItem>(([label, count]) => ({
+                id: label,
+                label,
+                count,
+            }));
+
+        return [
+            {id: ALL_CATEGORY_ID, label: 'All credentials', count: credentials.length},
+            ...dynamic,
+        ];
+    }, [credentials]);
+
+    useEffect(() => {
+        if (selectedCategory === ALL_CATEGORY_ID) return;
+        if (!categoryItems.some((category) => category.id === selectedCategory)) {
+            setSelectedCategory(ALL_CATEGORY_ID);
+        }
+    }, [categoryItems, selectedCategory]);
+
+    const filteredCredentials = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
+
+        return credentials.filter((credential) => {
+            if (selectedCategory !== ALL_CATEGORY_ID) {
+                const category = inferCategory(credential);
+                if (category !== selectedCategory) {
+                    return false;
+                }
+            }
+
+            if (!normalizedQuery) {
+                return true;
+            }
+
+            const haystack = [credential.name, credential.username, credential.url ?? ''];
+            return haystack.some((value) => value.toLowerCase().includes(normalizedQuery));
+        });
+    }, [credentials, searchQuery, selectedCategory]);
+
+    const activeCategory = useMemo(() =>
+            categoryItems.find((category) => category.id === selectedCategory) ?? categoryItems[0],
+        [categoryItems, selectedCategory]);
+
+    useEffect(() => {
+        if (selected) {
+            const match = filteredCredentials.find((credential) => credential.id === selected.id);
+            if (match) {
+                if (match !== selected) {
+                    setSelected(match);
+                }
+                return;
+            }
+        }
+
+        const nextSelection = filteredCredentials[0] ?? null;
+        if (nextSelection !== selected) {
+            setSelected(nextSelection);
+        }
+    }, [filteredCredentials, selected]);
+
+    const renderCategoryIcon = (categoryId: string) => {
+        if (categoryId === ALL_CATEGORY_ID) {
+            return <Key/>;
+        }
+        if (categoryId === UNCATEGORIZED_LABEL) {
+            return <Note/>;
+        }
+        return <LinkIcon/>;
+    };
 
     const resetFormFields = () => {
         setTitle('');
@@ -499,15 +605,21 @@ export default function Dashboard() {
             >
                 <Box p={2}>
                     <Typography variant="h6" fontWeight={700} gutterBottom>
-                        All Credentials ({credentials.length})
+                        {activeCategory
+                            ? `${activeCategory.label} (${activeCategory.count})`
+                            : `All Credentials (${credentials.length})`}
                     </Typography>
                 </Box>
                 <Divider/>
                 <List dense>
-                    {categories.map((cat) => (
-                        <ListItemButton key={cat.text}>
-                            <ListItemIcon sx={{minWidth: 36}}>{cat.icon}</ListItemIcon>
-                            <ListItemText primary={cat.text}/>
+                    {categoryItems.map((category) => (
+                        <ListItemButton
+                            key={category.id}
+                            selected={selectedCategory === category.id}
+                            onClick={() => setSelectedCategory(category.id)}
+                        >
+                            <ListItemIcon sx={{minWidth: 36}}>{renderCategoryIcon(category.id)}</ListItemIcon>
+                            <ListItemText primary={`${category.label} (${category.count})`}/>
                         </ListItemButton>
                     ))}
                 </List>
@@ -517,6 +629,8 @@ export default function Dashboard() {
                 <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} gap={2}>
                     <TextField
                         placeholder="Search"
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
                         size="small"
                         sx={{maxWidth: 420}}
                         slotProps={{
@@ -572,8 +686,18 @@ export default function Dashboard() {
                                 <ListItem>
                                     <ListItemText primary="Vault locked" secondary="Unlock to view credentials."/>
                                 </ListItem>
+                            ) : filteredCredentials.length === 0 ? (
+                                <ListItem>
+                                    <ListItemText
+                                        primary={
+                                            searchQuery
+                                                ? 'No credentials match your search.'
+                                                : 'No credentials in this category yet.'
+                                        }
+                                    />
+                                </ListItem>
                             ) : (
-                                credentials.map((credential) => {
+                                filteredCredentials.map((credential) => {
                                     const active = selected?.id === credential.id;
                                     return (
                                         <ListItemButton
