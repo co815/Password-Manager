@@ -194,9 +194,9 @@ export const api = {
     getSalt: (identifier: string) =>
         req<SaltResponse>(`/auth/salt?identifier=${encodeURIComponent(identifier)}`),
     register: (body: RegisterRequest) =>
-        req<{ id: string }>(`/auth/register`, { method: 'POST', body: JSON.stringify(body) }),
+        req<{ id: string }>(`/auth/register`, { method: 'POST', body: JSON.stringify(body) }, { skipCsrf: true }),
     login: (body: LoginRequest) =>
-        req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
+        req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }, { skipCsrf: true }),
     logout: () => req<void>(`/auth/logout`, { method: 'POST' }, { skipCsrf: true }),
     currentUser: () => req<PublicUser>(`/auth/me`, {}, { suppressAuthCleared: true }),
     updateAvatar: (avatarData: string | null) =>
