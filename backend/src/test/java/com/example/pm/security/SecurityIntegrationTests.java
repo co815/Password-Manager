@@ -125,7 +125,7 @@ class SecurityIntegrationTests {
     }
 
     @Test
-    void csrfCookieUsesNoneWhenOriginSchemeDiffers() throws Exception {
+    void csrfCookieFallsBackToLaxWhenSecureNotAvailable() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/health")
                         .secure(true)
                         .header("Origin", "http://localhost:5173"))
@@ -137,7 +137,8 @@ class SecurityIntegrationTests {
                 .findFirst()
                 .orElseThrow();
 
-        assertThat(xsrfCookieHeader).contains("SameSite=None");
+        assertThat(xsrfCookieHeader).contains("SameSite=Lax");
+        assertThat(xsrfCookieHeader).doesNotContain("Secure");
     }
 
     @Test

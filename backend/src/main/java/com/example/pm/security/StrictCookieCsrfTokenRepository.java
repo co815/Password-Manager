@@ -51,22 +51,30 @@ class StrictCookieCsrfTokenRepository implements CsrfTokenRepository {
             @Override
             public void addCookie(Cookie cookie) {
                 if (cookie != null && "XSRF-TOKEN".equals(cookie.getName())) {
+                    String sameSite = determineSameSite(request);
+                    boolean secure = shouldUseSecureCookie(request);
+                    if (sameSite != null && sameSite.equalsIgnoreCase("None") && !secure) {
+                        sameSite = "Lax";
+                    }
+
                     ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(
                                     cookie.getName(),
                                     cookie.getValue() != null ? cookie.getValue() : ""
                             )
                             .httpOnly(false)
-                            .sameSite(determineSameSite(request));
+                            .path(cookie.getPath() != null && !cookie.getPath().isBlank() ? cookie.getPath() : "/")
+                            .sameSite(sameSite);
                     if (cookie.getDomain() != null && !cookie.getDomain().isBlank()) {
                         builder.domain(cookie.getDomain());
                     }
                     if (cookie.getMaxAge() >= 0) {
                         builder.maxAge(Duration.ofSeconds(cookie.getMaxAge()));
                     }
-                    if (shouldUseSecureCookie(request)) {
+                    if (secure) {
                         builder.secure(true);
                     }
-                    super.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
+                    ResponseCookie responseCookie = builder.build();
+                    super.addHeader(HttpHeaders.SET_COOKIE, responseCookie.toString());
                 } else {
                     super.addCookie(cookie);
                 }
