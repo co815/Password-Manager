@@ -126,7 +126,11 @@ async function req<T>(
 
     if (!res.ok) {
         if (res.status === 401 && !options.suppressAuthCleared) emitAuthCleared();
-        const message = (data && (data.error || (data as { message?: string }).message)) || `HTTP ${res.status}`;
+        const errorData = (data || {}) as { error?: string | null; message?: string | null };
+        const message =
+            (errorData.message && errorData.message.trim())
+            || (errorData.error && errorData.error.trim())
+            || `HTTP ${res.status}`;
         throw new ApiError(message, res.status, data);
     }
     return data as T;
