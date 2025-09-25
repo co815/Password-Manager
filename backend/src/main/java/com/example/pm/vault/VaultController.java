@@ -133,6 +133,12 @@ public class VaultController {
         if (principal instanceof String s) {
             return Optional.of(s);
         }
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails userDetails) {
+            return Optional.ofNullable(userDetails.getUsername());
+        }
+        if (principal instanceof java.security.Principal namedPrincipal) {
+            return Optional.ofNullable(namedPrincipal.getName());
+        }
         return Optional.empty();
     }
 

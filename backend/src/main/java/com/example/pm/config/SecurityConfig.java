@@ -12,7 +12,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -42,14 +41,12 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository csrfTokenRepository = new CookieCsrfTokenRepository();
+        StrictCookieCsrfTokenRepository csrfTokenRepository = new StrictCookieCsrfTokenRepository(sslEnabled);
         csrfTokenRepository.setCookieName("XSRF-TOKEN");
         csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
         csrfTokenRepository.setCookieCustomizer(cookie -> cookie
-                .sameSite("Strict")
-                .httpOnly(true)
-                .path("/")
-                .secure(sslEnabled));
+                csrfTokenRepository.setCookieHttpOnly(true);
+                csrfTokenRepository.setCookiePath("/");
         http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
