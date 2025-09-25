@@ -16,8 +16,8 @@ import {
 } from '@mui/material';
 
 import {
-    Search, Note, Key, Star, Edit, Delete,
-    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline, ListAlt,
+    Search, Note, Key, Star, StarBorder, Edit, Delete,
+    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline, ListAlt, ContentCopy,
 } from '@mui/icons-material';
 
 const td = new TextDecoder();
@@ -39,6 +39,7 @@ export type Credential = {
 
 const ALL_CATEGORY_ID = '__all__';
 const UNCATEGORIZED_LABEL = 'Uncategorized';
+const FAVORITES_STORAGE_KEY = 'pm:favorites';
 
 type CategoryItem = {
     id: string;
@@ -100,6 +101,20 @@ export default function Dashboard() {
 
     const [credentials, setCredentials] = useState<Credential[]>([]);
     const [selected, setSelected] = useState<Credential | null>(null);
+    const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed.filter((id): id is string => typeof id === 'string');
+            }
+        } catch {
+            // Ignore malformed stored data and fall back to an empty list.
+        }
+        return [];
+    });
 
     const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
     const [editingTarget, setEditingTarget] = useState<Credential | null>(null);
@@ -112,6 +127,7 @@ export default function Dashboard() {
     const [showUnlockPwd, setShowUnlockPwd] = useState(false);
     const [unlockBusy, setUnlockBusy] = useState(false);
     const [unlockError, setUnlockError] = useState<string | null>(null);
+    const [showSelectedPassword, setShowSelectedPassword] = useState(false);
 
     const [title, setTitle] = useState('');
     const [username, setUsername] = useState('');
@@ -232,8 +248,21 @@ export default function Dashboard() {
     }, [dek, user]);
 
     useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
+        } catch {
+            // Ignore write errors (e.g. storage disabled).
+        }
+    }, [favoriteIds]);
+
+    useEffect(() => {
         setAvatarLoadError(false);
     }, [user?.avatarData, user?.email]);
+
+    useEffect(() => {
+        setShowSelectedPassword(false);
+    }, [selected?.id]);
 
     const categoryItems = useMemo<CategoryItem[]>(() => {
         const counts = new Map<string, number>();
@@ -572,6 +601,7 @@ export default function Dashboard() {
                 }
                 return next;
             });
+            setFavoriteIds((prev) => prev.filter((id) => id !== deleteTarget.id));
             setToast({type: 'success', msg: 'Credential deleted.'});
             setDeleteTarget(null);
         } catch (e: unknown) {
@@ -585,6 +615,46 @@ export default function Dashboard() {
     const handleDeleteDialogClose = () => {
         if (deleteBusy) return;
         setDeleteTarget(null);
+    };
+
+    const selectedIsFavorite = selected ? favoriteIds.includes(selected.id) : false;
+
+    const handleToggleFavorite = () => {
+        if (!selected) return;
+        setFavoriteIds((prev) => {
+            const nextSet = new Set(prev);
+            if (nextSet.has(selected.id)) {
+                nextSet.delete(selected.id);
+            } else {
+                nextSet.add(selected.id);
+            }
+            return Array.from(nextSet);
+        });
+    };
+
+    const handleCopyPassword = async () => {
+        if (!selected?.password) return;
+        try {
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(selected.password);
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = selected.password;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (!successful) {
+                    throw new Error('Copy command was unsuccessful');
+                }
+            }
+            setToast({type: 'success', msg: 'Password copied to clipboard.'});
+        } catch {
+            setToast({type: 'error', msg: 'Failed to copy password.'});
+        }
     };
 
     return (
@@ -713,8 +783,14 @@ export default function Dashboard() {
                                                 },
                                             }}
                                         >
-                                            <ListItemText primary={credential.name}
-                                                          secondary={credential.username || '—'}/>
+                                            <ListItemText
+                                                primary={
+                                                    favoriteIds.includes(credential.id)
+                                                        ? `${credential.name} ★`
+                                                        : credential.name
+                                                }
+                                                secondary={credential.username || '—'}
+                                            />
                                         </ListItemButton>
                                     );
                                 })
@@ -746,8 +822,13 @@ export default function Dashboard() {
                                             >
                                                 <AddIcon/>
                                             </IconButton>
-                                            <IconButton size="small">
-                                                <Star color="warning"/>
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleToggleFavorite}
+                                                disabled={!selected}
+                                                title={selectedIsFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                            >
+                                                {selectedIsFavorite ? <Star color="warning"/> : <StarBorder/>}
                                             </IconButton>
                                             <IconButton
                                                 size="small"
@@ -773,7 +854,40 @@ export default function Dashboard() {
                                     <Typography sx={{mb: 1}}>{selected?.username || '—'}</Typography>
 
                                     <Typography variant="caption" color="text.secondary">password</Typography>
-                                    <Typography sx={{mb: 1}}>••••••••</Typography>
+                                    <Box display="flex" alignItems="center" gap={0.5} sx={{mb: 1}}>
+                                        <Typography
+                                            sx={{
+                                                fontFamily: 'monospace',
+                                                wordBreak: 'break-all',
+                                                mb: 0,
+                                            }}
+                                            title={showSelectedPassword ? selected?.password : undefined}
+                                        >
+                                            {selected
+                                                ? showSelectedPassword
+                                                    ? selected.password
+                                                    : '••••••••'
+                                                : '—'}
+                                        </Typography>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => setShowSelectedPassword((prev) => !prev)}
+                                            disabled={!selected}
+                                            title={showSelectedPassword ? 'Hide password' : 'Show password'}
+                                        >
+                                            {showSelectedPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}
+                                        </IconButton>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                                void handleCopyPassword();
+                                            }}
+                                            disabled={!selected}
+                                            title="Copy password"
+                                        >
+                                            <ContentCopy fontSize="small"/>
+                                        </IconButton>
+                                    </Box>
 
                                     <Typography variant="caption" color="text.secondary">strength</Typography>
                                     <Box sx={{
