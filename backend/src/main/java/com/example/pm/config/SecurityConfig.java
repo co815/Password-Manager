@@ -53,7 +53,8 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(
                                 new AntPathRequestMatcher("/api/auth/login", "POST"),
                                 new AntPathRequestMatcher("/api/auth/register", "POST"),
-                                new AntPathRequestMatcher("/api/auth/logout", "POST")
+                                new AntPathRequestMatcher("/api/auth/logout", "POST"),
+                                new AntPathRequestMatcher("/api/auth/master/reset", "POST")
                         )
                 )
                 .cors(cors -> cors.configurationSource(corsSource()))
@@ -64,7 +65,8 @@ public class SecurityConfig {
                                 "/api/health",
                                 "/api/auth/register",
                                 "/api/auth/login",
-                                "/api/auth/salt"
+                                "/api/auth/salt",
+                                "/api/auth/master/reset"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

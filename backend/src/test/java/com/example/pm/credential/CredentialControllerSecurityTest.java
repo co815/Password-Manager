@@ -6,6 +6,7 @@ import com.example.pm.auditlog.AuditLogController;
 import com.example.pm.config.TestMongoConfig;
 import com.example.pm.dto.CredentialDtos;
 import com.example.pm.model.Credential;
+import com.example.pm.model.User;
 import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
@@ -80,8 +81,9 @@ class CredentialControllerSecurityTest {
         c.setPasswordNonce("pNonce");
 
         when(credentialRepository.findByUserId("user-123")).thenReturn(List.of(c));
+        stubUser("user-123");
 
-        String token = jwtService.generate("user-123");
+        String token = jwtService.generate("user-123", 0);
 
         mockMvc.perform(get("/api/credentials")
                         .secure(true)
@@ -107,7 +109,8 @@ class CredentialControllerSecurityTest {
 
     @Test
     void createCredentialWithoutCsrfTokenReturns403() throws Exception {
-        String token = jwtService.generate("user-123");
+        stubUser("user-123");
+        String token = jwtService.generate("user-123", 0);
 
         var req = new CredentialDtos.AddCredentialRequest(
                 "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce"
@@ -123,7 +126,8 @@ class CredentialControllerSecurityTest {
 
     @Test
     void createCredentialDuplicateServiceReturns409() throws Exception {
-        String token = jwtService.generate("user-123");
+        stubUser("user-123");
+        String token = jwtService.generate("user-123", 0);
         when(credentialRepository.findByUserIdAndService("user-123", "Email"))
                 .thenReturn(Optional.of(new Credential()));
 
@@ -140,5 +144,12 @@ class CredentialControllerSecurityTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("CONFLICT"))
                 .andExpect(jsonPath("$.message", containsString("already exist")));
+    }
+
+    private void stubUser(String userId) {
+        User user = new User();
+        user.setId(userId);
+        user.setTokenVersion(0);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     }
 }

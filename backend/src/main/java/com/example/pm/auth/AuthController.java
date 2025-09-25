@@ -1,5 +1,6 @@
 package com.example.pm.auth;
 
+import com.example.pm.auditlog.SecurityAuditService;
 import com.example.pm.config.AuthCookieProps;
 import com.example.pm.dto.AuthDtos.*;
 import com.example.pm.exceptions.ErrorResponse;
@@ -7,6 +8,7 @@ import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
 import com.example.pm.security.RateLimiterService;
+import com.example.pm.security.TotpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -16,9 +18,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,6 +40,8 @@ public class AuthController {
     private final JwtService jwt;
     private final AuthCookieProps authCookieProps;
     private final RateLimiterService rateLimiterService;
+    private final TotpService totpService;
+    private final SecurityAuditService auditService;
     private final boolean sslEnabled;
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
@@ -40,14 +51,19 @@ public class AuthController {
     private static final int MAX_AVATAR_BYTES = 256 * 1024;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final SecureRandom RECOVERY_RANDOM = new SecureRandom();
+    private static final char[] RECOVERY_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
 
     public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
-                          RateLimiterService rateLimiterService,
+                          RateLimiterService rateLimiterService, TotpService totpService,
+                          SecurityAuditService auditService,
                           @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
         this.users = users;
         this.jwt = jwt;
         this.authCookieProps = authCookieProps;
         this.rateLimiterService = rateLimiterService;
+        this.totpService = totpService;
+        this.auditService = auditService;
         this.sslEnabled = sslEnabled;
     }
 
@@ -114,19 +130,42 @@ public class AuthController {
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
         }
 
-        return users.findByEmail(normalizedEmail)
-                .filter(user -> user.getVerifier().equals(loginRequest.verifier()))
-                .<ResponseEntity<?>>map(user -> {
-                    String token = jwt.generate(user.getId());
-                    var publicUser = PublicUser.fromUser(user);
-                    ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry(),
-                            shouldUseSecureCookie(request));
-                    return ResponseEntity.ok()
-                            .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                            .body(new LoginResponse(publicUser));
-                })
-                .orElseGet(() -> ResponseEntity.status(401)
-                        .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials")));
+        var userOpt = users.findByEmail(normalizedEmail);
+        if (userOpt.isEmpty() || !normalizedEquals(userOpt.get().getVerifier(), loginRequest.verifier())) {
+            auditService.recordLoginFailure(normalizedEmail);
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+
+        User user = userOpt.get();
+
+        if (user.isMfaEnabled()) {
+            boolean usedRecovery = false;
+            boolean verified = false;
+            if (loginRequest.mfaCode() != null && totpService.verifyCode(user.getMfaSecret(), loginRequest.mfaCode())) {
+                verified = true;
+            } else if (loginRequest.recoveryCode() != null && consumeRecoveryCode(user, loginRequest.recoveryCode())) {
+                verified = true;
+                usedRecovery = true;
+            }
+            if (!verified) {
+                auditService.recordLoginFailure(normalizedEmail);
+                return ResponseEntity.status(401)
+                        .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid MFA challenge"));
+            }
+            if (usedRecovery) {
+                users.save(user);
+            }
+        }
+
+        String token = jwt.generate(user.getId(), user.getTokenVersion());
+        var publicUser = PublicUser.fromUser(user);
+        ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry(),
+                shouldUseSecureCookie(request));
+        auditService.recordLoginSuccess(user.getId());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new LoginResponse(publicUser));
 
     }
 
@@ -137,6 +176,212 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cleared.toString())
                 .build();
+    }
+
+    @PostMapping("/sessions/revoke")
+    public ResponseEntity<?> revokeSessions(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+
+        String userId = (String) authentication.getPrincipal();
+        return users.findById(userId)
+                .<ResponseEntity<?>>map(user -> {
+                    incrementTokenVersion(user);
+                    users.save(user);
+                    auditService.recordSessionsRevoked(user.getId(), user.getTokenVersion());
+                    return ResponseEntity.ok(new RevokeSessionsResponse(user.getTokenVersion()));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    @PostMapping("/master/rotate")
+    public ResponseEntity<?> rotateMasterPassword(Authentication authentication,
+                                                  @Valid @RequestBody RotateMasterPasswordRequest request) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+
+        String userId = (String) authentication.getPrincipal();
+        return users.findById(userId)
+                .<ResponseEntity<?>>map(user -> {
+                    if (!normalizedEquals(user.getVerifier(), request.currentVerifier())) {
+                        return ResponseEntity.status(403)
+                                .body(new ErrorResponse(403, "FORBIDDEN", "Verifier mismatch"));
+                    }
+
+                    user.setVerifier(request.newVerifier());
+                    user.setSaltClient(request.newSaltClient());
+                    user.setDekEncrypted(request.newDekEncrypted());
+                    user.setDekNonce(request.newDekNonce());
+                    user.setMasterPasswordLastRotated(Instant.now());
+
+                    boolean invalidated = request.invalidateSessions();
+                    if (invalidated) {
+                        incrementTokenVersion(user);
+                    }
+
+                    users.save(user);
+                    auditService.recordMasterPasswordRotation(user.getId(), invalidated);
+
+                    return ResponseEntity.ok(new RotateMasterPasswordResponse(
+                            user.getMasterPasswordLastRotated(),
+                            invalidated
+                    ));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    @PostMapping("/master/reset")
+    public ResponseEntity<?> resetMasterPassword(@Valid @RequestBody ResetMasterPasswordRequest request) {
+        String normalizedEmail = request.email() == null ? null : request.email().trim().toLowerCase(Locale.ROOT);
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse(400, "BAD_REQUEST", "Email required"));
+        }
+
+        return users.findByEmail(normalizedEmail)
+                .<ResponseEntity<?>>map(user -> {
+                    if (!consumeRecoveryCode(user, request.recoveryCode())) {
+                        auditService.recordLoginFailure(normalizedEmail);
+                        return ResponseEntity.status(403)
+                                .body(new ErrorResponse(403, "FORBIDDEN", "Invalid recovery code"));
+                    }
+
+                    user.setVerifier(request.newVerifier());
+                    user.setSaltClient(request.newSaltClient());
+                    user.setDekEncrypted(request.newDekEncrypted());
+                    user.setDekNonce(request.newDekNonce());
+                    user.setMasterPasswordLastRotated(Instant.now());
+                    incrementTokenVersion(user);
+
+                    if (request.disableMfa()) {
+                        disableMfaState(user);
+                    }
+
+                    users.save(user);
+                    auditService.recordMasterPasswordReset(user.getId(), request.disableMfa());
+                    auditService.recordSessionsRevoked(user.getId(), user.getTokenVersion());
+
+                    return ResponseEntity.ok(new SimpleMessageResponse("Master password reset"));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    @PostMapping("/mfa/enroll")
+    public ResponseEntity<?> enrollMfa(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+
+        String userId = (String) authentication.getPrincipal();
+        return users.findById(userId)
+                .<ResponseEntity<?>>map(user -> {
+                    String secret = totpService.generateSecret();
+                    List<String> recoveryCodes = generateRecoveryCodes();
+                    user.setMfaSecret(secret);
+                    user.setMfaEnabled(false);
+                    user.setMfaRecoveryCodes(hashRecoveryCodes(recoveryCodes));
+                    users.save(user);
+                    auditService.recordMfaEnrollmentStarted(user.getId());
+
+                    return ResponseEntity.ok(new MfaEnrollmentResponse(
+                            secret,
+                            totpService.buildOtpAuthUrl(user.getEmail(), secret),
+                            recoveryCodes
+                    ));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    @PostMapping("/mfa/activate")
+    public ResponseEntity<?> activateMfa(Authentication authentication,
+                                         @Valid @RequestBody MfaActivationRequest request) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+        String userId = (String) authentication.getPrincipal();
+        return users.findById(userId)
+                .<ResponseEntity<?>>map(user -> {
+                    if (user.getMfaSecret() == null) {
+                        return ResponseEntity.status(400)
+                                .body(new ErrorResponse(400, "BAD_REQUEST", "MFA enrollment required"));
+                    }
+                    if (!totpService.verifyCode(user.getMfaSecret(), request.code())) {
+                        return ResponseEntity.status(403)
+                                .body(new ErrorResponse(403, "FORBIDDEN", "Invalid MFA code"));
+                    }
+                    user.setMfaEnabled(true);
+                    user.setMfaEnabledAt(Instant.now());
+                    users.save(user);
+                    auditService.recordMfaEnabled(user.getId());
+                    return ResponseEntity.ok(new MfaStatusResponse(true, user.getMfaEnabledAt(),
+                            user.getMfaRecoveryCodes() != null ? user.getMfaRecoveryCodes().size() : 0));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    @PostMapping("/mfa/disable")
+    public ResponseEntity<?> disableMfa(Authentication authentication,
+                                        @RequestBody MfaDisableRequest request) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+
+        String userId = (String) authentication.getPrincipal();
+        return users.findById(userId)
+                .<ResponseEntity<?>>map(user -> {
+                    if (!user.isMfaEnabled()) {
+                        return ResponseEntity.ok(new MfaStatusResponse(false, null, 0));
+                    }
+                    boolean viaRecovery = false;
+                    boolean verified = false;
+                    if (request != null && request.code() != null
+                            && totpService.verifyCode(user.getMfaSecret(), request.code())) {
+                        verified = true;
+                    } else if (request != null && request.recoveryCode() != null
+                            && consumeRecoveryCode(user, request.recoveryCode())) {
+                        verified = true;
+                        viaRecovery = true;
+                    }
+                    if (!verified) {
+                        return ResponseEntity.status(403)
+                                .body(new ErrorResponse(403, "FORBIDDEN", "Invalid MFA challenge"));
+                    }
+
+                    disableMfaState(user);
+                    users.save(user);
+                    auditService.recordMfaDisabled(user.getId(), viaRecovery);
+                    return ResponseEntity.ok(new MfaStatusResponse(false, null, 0));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
+    }
+
+    @GetMapping("/mfa/status")
+    public ResponseEntity<?> mfaStatus(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
+        }
+
+        String userId = (String) authentication.getPrincipal();
+        return users.findById(userId)
+                .<ResponseEntity<?>>map(user -> ResponseEntity.ok(
+                        new MfaStatusResponse(user.isMfaEnabled(), user.getMfaEnabledAt(),
+                                user.getMfaRecoveryCodes() != null ? user.getMfaRecoveryCodes().size() : 0)))
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
     }
 
     private ResponseCookie buildAccessTokenCookie(String value, Duration maxAge, boolean secure) {
@@ -211,6 +456,84 @@ public class AuthController {
         byte[] saltBytes = new byte[16];
         SECURE_RANDOM.nextBytes(saltBytes);
         return Base64.getEncoder().encodeToString(saltBytes);
+    }
+
+    private List<String> generateRecoveryCodes() {
+        List<String> codes = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            codes.add(generateRecoveryCode());
+        }
+        return codes;
+    }
+
+    private String generateRecoveryCode() {
+        StringBuilder sb = new StringBuilder(11);
+        for (int i = 0; i < 10; i++) {
+            int idx = RECOVERY_RANDOM.nextInt(RECOVERY_CODE_CHARS.length);
+            sb.append(RECOVERY_CODE_CHARS[idx]);
+            if (i == 4) {
+                sb.append('-');
+            }
+        }
+        return sb.toString();
+    }
+
+    private List<String> hashRecoveryCodes(List<String> codes) {
+        if (codes == null) {
+            return Collections.emptyList();
+        }
+        List<String> hashed = new ArrayList<>(codes.size());
+        for (String code : codes) {
+            hashed.add(hashRecoveryCode(code));
+        }
+        return hashed;
+    }
+
+    private String hashRecoveryCode(String code) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(code.trim().toUpperCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+
+    private boolean consumeRecoveryCode(User user, String recoveryCode) {
+        if (recoveryCode == null || recoveryCode.isBlank() || user.getMfaRecoveryCodes() == null
+                || user.getMfaRecoveryCodes().isEmpty()) {
+            return false;
+        }
+        String hashed = hashRecoveryCode(recoveryCode);
+        List<String> existing = new ArrayList<>(user.getMfaRecoveryCodes());
+        boolean removed = existing.remove(hashed);
+        if (removed) {
+            user.setMfaRecoveryCodes(existing);
+        }
+        return removed;
+    }
+
+    private void disableMfaState(User user) {
+        user.setMfaEnabled(false);
+        user.setMfaSecret(null);
+        user.setMfaRecoveryCodes(Collections.emptyList());
+        user.setMfaEnabledAt(null);
+    }
+
+    private void incrementTokenVersion(User user) {
+        int current = user.getTokenVersion();
+        user.setTokenVersion(current + 1);
+    }
+
+    private boolean normalizedEquals(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.trim().equals(right.trim());
     }
 
     private String buildSaltRateLimitKey(HttpServletRequest request, String identifier) {

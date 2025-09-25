@@ -113,6 +113,11 @@ class CredentialControllerIntegrationTest {
                     .findFirst();
         });
 
+        when(userRepository.findById(anyString())).thenAnswer(invocation -> {
+            String id = invocation.getArgument(0);
+            return Optional.ofNullable(userStore.get(id));
+        });
+
         when(userRepository.findByUsername(anyString())).thenAnswer(invocation -> {
             String username = invocation.getArgument(0);
             if (username == null) {
@@ -172,7 +177,7 @@ class CredentialControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isOk());
 
-        var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier());
+        var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier(), null, null);
 
         MvcResult loginResult = mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

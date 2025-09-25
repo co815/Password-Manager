@@ -4,6 +4,7 @@ import com.example.pm.TestSupportConfig;
 import com.example.pm.auditlog.AuditLogAspect;
 import com.example.pm.auditlog.AuditLogController;
 import com.example.pm.config.TestMongoConfig;
+import com.example.pm.model.User;
 import com.example.pm.model.VaultItem;
 import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
@@ -26,6 +27,7 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -80,7 +82,8 @@ class VaultControllerSecurityTest {
         item.setCreatedAt(Instant.now());
 
         when(vaultItemRepository.findByUserId("user-123")).thenReturn(List.of(item));
-        String token = jwtService.generate("user-123");
+        stubUser("user-123");
+        String token = jwtService.generate("user-123", 0);
 
         mockMvc.perform(get("/api/vault")
                         .secure(true)
@@ -107,5 +110,12 @@ class VaultControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private void stubUser(String userId) {
+        User user = new User();
+        user.setId(userId);
+        user.setTokenVersion(0);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     }
 }

@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Map;
 
 @Service
 public class JwtService {
@@ -22,24 +23,28 @@ public class JwtService {
         this.expiryMinutes = expiryMinutes;
     }
 
-    public String generate(String subject) {
+    public String generate(String subject, int tokenVersion) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(subject)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(expiryMinutes * 60)))
+                .claims(Map.of("tv", tokenVersion))
                 .signWith(key)
                 .compact();
     }
 
-    public String validateAndGetSubject(String token) {
-        return Jwts.parser().verifyWith(key).build()
+    public JwtPayload validate(String token) {
+        var claims = Jwts.parser().verifyWith(key).build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
+        Integer tokenVersion = claims.get("tv", Integer.class);
+        return new JwtPayload(claims.getSubject(), tokenVersion != null ? tokenVersion : 0);
     }
 
     public Duration getExpiry() {
         return Duration.ofMinutes(expiryMinutes);
     }
+
+    public record JwtPayload(String subject, int tokenVersion) {}
 }

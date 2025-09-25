@@ -1,5 +1,6 @@
 package com.example.pm.auth;
 
+import com.example.pm.auditlog.SecurityAuditService;
 import com.example.pm.config.AuthCookieProps;
 import com.example.pm.dto.AuthDtos.LoginRequest;
 import com.example.pm.dto.AuthDtos.SaltResponse;
@@ -7,6 +8,7 @@ import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
 import com.example.pm.security.RateLimiterService;
+import com.example.pm.security.TotpService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,8 @@ class AuthControllerTest {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -36,7 +40,7 @@ class AuthControllerTest {
         user.setDekNonce("nonce");
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-123")).thenReturn("token-value");
+        when(jwt.generate("user-123", 0)).thenReturn("token-value");
         when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
 
         AuthCookieProps props = new AuthCookieProps();
@@ -44,14 +48,14 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
         request.setSecure(true);
         request.addHeader("Origin", "https://app.example.com");
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier"), request);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -68,6 +72,8 @@ class AuthControllerTest {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -79,7 +85,7 @@ class AuthControllerTest {
         user.setDekNonce("nonce");
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-123")).thenReturn("token-value");
+        when(jwt.generate("user-123", 0)).thenReturn("token-value");
         when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
 
         AuthCookieProps props = new AuthCookieProps();
@@ -87,14 +93,14 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
         request.setSecure(true);
         request.addHeader("Origin", "http://localhost:5173");
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier"), request);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -111,6 +117,8 @@ class AuthControllerTest {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -122,7 +130,7 @@ class AuthControllerTest {
         user.setDekNonce("nonce");
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-123")).thenReturn("token-value");
+        when(jwt.generate("user-123", 0)).thenReturn("token-value");
         when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
 
         AuthCookieProps props = new AuthCookieProps();
@@ -130,14 +138,14 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
         request.setSecure(true);
         request.addHeader("X-Forwarded-Proto", "http");
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier"), request);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -155,6 +163,8 @@ class AuthControllerTest {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
 
         User user = new User();
         user.setEmail("user@example.com");
@@ -165,7 +175,7 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -183,6 +193,8 @@ class AuthControllerTest {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
 
         when(users.findByUsername("unknown_user"))
                 .thenReturn(Optional.empty());
@@ -190,7 +202,7 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -208,13 +220,15 @@ class AuthControllerTest {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
 
         when(users.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
 
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 

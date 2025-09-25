@@ -14,7 +14,10 @@ public class AuthDtos {
             String saltClient,
             String dekEncrypted,
             String dekNonce,
-            String avatarData
+            String avatarData,
+            boolean mfaEnabled,
+            java.time.Instant masterPasswordLastRotated,
+            java.time.Instant mfaEnabledAt
     ) {
         public static PublicUser fromUser(User user) {
             return new PublicUser(
@@ -24,7 +27,10 @@ public class AuthDtos {
                     user.getSaltClient(),
                     user.getDekEncrypted(),
                     user.getDekNonce(),
-                    user.getAvatarData()
+                    user.getAvatarData(),
+                    user.isMfaEnabled(),
+                    user.getMasterPasswordLastRotated(),
+                    user.getMfaEnabledAt()
             );
         }
     }
@@ -45,7 +51,9 @@ public class AuthDtos {
 
     public record LoginRequest(
             @Email String email,
-            @NotBlank String verifier
+            @NotBlank String verifier,
+            String mfaCode,
+            String recoveryCode
     ) {}
 
     public record LoginResponse(
@@ -60,4 +68,53 @@ public class AuthDtos {
     public record AvatarUploadRequest(
             String avatarData
     ) {}
+
+    public record RotateMasterPasswordRequest(
+            @NotBlank String currentVerifier,
+            @NotBlank String newVerifier,
+            @NotBlank String newSaltClient,
+            @NotBlank String newDekEncrypted,
+            @NotBlank String newDekNonce,
+            boolean invalidateSessions
+    ) {}
+
+    public record RotateMasterPasswordResponse(
+            java.time.Instant rotatedAt,
+            boolean sessionsInvalidated
+    ) {}
+
+    public record ResetMasterPasswordRequest(
+            @Email String email,
+            @NotBlank String recoveryCode,
+            @NotBlank String newVerifier,
+            @NotBlank String newSaltClient,
+            @NotBlank String newDekEncrypted,
+            @NotBlank String newDekNonce,
+            boolean disableMfa
+    ) {}
+
+    public record SimpleMessageResponse(String message) {}
+
+    public record MfaEnrollmentResponse(
+            String secret,
+            String otpauthUrl,
+            java.util.List<String> recoveryCodes
+    ) {}
+
+    public record MfaStatusResponse(
+            boolean enabled,
+            java.time.Instant enabledAt,
+            int recoveryCodesRemaining
+    ) {}
+
+    public record MfaActivationRequest(
+            @NotBlank String code
+    ) {}
+
+    public record MfaDisableRequest(
+            String code,
+            String recoveryCode
+    ) {}
+
+    public record RevokeSessionsResponse(int tokenVersion) {}
 }

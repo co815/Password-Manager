@@ -11,6 +11,8 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 
 @Data @Builder @AllArgsConstructor @NoArgsConstructor
@@ -30,6 +32,12 @@ public class User {
     private String avatarData;
     @CreatedDate
     private Instant createdAt;
+    private Instant masterPasswordLastRotated;
+    private boolean mfaEnabled;
+    private Instant mfaEnabledAt;
+    private String mfaSecret;
+    private List<String> mfaRecoveryCodes;
+    private int tokenVersion;
 
     public static User fromRegisterRequest(AuthDtos.RegisterRequest req) {
         String normalizedEmail = req.email() != null ? req.email().trim().toLowerCase(Locale.ROOT) : null;
@@ -43,6 +51,8 @@ public class User {
                 .dekEncrypted(req.dekEncrypted())
                 .dekNonce(req.dekNonce())
                 .createdAt(Instant.now())
+                .masterPasswordLastRotated(Instant.now())
+                .tokenVersion(0)
                 .build();
     }
 }

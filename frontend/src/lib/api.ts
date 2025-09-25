@@ -79,6 +79,9 @@ export interface PublicUser {
     dekEncrypted: string;
     dekNonce: string;
     avatarData: string | null;
+    mfaEnabled: boolean;
+    masterPasswordLastRotated: string | null;
+    mfaEnabledAt: string | null;
 }
 
 export const AUTH_CLEARED_EVENT = 'auth-cleared';
@@ -145,7 +148,12 @@ export interface RegisterRequest {
     dekNonce: string;
     avatarData?: string | null;
 }
-export interface LoginRequest { email: string; verifier: string; }
+export interface LoginRequest {
+    email: string;
+    verifier: string;
+    mfaCode?: string | null;
+    recoveryCode?: string | null;
+}
 export interface LoginResponse { user: PublicUser; }
 export interface SaltResponse { email: string; saltClient: string; }
 
