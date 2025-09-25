@@ -113,66 +113,68 @@ class StrictCookieCsrfTokenRepository implements CsrfTokenRepository {
             }
         }
         return false;
-        private String determineSameSite(HttpServletRequest request) {
-            if (request == null) {
-                return "Strict";
-            }
+    }
 
-            String origin = request.getHeader("Origin");
-            if (origin == null || origin.isBlank()) {
-                return "Strict";
-            }
+    private String determineSameSite(HttpServletRequest request) {
+        if (request == null) {
+            return "Strict";
+        }
 
-            try {
-                URI originUri = new URI(origin);
-                String originHost = originUri.getHost();
-                if (originHost == null) {
-                    return "None";
-                }
+        String origin = request.getHeader("Origin");
+        if (origin == null || origin.isBlank()) {
+            return "Strict";
+        }
 
-                String requestHost = request.getServerName();
-                if (!originHost.equalsIgnoreCase(requestHost)) {
-                    return "None";
-                }
-
-                String originScheme = originUri.getScheme();
-                String requestScheme = resolveScheme(request);
-                if (originScheme != null && originScheme.equalsIgnoreCase(requestScheme)) {
-                    return "Strict";
-                }
-            } catch (URISyntaxException ignored) {
+        try {
+            URI originUri = new URI(origin);
+            String originHost = originUri.getHost();
+            if (originHost == null) {
                 return "None";
             }
 
+            String requestHost = request.getServerName();
+            if (!originHost.equalsIgnoreCase(requestHost)) {
+                return "None";
+            }
+
+            String originScheme = originUri.getScheme();
+            String requestScheme = resolveScheme(request);
+            if (originScheme != null && originScheme.equalsIgnoreCase(requestScheme)) {
+                return "Strict";
+            }
+        } catch (URISyntaxException ignored) {
             return "None";
         }
 
-        private String resolveScheme(HttpServletRequest request) {
-            if (request.isSecure()) {
-                return "https";
-            }
+        return "None";
+    }
 
-            String forwardedProto = request.getHeader("X-Forwarded-Proto");
-            if (forwardedProto != null) {
-                for (String proto : forwardedProto.split(",")) {
-                    if (!proto.isBlank()) {
-                        return proto.trim().toLowerCase(Locale.ROOT);
-                    }
-                }
-            }
-
-            String forwarded = request.getHeader("Forwarded");
-            if (forwarded != null) {
-                for (String segment : forwarded.split(",")) {
-                    for (String part : segment.split(";")) {
-                        String trimmed = part.trim();
-                        if (trimmed.regionMatches(true, 0, "proto=", 0, 6)) {
-                            return trimmed.substring(6).trim().toLowerCase(Locale.ROOT);
-                        }
-                    }
-                }
-            }
-
-            return request.getScheme();
+    private String resolveScheme(HttpServletRequest request) {
+        if (request.isSecure()) {
+            return "https";
         }
+
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        if (forwardedProto != null) {
+            for (String proto : forwardedProto.split(",")) {
+                if (!proto.isBlank()) {
+                    return proto.trim().toLowerCase(Locale.ROOT);
+                }
+            }
+        }
+
+        String forwarded = request.getHeader("Forwarded");
+        if (forwarded != null) {
+            for (String segment : forwarded.split(",")) {
+                for (String part : segment.split(";")) {
+                    String trimmed = part.trim();
+                    if (trimmed.regionMatches(true, 0, "proto=", 0, 6)) {
+                        return trimmed.substring(6).trim().toLowerCase(Locale.ROOT);
+                    }
+                }
+            }
+        }
+
+        return request.getScheme();
+    }
 }
