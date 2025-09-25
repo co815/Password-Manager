@@ -29,18 +29,39 @@ function getCookie(name: string): string | null {
     return decodeURIComponent(match.substring(name.length + 1));
 }
 
+function setCookie(name: string, value: string) {
+    if (typeof document === 'undefined') return;
+    const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const attributes = [`path=/`, `SameSite=Strict`];
+    if (secure) {
+        attributes.push('Secure');
+    }
+    document.cookie = `${name}=${encodeURIComponent(value)}; ${attributes.join('; ')}`;
+}
+
 async function ensureCsrfToken(method: string): Promise<string | null> {
     if (SAFE_HTTP_METHODS.has(method) || typeof document === 'undefined') {
         return null;
     }
+
     let token = getCookie(CSRF_COOKIE);
     if (!token) {
         try {
-            await fetch(`${API_BASE}/health`, { credentials: CSRF_FETCH_CREDENTIALS });
+            const res = await fetch(`${API_BASE}/health`, { credentials: CSRF_FETCH_CREDENTIALS });
+            if (res.ok) {
+                const headerToken = res.headers.get(CSRF_HEADER);
+                if (headerToken) {
+                    token = headerToken;
+                    setCookie(CSRF_COOKIE, headerToken);
+                }
+            }
         } catch {
             // Ignore network errors here; the main request will surface failures to the caller.
         }
-        token = getCookie(CSRF_COOKIE);
+
+        if (!token) {
+            token = getCookie(CSRF_COOKIE);
+        }
     }
 
     if (!token) {
