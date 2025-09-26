@@ -4,9 +4,9 @@ import { useCrypto } from '../../lib/crypto/crypto-context';
 import UnlockDialog from './UnlockDialog';
 
 export default function CryptoGuard() {
-    const { locked } = useCrypto();
+    const { locked, hadDek } = useCrypto();
     const { user, loggingOut } = useAuth();
     const { pathname } = useLocation();
-    const open = locked && !!user && !loggingOut && pathname !== '/';
+    const open = locked && hadDek && !!user && !loggingOut && pathname !== '/';
     return <UnlockDialog open={open} />;
 }
