@@ -6,6 +6,21 @@ const CSRF_COOKIE = 'XSRF-TOKEN';
 const CSRF_HEADER = 'X-CSRF-TOKEN';
 const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
 const CSRF_FETCH_CREDENTIALS: RequestCredentials = RAW_API_ORIGIN ? 'include' : 'same-origin';
+let lastCsrfToken: string | null = null;
+
+function isLikelySameSite(): boolean {
+    if (typeof window === 'undefined') return true;
+    if (!RAW_API_ORIGIN) return true;
+    try {
+        const apiUrl = new URL(RAW_API_ORIGIN, window.location.href);
+        return (
+            apiUrl.protocol === window.location.protocol
+            && apiUrl.hostname === window.location.hostname
+        );
+    } catch {
+        return false;
+    }
+}
 
 export class ApiError extends Error {
     status: number;
@@ -39,21 +54,41 @@ function setCookie(name: string, value: string) {
     document.cookie = `${name}=${encodeURIComponent(value)}; ${attributes.join('; ')}`;
 }
 
+function rememberCsrfToken(token: string) {
+    lastCsrfToken = token;
+    if (typeof document === 'undefined') return;
+    const existing = getCookie(CSRF_COOKIE);
+    if (existing === token) return;
+    if (isLikelySameSite()) {
+        setCookie(CSRF_COOKIE, token);
+    }
+}
+
 async function refreshCsrfToken(): Promise<string | null> {
     try {
         const res = await fetch(`${API_BASE}/health`, { credentials: CSRF_FETCH_CREDENTIALS });
         if (res.ok) {
             const headerToken = res.headers.get(CSRF_HEADER);
             if (headerToken) {
-                setCookie(CSRF_COOKIE, headerToken);
+                rememberCsrfToken(headerToken);
                 return headerToken;
+            }
+            const cookieToken = getCookie(CSRF_COOKIE);
+            if (cookieToken) {
+                rememberCsrfToken(cookieToken);
+                return cookieToken;
             }
         }
     } catch {
         // Ignore network errors here; the main request will surface failures to the caller.
     }
 
-    return getCookie(CSRF_COOKIE);
+    const cookieToken = getCookie(CSRF_COOKIE);
+    if (cookieToken) {
+        rememberCsrfToken(cookieToken);
+        return cookieToken;
+    }
+    return lastCsrfToken;
 }
 
 async function ensureCsrfToken(method: string, forceRefresh = false): Promise<string | null> {
@@ -61,7 +96,7 @@ async function ensureCsrfToken(method: string, forceRefresh = false): Promise<st
         return null;
     }
 
-    let token = forceRefresh ? null : getCookie(CSRF_COOKIE);
+    let token = forceRefresh ? null : getCookie(CSRF_COOKIE) ?? lastCsrfToken;
     if (!token) {
         token = await refreshCsrfToken();
     }
