@@ -8,6 +8,11 @@ export default function AuthProvider({children}: PropsWithChildren) {
     const [user, setUser] = useState<AuthUser>(null);
     const [loading, setLoading] = useState(true);
     const refreshEpochRef = useRef(0);
+    const dispatchAuthClearedEvent = useCallback(() => {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent(AUTH_CLEARED_EVENT));
+        }
+    }, []);
 
     const applyAuthCleared = useCallback(() => {
         refreshEpochRef.current += 1;
@@ -69,10 +74,11 @@ export default function AuthProvider({children}: PropsWithChildren) {
                 console.error('Failed to logout user', error);
             }
         } finally {
+            dispatchAuthClearedEvent();
             applyAuthCleared();
             window.location.href = '/';
         }
-    }, [applyAuthCleared]);
+    }, [applyAuthCleared, dispatchAuthClearedEvent]);
 
     const value = useMemo<AuthContextValue>(
         () => ({user, loading, login, logout, refresh}),

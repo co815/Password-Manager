@@ -39,29 +39,31 @@ function setCookie(name: string, value: string) {
     document.cookie = `${name}=${encodeURIComponent(value)}; ${attributes.join('; ')}`;
 }
 
-async function ensureCsrfToken(method: string): Promise<string | null> {
+async function refreshCsrfToken(): Promise<string | null> {
+    try {
+        const res = await fetch(`${API_BASE}/health`, { credentials: CSRF_FETCH_CREDENTIALS });
+        if (res.ok) {
+            const headerToken = res.headers.get(CSRF_HEADER);
+            if (headerToken) {
+                setCookie(CSRF_COOKIE, headerToken);
+                return headerToken;
+            }
+        }
+    } catch {
+        // Ignore network errors here; the main request will surface failures to the caller.
+    }
+
+    return getCookie(CSRF_COOKIE);
+}
+
+async function ensureCsrfToken(method: string, forceRefresh = false): Promise<string | null> {
     if (SAFE_HTTP_METHODS.has(method) || typeof document === 'undefined') {
         return null;
     }
 
-    let token = getCookie(CSRF_COOKIE);
+    let token = forceRefresh ? null : getCookie(CSRF_COOKIE);
     if (!token) {
-        try {
-            const res = await fetch(`${API_BASE}/health`, { credentials: CSRF_FETCH_CREDENTIALS });
-            if (res.ok) {
-                const headerToken = res.headers.get(CSRF_HEADER);
-                if (headerToken) {
-                    token = headerToken;
-                    setCookie(CSRF_COOKIE, headerToken);
-                }
-            }
-        } catch {
-            // Ignore network errors here; the main request will surface failures to the caller.
-        }
-
-        if (!token) {
-            token = getCookie(CSRF_COOKIE);
-        }
+        token = await refreshCsrfToken();
     }
 
     if (!token) {
@@ -114,13 +116,20 @@ async function req<T>(
     options: RequestOptions = {},
 ): Promise<T> {
     const method = (init.method ?? 'GET').toUpperCase();
-    const csrfToken = options.skipCsrf ? null : await ensureCsrfToken(method);
-    const res = await fetch(`${API_BASE}${path}`, {
-        ...init,
-        method,
-        headers: mergeHeaders(init, { [CSRF_HEADER]: csrfToken }),
-        credentials: init.credentials ?? 'include',
-    });
+    const performFetch = async (forceRefresh: boolean) => {
+        const csrfToken = options.skipCsrf ? null : await ensureCsrfToken(method, forceRefresh);
+        return fetch(`${API_BASE}${path}`, {
+            ...init,
+            method,
+            headers: mergeHeaders(init, { [CSRF_HEADER]: csrfToken ?? undefined }),
+            credentials: init.credentials ?? 'include',
+        });
+    };
+
+    let res = await performFetch(false);
+    if (res.status === 403 && !options.skipCsrf) {
+        res = await performFetch(true);
+    }
 
     if (res.status === 204) return undefined as unknown as T;
 

@@ -12,14 +12,15 @@ import { useAuth } from '../../auth/auth-context';
 
 export default function UnlockDialog({ open }: { open: boolean }) {
     const { setDEK } = useCrypto();
-    const { user: authUser } = useAuth();
+    const { user: authUser, logout } = useAuth();
     const [mp, setMp] = useState('');
     const [show, setShow] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [logoutBusy, setLogoutBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
 
     const onUnlock = async () => {
-        if (!mp || busy) return;
+        if (!mp || busy || logoutBusy) return;
         setBusy(true);
         setErr(null);
 
@@ -39,6 +40,16 @@ export default function UnlockDialog({ open }: { open: boolean }) {
             setErr('Master password invalid');
         } finally {
             setBusy(false);
+        }
+    };
+
+    const onLogout = async () => {
+        if (logoutBusy || busy) return;
+        setLogoutBusy(true);
+        try {
+            await logout();
+        } finally {
+            setLogoutBusy(false);
         }
     };
 
@@ -104,13 +115,21 @@ export default function UnlockDialog({ open }: { open: boolean }) {
             <DialogActions>
                 <Button
                     onClick={() => {
+                        void onLogout();
+                    }}
+                    disabled={busy || logoutBusy}
+                >
+                    {logoutBusy ? 'Logging out…' : 'Log out'}
+                </Button>
+                <Button
+                    onClick={() => {
                         void onUnlock();
                     }}
-                    disabled={!mp || busy}
+                    disabled={!mp || busy || logoutBusy}
                     variant="contained"
                     sx={{ fontWeight: 800 }}
                 >
-                    Unlock
+                    {busy ? 'Unlocking…' : 'Unlock'}
                 </Button>
             </DialogActions>
         </Dialog>
