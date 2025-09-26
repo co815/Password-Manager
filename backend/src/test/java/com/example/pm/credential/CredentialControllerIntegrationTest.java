@@ -172,14 +172,34 @@ class CredentialControllerIntegrationTest {
                 null
         );
 
+        MvcResult registerCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/health"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie registerCsrfCookie = extractCookie(registerCsrfResult, "XSRF-TOKEN");
+        String registerCsrfToken = Optional.ofNullable(registerCsrfResult.getResponse().getHeader("X-CSRF-TOKEN"))
+                .orElseGet(registerCsrfCookie::getValue);
+
         mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/register")
+                        .cookie(registerCsrfCookie)
+                        .header("X-CSRF-TOKEN", registerCsrfToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isOk());
 
         var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier(), null, null);
 
+        MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/health"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie loginCsrfCookie = extractCookie(loginCsrfResult, "XSRF-TOKEN");
+        String loginCsrfToken = Optional.ofNullable(loginCsrfResult.getResponse().getHeader("X-CSRF-TOKEN"))
+                .orElseGet(loginCsrfCookie::getValue);
+
         MvcResult loginResult = mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
+                        .cookie(loginCsrfCookie)
+                        .header("X-CSRF-TOKEN", loginCsrfToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())

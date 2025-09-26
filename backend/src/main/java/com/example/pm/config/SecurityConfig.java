@@ -50,12 +50,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                        .ignoringRequestMatchers(
-                                new AntPathRequestMatcher("/api/auth/login", "POST"),
-                                new AntPathRequestMatcher("/api/auth/register", "POST"),
-                                new AntPathRequestMatcher("/api/auth/logout", "POST"),
-                                new AntPathRequestMatcher("/api/auth/master/reset", "POST")
-                        )
+                        .ignoringRequestMatchers(new AntPathRequestMatcher("/api/auth/master/reset", "POST"))
                 )
                 .cors(cors -> cors.configurationSource(corsSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
