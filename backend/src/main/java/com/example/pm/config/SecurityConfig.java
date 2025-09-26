@@ -80,7 +80,7 @@ public class SecurityConfig {
                 .formLogin(f -> f.disable())
                 .logout(l -> l.disable())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
+                .addFilterAfter(new CsrfCookieFilter(sslEnabled), CsrfFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->
                                 writeError(response, HttpServletResponse.SC_UNAUTHORIZED,
