@@ -172,7 +172,7 @@ class CredentialControllerIntegrationTest {
                 null
         );
 
-        MvcResult registerCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/health"))
+        MvcResult registerCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -189,7 +189,7 @@ class CredentialControllerIntegrationTest {
 
         var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier(), null, null);
 
-        MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/health"))
+        MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -207,7 +207,7 @@ class CredentialControllerIntegrationTest {
 
         Cookie accessTokenCookie = extractCookie(loginResult, "accessToken");
 
-        MvcResult healthResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/health"))
+        MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
                 .andExpect(status().isOk())
                 .andReturn();
 

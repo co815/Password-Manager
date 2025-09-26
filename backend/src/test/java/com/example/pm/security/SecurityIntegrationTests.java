@@ -105,7 +105,7 @@ class SecurityIntegrationTests {
 
     @Test
     void csrfTokenIsProvidedInCookieAndHeader() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/health"))
+        MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
                 .andExpect(status().isOk())
                 .andExpect(header().exists("X-CSRF-TOKEN"))
                 .andReturn();
@@ -126,7 +126,7 @@ class SecurityIntegrationTests {
 
     @Test
     void csrfCookieFallsBackToLaxWhenSecureNotAvailable() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/health")
+        MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
                         .secure(true)
                         .header("Origin", "http://localhost:5173"))
                 .andExpect(status().isOk())
@@ -230,7 +230,7 @@ class SecurityIntegrationTests {
     }
 
     private String obtainCsrfToken() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/health"))
+        MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
                 .andExpect(status().isOk())
                 .andReturn();
         return result.getResponse().getHeader("X-CSRF-TOKEN");

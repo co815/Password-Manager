@@ -64,20 +64,34 @@ function rememberCsrfToken(token: string) {
     }
 }
 
+async function fetchAndRememberCsrf(path: string): Promise<string | null> {
+    const res = await fetch(`${API_BASE}${path}`, { credentials: CSRF_FETCH_CREDENTIALS });
+    if (!res.ok) {
+        return null;
+    }
+
+    const headerToken = res.headers.get(CSRF_HEADER);
+    if (headerToken) {
+        rememberCsrfToken(headerToken);
+        return headerToken;
+    }
+    const cookieToken = getCookie(CSRF_COOKIE);
+    if (cookieToken) {
+        rememberCsrfToken(cookieToken);
+        return cookieToken;
+    }
+    return null;
+}
+
 async function refreshCsrfToken(): Promise<string | null> {
     try {
-        const res = await fetch(`${API_BASE}/health`, { credentials: CSRF_FETCH_CREDENTIALS });
-        if (res.ok) {
-            const headerToken = res.headers.get(CSRF_HEADER);
-            if (headerToken) {
-                rememberCsrfToken(headerToken);
-                return headerToken;
-            }
-            const cookieToken = getCookie(CSRF_COOKIE);
-            if (cookieToken) {
-                rememberCsrfToken(cookieToken);
-                return cookieToken;
-            }
+        const csrfToken = await fetchAndRememberCsrf('/auth/csrf');
+        if (csrfToken) {
+            return csrfToken;
+        }
+        const healthToken = await fetchAndRememberCsrf('/health');
+        if (healthToken) {
+            return healthToken;
         }
     } catch {
         // Ignore network errors here; the main request will surface failures to the caller.

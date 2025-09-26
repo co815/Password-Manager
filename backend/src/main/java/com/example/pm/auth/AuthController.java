@@ -170,6 +170,8 @@ public class AuthController {
         ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry(),
                 shouldUseSecureCookie(request));
         CsrfToken csrfToken = csrfTokenRepository.generateToken(request);
+        request.setAttribute(CsrfToken.class.getName(), csrfToken);
+        request.setAttribute(csrfToken.getParameterName(), csrfToken);
         csrfTokenRepository.saveToken(csrfToken, request, response);
         auditService.recordLoginSuccess(user.getId());
         return ResponseEntity.ok()
@@ -177,6 +179,17 @@ public class AuthController {
                 .header(csrfToken.getHeaderName(), csrfToken.getToken())
                 .body(new LoginResponse(publicUser));
 
+    }
+
+    @GetMapping("/csrf")
+    public ResponseEntity<Void> csrf(HttpServletRequest request, HttpServletResponse response) {
+        CsrfToken csrfToken = csrfTokenRepository.generateToken(request);
+        request.setAttribute(CsrfToken.class.getName(), csrfToken);
+        request.setAttribute(csrfToken.getParameterName(), csrfToken);
+        csrfTokenRepository.saveToken(csrfToken, request, response);
+        return ResponseEntity.ok()
+                .header(csrfToken.getHeaderName(), csrfToken.getToken())
+                .build();
     }
 
     @PostMapping("/logout")

@@ -50,7 +50,7 @@ class CorsIntegrationTest {
 
     @Test
     void preflightFromDisallowedOriginIsForbidden() throws Exception {
-        mockMvc.perform(options("/api/health")
+        mockMvc.perform(options("/api/auth/csrf")
                         .secure(true)
                         .header(HttpHeaders.ORIGIN, "http://evil.example")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
@@ -61,7 +61,7 @@ class CorsIntegrationTest {
     @Test
     void allowedOriginReceivesAllowOriginHeader() throws Exception {
         String origin = "http://localhost:5173";
-        mockMvc.perform(get("/api/health")
+        mockMvc.perform(options("/api/auth/csrf")
                         .secure(true)
                         .header(HttpHeaders.ORIGIN, origin))
                 .andExpect(status().isOk())
