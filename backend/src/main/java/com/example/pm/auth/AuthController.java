@@ -408,10 +408,13 @@ public class AuthController {
     }
 
     private ResponseCookie buildAccessTokenCookie(String value, Duration maxAge, boolean secure) {
+        String sameSite = authCookieProps.getSameSiteAttribute();
+        boolean requiresCrossSite = sameSite != null && sameSite.equalsIgnoreCase("None");
+
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("accessToken", value != null ? value : "")
                 .path("/")
                 .httpOnly(true)
-                .secure(secure);
+                .secure(secure || requiresCrossSite);
 
         if (maxAge != null) {
             if (maxAge.isZero() || maxAge.isNegative()) {
@@ -421,10 +424,6 @@ public class AuthController {
             }
         }
 
-        String sameSite = authCookieProps.getSameSiteAttribute();
-        if (!secure && sameSite != null && sameSite.equalsIgnoreCase("None")) {
-            sameSite = "Lax";
-        }
         if (sameSite != null && !sameSite.isBlank()) {
             builder.sameSite(sameSite);
         }

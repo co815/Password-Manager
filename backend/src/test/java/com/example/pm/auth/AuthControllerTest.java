@@ -130,7 +130,7 @@ class AuthControllerTest {
     }
 
     @Test
-    void loginDowngradesToNonSecureCookieWhenForwardedProtoIsHttp() {
+    void loginKeepsSecureCookieWithSameSiteNoneWhenForwardedProtoIsHttp() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
@@ -173,9 +173,8 @@ class AuthControllerTest {
                 .isNotNull()
                 .contains("accessToken=token-value")
                 .contains("Max-Age=900")
-                .contains("SameSite=Lax")
-                .doesNotContain("SameSite=None")
-                .doesNotContain("Secure")
+                .contains("SameSite=None")
+                .contains("Secure")
                 .contains("HttpOnly");
         assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN"))
                 .isEqualTo("csrf-token-value");
