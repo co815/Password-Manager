@@ -207,12 +207,12 @@ class CredentialControllerIntegrationTest {
 
         Cookie accessTokenCookie = extractCookie(loginResult, "accessToken");
 
-        MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
+        MvcResult credentialCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        Cookie csrfCookie = extractCookie(healthResult, "XSRF-TOKEN");
-        String csrfToken = Optional.ofNullable(healthResult.getResponse().getHeader("X-CSRF-TOKEN"))
+        Cookie csrfCookie = extractCookie(credentialCsrfResult, "XSRF-TOKEN");
+        String csrfToken = Optional.ofNullable(credentialCsrfResult.getResponse().getHeader("X-CSRF-TOKEN"))
                 .orElseGet(csrfCookie::getValue);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/credential")

@@ -126,7 +126,7 @@ class SecurityIntegrationTests {
 
     @Test
     void csrfCookieFallsBackToLaxWhenSecureNotAvailable() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
+        MvcResult result = mockMvc.perform(get("/api/auth/csrf")
                         .secure(true)
                         .header("Origin", "http://localhost:5173"))
                 .andExpect(status().isOk())
