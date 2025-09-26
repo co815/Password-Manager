@@ -5,8 +5,8 @@ import UnlockDialog from './UnlockDialog';
 
 export default function CryptoGuard() {
     const { locked } = useCrypto();
-    const { user } = useAuth();
+    const { user, loggingOut } = useAuth();
     const { pathname } = useLocation();
-    const open = locked && !!user && pathname !== '/';
+    const open = locked && !!user && !loggingOut && pathname !== '/';
     return <UnlockDialog open={open} />;
 }

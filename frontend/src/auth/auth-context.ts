@@ -6,6 +6,7 @@ export type AuthUser = PublicUser | null;
 export type AuthContextValue = {
     user: AuthUser;
     loading: boolean;
+    loggingOut: boolean;
     login: (user: PublicUser) => void;
     logout: () => Promise<void>;
     refresh: () => Promise<void>;
@@ -14,6 +15,7 @@ export type AuthContextValue = {
 export const AuthContext = createContext<AuthContextValue>({
     user: null,
     loading: true,
+    loggingOut: false,
     login: () => {
         throw new Error('AuthContext login called outside of provider');
     },
