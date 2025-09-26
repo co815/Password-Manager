@@ -13,8 +13,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -29,23 +29,24 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final ObjectMapper objectMapper;
     private final CorsProps corsProps;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     @Value("${server.ssl.enabled:true}")
     private boolean sslEnabled;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ObjectMapper objectMapper, CorsProps corsProps) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ObjectMapper objectMapper, CorsProps corsProps,
+                          CsrfTokenRepository csrfTokenRepository) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.objectMapper = objectMapper;
         this.corsProps = corsProps;
+        this.csrfTokenRepository = csrfTokenRepository;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> {
-                    CookieCsrfTokenRepository cookieRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-                    cookieRepository.setHeaderName("X-CSRF-TOKEN");
-                    csrf.csrfTokenRepository(cookieRepository);
+                    csrf.csrfTokenRepository(csrfTokenRepository);
                     csrf.csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler());
                 })
                 .cors(cors -> cors.configurationSource(corsSource()))
