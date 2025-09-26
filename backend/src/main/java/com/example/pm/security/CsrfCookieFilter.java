@@ -33,6 +33,12 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
 
         CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+        if (token == null) {
+            Object attribute = request.getAttribute("_csrf");
+            if (attribute instanceof CsrfToken csrfToken) {
+                token = csrfToken;
+            }
+        }
         if (token != null) {
             response.setHeader("X-CSRF-TOKEN", token.getToken());
             rewriteXsrfCookie(response, request);
