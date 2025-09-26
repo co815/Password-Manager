@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -40,11 +41,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http,
-                                           StrictCookieCsrfTokenRepository csrfTokenRepository) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfTokenRepository)
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         .ignoringRequestMatchers(new AntPathRequestMatcher("/api/auth/master/reset", "POST"))
                 )
@@ -93,16 +93,6 @@ public class SecurityConfig {
         }
 
         return http.build();
-    }
-
-    @Bean
-    public StrictCookieCsrfTokenRepository csrfTokenRepository() {
-        StrictCookieCsrfTokenRepository repository = new StrictCookieCsrfTokenRepository(sslEnabled);
-        repository.setCookieName("XSRF-TOKEN");
-        repository.setHeaderName("X-CSRF-TOKEN");
-        repository.setCookieHttpOnly(false);
-        repository.setCookiePath("/");
-        return repository;
     }
 
     @Bean
