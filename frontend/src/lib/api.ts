@@ -161,9 +161,18 @@ async function req<T>(
         });
     };
 
+    const rememberFromResponse = (res: Response) => {
+        const headerToken = res.headers.get(CSRF_HEADER);
+        if (headerToken) {
+            rememberCsrfToken(headerToken);
+        }
+    };
+
     let res = await performFetch(false);
+    rememberFromResponse(res);
     if (res.status === 403 && !options.skipCsrf) {
         res = await performFetch(true);
+        rememberFromResponse(res);
     }
 
     if (res.status === 204) return undefined as unknown as T;

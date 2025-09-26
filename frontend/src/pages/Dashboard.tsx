@@ -1,4 +1,4 @@
-import {useMemo, useState, useEffect} from 'react';
+import {useMemo, useState, useEffect, useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
 import type {ChangeEvent, MouseEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
@@ -473,15 +473,25 @@ export default function Dashboard() {
         setDeleteTarget(selected);
     };
 
-    const closeUnlockDialog = () => {
-        if (unlockBusy) return;
+    const resetUnlockDialog = useCallback(() => {
         setShowUnlockDialog(false);
         setUnlockPassword('');
         setUnlockError(null);
         setShowUnlockPwd(false);
         setPendingDialogMode(null);
         setPendingEditTarget(null);
-    };
+        setUnlockBusy(false);
+    }, []);
+
+    const closeUnlockDialog = useCallback(() => {
+        if (unlockBusy) return;
+        resetUnlockDialog();
+    }, [resetUnlockDialog, unlockBusy]);
+
+    const handleLogoutClick = useCallback(() => {
+        resetUnlockDialog();
+        void logout();
+    }, [logout, resetUnlockDialog]);
 
     const handleUnlock = async () => {
         if (!unlockPassword || unlockBusy) return;
@@ -501,10 +511,7 @@ export default function Dashboard() {
             setDEK(dekKey);
             const nextMode = pendingDialogMode;
             const nextEditTarget = pendingEditTarget;
-            setPendingDialogMode(null);
-            setPendingEditTarget(null);
-            setUnlockPassword('');
-            setShowUnlockDialog(false);
+            resetUnlockDialog();
             if (nextMode === 'add') {
                 openAddDialog();
             } else if (nextMode === 'edit' && nextEditTarget) {
@@ -754,9 +761,7 @@ export default function Dashboard() {
                         >
                             Settings
                         </Button>
-                        <Button onClick={() => {
-                            void logout();
-                        }} variant="outlined" size="small">
+                        <Button onClick={handleLogoutClick} variant="outlined" size="small">
                             Log out
                         </Button>
                         <Avatar
@@ -1159,7 +1164,7 @@ export default function Dashboard() {
             {/* Unlock Dialog */}
             <Dialog
                 open={showUnlockDialog}
-                onClose={closeUnlockDialog}
+                onClose={() => closeUnlockDialog()}
                 fullWidth
                 maxWidth="xs"
                 slotProps={{
@@ -1203,7 +1208,7 @@ export default function Dashboard() {
                 </DialogContent>
                 <DialogActions sx={{px: 3, pb: 2}}>
                     <Button
-                        onClick={closeUnlockDialog}
+                        onClick={() => closeUnlockDialog()}
                         disabled={unlockBusy}
                     >
                         Cancel
