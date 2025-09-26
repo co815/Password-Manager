@@ -61,7 +61,7 @@ public class SecurityConfig {
                                 "/api/auth/salt",
                                 "/api/auth/master/reset"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
