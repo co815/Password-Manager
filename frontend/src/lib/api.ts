@@ -91,6 +91,10 @@ async function refreshCsrfToken(): Promise<string | null> {
     return lastCsrfToken;
 }
 
+export function primeCsrfToken(): Promise<string | null> {
+    return refreshCsrfToken();
+}
+
 async function ensureCsrfToken(method: string, forceRefresh = false): Promise<string | null> {
     if (SAFE_HTTP_METHODS.has(method) || typeof document === 'undefined') {
         return null;

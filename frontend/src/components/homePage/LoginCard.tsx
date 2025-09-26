@@ -19,7 +19,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
 
-import { api, type PublicUser } from '../../lib/api';
+import { api, primeCsrfToken, type PublicUser } from '../../lib/api';
 import { makeVerifier, deriveKEK } from '../../lib/crypto/argon2';
 import { unwrapDEK } from '../../lib/crypto/unwrap';
 import { useAuth } from '../../auth/auth-context';
@@ -110,6 +110,7 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
             const dek = await unwrapDEK(kek, data.user.dekEncrypted, data.user.dekNonce);
             setDEK(dek);
 
+            await primeCsrfToken();
             onSuccess?.(data.user, mp);
             await Promise.resolve();
             navigate('/dashboard', { replace: true });

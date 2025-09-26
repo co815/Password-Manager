@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
-import { AUTH_CLEARED_EVENT, api } from '../lib/api';
+import { AUTH_CLEARED_EVENT, api, primeCsrfToken } from '../lib/api';
 import type { PublicUser } from '../lib/api';
 import { AuthContext, type AuthContextValue, type AuthUser } from './auth-context';
 
@@ -31,6 +31,7 @@ export default function AuthProvider({children}: PropsWithChildren) {
         }
         try {
             const profile = await api.currentUser();
+            await primeCsrfToken();
             if (isLatest()) {
                 setUser(profile);
             }
