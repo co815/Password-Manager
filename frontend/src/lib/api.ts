@@ -175,6 +175,7 @@ async function req<T>(
     let res = await performFetch(false);
     rememberFromResponse(res);
     if (res.status === 403 && !options.skipCsrf) {
+        await primeCsrfToken();
         res = await performFetch(true);
         rememberFromResponse(res);
     }
