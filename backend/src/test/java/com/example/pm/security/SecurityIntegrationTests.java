@@ -142,6 +142,46 @@ class SecurityIntegrationTests {
     }
 
     @Test
+    void loginRequiresCsrfToken() throws Exception {
+        when(userRepository.findByEmail("user@example.com"))
+                .thenReturn(Optional.of(User.builder()
+                        .id("user-1")
+                        .email("user@example.com")
+                        .username("user")
+                        .verifier("client-verifier")
+                        .saltClient("client-salt")
+                        .dekEncrypted("dek")
+                        .dekNonce("nonce")
+                        .build()));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  \"email\": \"user@example.com\",
+                                  \"verifier\": \"client-verifier\"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        String csrfToken = obtainCsrfToken();
+        Cookie csrfCookie = buildCsrfCookie(csrfToken);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .cookie(csrfCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-CSRF-TOKEN", csrfToken)
+                        .content("""
+                                {
+                                  \"email\": \"user@example.com\",
+                                  \"verifier\": \"client-verifier\"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-CSRF-TOKEN"));
+    }
+
+    @Test
     void requestWithoutCsrfHeaderIsRejected() throws Exception {
         String token = obtainCsrfToken();
         Cookie csrfCookie = buildCsrfCookie(token);

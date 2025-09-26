@@ -21,7 +21,7 @@ import LockOutlined from '@mui/icons-material/LockOutlined';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
-import { api } from '../../lib/api';
+import { api, primeCsrfToken } from '../../lib/api';
 import { createAccountMaterial } from '../../lib/crypto/keys';
 import { makeVerifier } from '../../lib/crypto/argon2';
 
@@ -121,6 +121,7 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
         try {
             const { saltClient, dekEncrypted, dekNonce } = await createAccountMaterial(mp);
             const verifier = await makeVerifier(trimmedEmail, mp, saltClient);
+            await primeCsrfToken();
             await api.register({
                 email: trimmedEmail,
                 username: trimmedUsername,

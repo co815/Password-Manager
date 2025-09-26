@@ -15,7 +15,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -48,7 +47,6 @@ public class SecurityConfig {
                     cookieRepository.setHeaderName("X-CSRF-TOKEN");
                     csrf.csrfTokenRepository(cookieRepository);
                     csrf.csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler());
-                    csrf.ignoringRequestMatchers(new AntPathRequestMatcher("/api/auth/master/reset", "POST"));
                 })
                 .cors(cors -> cors.configurationSource(corsSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

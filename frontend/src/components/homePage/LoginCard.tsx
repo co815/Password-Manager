@@ -102,6 +102,7 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
 
             const { saltClient, email: canonicalEmail } = await api.getSalt(trimmedIdentifier);
             const verifier = await makeVerifier(canonicalEmail, mp, saltClient);
+            await primeCsrfToken();
             const data = await api.login({ email: canonicalEmail, verifier });
 
             login(data.user);
