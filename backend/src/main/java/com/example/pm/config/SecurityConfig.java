@@ -40,12 +40,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        StrictCookieCsrfTokenRepository csrfTokenRepository = new StrictCookieCsrfTokenRepository(sslEnabled);
-        csrfTokenRepository.setCookieName("XSRF-TOKEN");
-        csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
-        csrfTokenRepository.setCookieHttpOnly(false);
-        csrfTokenRepository.setCookiePath("/");
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           StrictCookieCsrfTokenRepository csrfTokenRepository) throws Exception {
         http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
@@ -97,6 +93,16 @@ public class SecurityConfig {
         }
 
         return http.build();
+    }
+
+    @Bean
+    public StrictCookieCsrfTokenRepository csrfTokenRepository() {
+        StrictCookieCsrfTokenRepository repository = new StrictCookieCsrfTokenRepository(sslEnabled);
+        repository.setCookieName("XSRF-TOKEN");
+        repository.setHeaderName("X-CSRF-TOKEN");
+        repository.setCookieHttpOnly(false);
+        repository.setCookiePath("/");
+        return repository;
     }
 
     @Bean

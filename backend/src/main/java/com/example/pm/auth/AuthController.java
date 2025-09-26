@@ -10,11 +10,14 @@ import com.example.pm.security.JwtService;
 import com.example.pm.security.RateLimiterService;
 import com.example.pm.security.TotpService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -43,6 +46,7 @@ public class AuthController {
     private final TotpService totpService;
     private final SecurityAuditService auditService;
     private final boolean sslEnabled;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
             "^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$",
@@ -57,6 +61,7 @@ public class AuthController {
     public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
                           RateLimiterService rateLimiterService, TotpService totpService,
                           SecurityAuditService auditService,
+                          CsrfTokenRepository csrfTokenRepository,
                           @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
         this.users = users;
         this.jwt = jwt;
@@ -64,6 +69,7 @@ public class AuthController {
         this.rateLimiterService = rateLimiterService;
         this.totpService = totpService;
         this.auditService = auditService;
+        this.csrfTokenRepository = csrfTokenRepository;
         this.sslEnabled = sslEnabled;
     }
 
@@ -122,7 +128,8 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest,
-                                   HttpServletRequest request) {
+                                   HttpServletRequest request,
+                                   HttpServletResponse response) {
 
         String normalizedEmail = loginRequest.email() == null ? null : loginRequest.email().trim().toLowerCase(Locale.ROOT);
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
@@ -162,9 +169,12 @@ public class AuthController {
         var publicUser = PublicUser.fromUser(user);
         ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry(),
                 shouldUseSecureCookie(request));
+        CsrfToken csrfToken = csrfTokenRepository.generateToken(request);
+        csrfTokenRepository.saveToken(csrfToken, request, response);
         auditService.recordLoginSuccess(user.getId());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .header(csrfToken.getHeaderName(), csrfToken.getToken())
                 .body(new LoginResponse(publicUser));
 
     }

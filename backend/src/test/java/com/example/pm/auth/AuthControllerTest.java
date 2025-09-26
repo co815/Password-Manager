@@ -13,6 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -29,6 +33,9 @@ class AuthControllerTest {
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
         user.setId("user-123");
@@ -48,14 +55,15 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
         request.setSecure(true);
         request.addHeader("Origin", "https://app.example.com");
+        MockHttpServletResponse responseServlet = new MockHttpServletResponse();
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request, responseServlet);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -65,6 +73,9 @@ class AuthControllerTest {
                 .contains("SameSite=None")
                 .contains("Secure")
                 .contains("HttpOnly");
+        assertThat(response.getHeaders().getFirst("X-CSRF-TOKEN"))
+                .isEqualTo("csrf-token-value");
+        verify(csrfTokenRepository).saveToken(csrfToken, request, responseServlet);
     }
 
     @Test
@@ -74,6 +85,9 @@ class AuthControllerTest {
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
         user.setId("user-123");
@@ -93,14 +107,15 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
         request.setSecure(true);
         request.addHeader("Origin", "http://localhost:5173");
+        MockHttpServletResponse responseServlet = new MockHttpServletResponse();
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request, responseServlet);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -110,6 +125,8 @@ class AuthControllerTest {
                 .contains("SameSite=None")
                 .contains("Secure")
                 .contains("HttpOnly");
+        assertThat(response.getHeaders().getFirst("X-CSRF-TOKEN"))
+                .isEqualTo("csrf-token-value");
     }
 
     @Test
@@ -119,6 +136,9 @@ class AuthControllerTest {
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
         user.setId("user-123");
@@ -138,14 +158,15 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
         request.setSecure(true);
         request.addHeader("X-Forwarded-Proto", "http");
+        MockHttpServletResponse responseServlet = new MockHttpServletResponse();
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request, responseServlet);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -156,6 +177,8 @@ class AuthControllerTest {
                 .doesNotContain("SameSite=None")
                 .doesNotContain("Secure")
                 .contains("HttpOnly");
+        assertThat(response.getHeaders().getFirst("X-CSRF-TOKEN"))
+                .isEqualTo("csrf-token-value");
     }
 
     @Test
@@ -165,6 +188,9 @@ class AuthControllerTest {
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
         user.setEmail("user@example.com");
@@ -175,7 +201,7 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -195,6 +221,9 @@ class AuthControllerTest {
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         when(users.findByUsername("unknown_user"))
                 .thenReturn(Optional.empty());
@@ -202,7 +231,7 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -222,13 +251,16 @@ class AuthControllerTest {
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         when(users.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
 
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, true);
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
