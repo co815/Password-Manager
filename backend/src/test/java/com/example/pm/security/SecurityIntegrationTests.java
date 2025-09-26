@@ -107,10 +107,10 @@ class SecurityIntegrationTests {
     void csrfTokenIsProvidedInCookieAndHeader() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
                 .andExpect(status().isOk())
-                .andExpect(header().exists("X-CSRF-TOKEN"))
+                .andExpect(header().exists("X-XSRF-TOKEN"))
                 .andReturn();
 
-        String csrfToken = result.getResponse().getHeader("X-CSRF-TOKEN");
+        String csrfToken = result.getResponse().getHeader("X-XSRF-TOKEN");
         assertThat(csrfToken).isNotBlank();
 
         List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
@@ -170,7 +170,7 @@ class SecurityIntegrationTests {
         mockMvc.perform(post("/api/auth/login")
                         .cookie(csrfCookie)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-CSRF-TOKEN", csrfToken)
+                        .header("X-XSRF-TOKEN", csrfToken)
                         .content("""
                                 {
                                   \"email\": \"user@example.com\",
@@ -178,7 +178,7 @@ class SecurityIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(header().exists("X-CSRF-TOKEN"));
+                .andExpect(header().exists("X-XSRF-TOKEN"));
     }
 
     @Test
@@ -203,7 +203,7 @@ class SecurityIntegrationTests {
                         .cookie(csrfCookie)
                         .with(authentication(authenticatedUser()))
                         .with(user("tester").roles("USER"))
-                        .header("X-CSRF-TOKEN", token)
+                        .header("X-XSRF-TOKEN", token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_VAULT_PAYLOAD))
                 .andExpect(status().isOk());
@@ -233,7 +233,7 @@ class SecurityIntegrationTests {
         MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
                 .andExpect(status().isOk())
                 .andReturn();
-        return result.getResponse().getHeader("X-CSRF-TOKEN");
+        return result.getResponse().getHeader("X-XSRF-TOKEN");
     }
 
     private Cookie buildCsrfCookie(String token) {

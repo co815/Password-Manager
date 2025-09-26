@@ -40,7 +40,7 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
             }
         }
         if (token != null) {
-            response.setHeader("X-CSRF-TOKEN", token.getToken());
+            response.setHeader("X-XSRF-TOKEN", token.getToken());
             rewriteXsrfCookie(response, request);
         }
     }

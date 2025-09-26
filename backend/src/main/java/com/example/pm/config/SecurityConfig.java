@@ -102,8 +102,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(corsProps.getOrigins()); // evită "*" când allowCredentials=true
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-CSRF-TOKEN"));
-        config.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-CSRF-TOKEN"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-XSRF-TOKEN"));
+        config.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-XSRF-TOKEN"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

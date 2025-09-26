@@ -3,7 +3,7 @@ const API_BASE = RAW_API_ORIGIN
     ? `${RAW_API_ORIGIN.replace(/\/$/, '')}/api`
     : '/api';
 const CSRF_COOKIE = 'XSRF-TOKEN';
-const CSRF_HEADER = 'X-CSRF-TOKEN';
+const CSRF_HEADER = 'X-XSRF-TOKEN';
 const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
 const CSRF_FETCH_CREDENTIALS: RequestCredentials = RAW_API_ORIGIN ? 'include' : 'same-origin';
 let lastCsrfToken: string | null = null;

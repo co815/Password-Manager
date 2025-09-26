@@ -34,7 +34,7 @@ class AuthControllerTest {
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
@@ -73,7 +73,7 @@ class AuthControllerTest {
                 .contains("SameSite=None")
                 .contains("Secure")
                 .contains("HttpOnly");
-        assertThat(response.getHeaders().getFirst("X-CSRF-TOKEN"))
+        assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN"))
                 .isEqualTo("csrf-token-value");
         verify(csrfTokenRepository).saveToken(csrfToken, request, responseServlet);
     }
@@ -86,7 +86,7 @@ class AuthControllerTest {
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
@@ -125,7 +125,7 @@ class AuthControllerTest {
                 .contains("SameSite=None")
                 .contains("Secure")
                 .contains("HttpOnly");
-        assertThat(response.getHeaders().getFirst("X-CSRF-TOKEN"))
+        assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN"))
                 .isEqualTo("csrf-token-value");
     }
 
@@ -137,7 +137,7 @@ class AuthControllerTest {
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
@@ -177,7 +177,7 @@ class AuthControllerTest {
                 .doesNotContain("SameSite=None")
                 .doesNotContain("Secure")
                 .contains("HttpOnly");
-        assertThat(response.getHeaders().getFirst("X-CSRF-TOKEN"))
+        assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN"))
                 .isEqualTo("csrf-token-value");
     }
 
@@ -189,7 +189,7 @@ class AuthControllerTest {
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         User user = new User();
@@ -222,7 +222,7 @@ class AuthControllerTest {
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         when(users.findByUsername("unknown_user"))
@@ -252,7 +252,7 @@ class AuthControllerTest {
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "csrf-token-value");
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         when(users.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
