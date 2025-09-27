@@ -137,6 +137,13 @@ public class AuthController {
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
         }
 
+        if (!rateLimiterService.isAllowed(buildLoginRateLimitKey(request, normalizedEmail))) {
+            auditService.recordLoginFailure(normalizedEmail);
+            return ResponseEntity.status(429)
+                    .body(new ErrorResponse(429, "TOO_MANY_REQUESTS",
+                            "Too many attempts. Please try again later."));
+        }
+
         var userOpt = users.findByEmail(normalizedEmail);
         if (userOpt.isEmpty() || !normalizedEquals(userOpt.get().getVerifier(), loginRequest.verifier())) {
             auditService.recordLoginFailure(normalizedEmail);
@@ -558,16 +565,27 @@ public class AuthController {
         return left.trim().equals(right.trim());
     }
 
-    private String buildSaltRateLimitKey(HttpServletRequest request, String identifier) {
+    return
+
+    buildRateLimitKey("salt",request, identifier);
+}
+
+private String buildLoginRateLimitKey(HttpServletRequest request, String email) {
+    return buildRateLimitKey("login", request, email);
+}
+
+private String buildRateLimitKey(String prefix, HttpServletRequest request, String identifier) {
+
+    private String buildSaltRateLimitKey (HttpServletRequest request, String identifier){
         String remoteAddr = request != null && request.getRemoteAddr() != null
                 ? request.getRemoteAddr()
                 : "unknown";
         String normalized = identifier == null ? "" : identifier.trim().toLowerCase(Locale.ROOT);
         int identifierHash = normalized.isEmpty() ? 0 : normalized.hashCode();
-        return remoteAddr + ":" + Integer.toHexString(identifierHash);
+        return prefix + ":" + remoteAddr + ":" + Integer.toHexString(identifierHash);
     }
 
-    private static String placeholderEmailFor(String identifier) {
+    private static String placeholderEmailFor (String identifier){
         if (identifier == null || identifier.isBlank()) {
             return "invalid@example.invalid";
         }
@@ -580,7 +598,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me(Authentication authentication) {
+    public ResponseEntity<?> me (Authentication authentication){
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -594,8 +612,8 @@ public class AuthController {
     }
 
     @PutMapping("/profile/avatar")
-    public ResponseEntity<?> updateAvatar(Authentication authentication,
-                                          @RequestBody AvatarUploadRequest request) {
+    public ResponseEntity<?> updateAvatar (Authentication authentication,
+            @RequestBody AvatarUploadRequest request){
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -620,7 +638,7 @@ public class AuthController {
                         .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
     }
 
-    private String normalizeAvatarData(String avatarData) {
+    private String normalizeAvatarData (String avatarData){
         if (avatarData == null) {
             return null;
         }

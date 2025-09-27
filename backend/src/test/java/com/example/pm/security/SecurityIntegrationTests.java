@@ -101,6 +101,7 @@ class SecurityIntegrationTests {
                 });
         lenient().when(auditLogRepository.save(any(AuditLog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(rateLimiterService.isAllowed(anyString())).thenReturn(true);
     }
 
     @Test

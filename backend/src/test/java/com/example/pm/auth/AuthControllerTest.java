@@ -4,6 +4,7 @@ import com.example.pm.auditlog.SecurityAuditService;
 import com.example.pm.config.AuthCookieProps;
 import com.example.pm.dto.AuthDtos.LoginRequest;
 import com.example.pm.dto.AuthDtos.SaltResponse;
+import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
@@ -179,6 +180,40 @@ class AuthControllerTest {
         assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN"))
                 .isEqualTo("csrf-token-value");
     }
+
+    @Test
+    void loginReturnsTooManyRequestsWhenRateLimitExceeded() {
+        UserRepository users = mock(UserRepository.class);
+        JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+
+        when(rateLimiter.isAllowed(anyString())).thenReturn(false);
+
+        AuthCookieProps props = new AuthCookieProps();
+        props.setSameSite("Strict");
+
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit,
+                csrfTokenRepository, true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setScheme("https");
+        request.setSecure(true);
+
+        ResponseEntity<?> response = controller.login(
+                new LoginRequest("user@example.com", "verifier", null, null),
+                request,
+                new MockHttpServletResponse()
+        );
+
+        assertThat(response.getStatusCode().value()).isEqualTo(429);
+        assertThat(response.getBody()).isInstanceOf(ErrorResponse.class);
+        ErrorResponse error = (ErrorResponse) response.getBody();
+        assertThat(error.error()).isEqualTo("TOO_MANY_REQUESTS");
+    }
+
 
     @Test
     void saltReturnsStoredSaltForKnownEmail() {
