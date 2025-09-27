@@ -33,3 +33,8 @@ app:
       - https://localhost:5173
   audit:
     admin-emails: ${APP_AUDIT_ADMIN_EMAILS:}
+
+logging:
+  level:
+    com.example.pm: INFO
+    org.springframework.security: WARN
