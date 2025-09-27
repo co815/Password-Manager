@@ -565,18 +565,15 @@ public class AuthController {
         return left.trim().equals(right.trim());
     }
 
-    return
+    private String buildSaltRateLimitKey(HttpServletRequest request, String identifier) {
+        return buildRateLimitKey("salt", request, identifier);
+    }
 
-    buildRateLimitKey("salt",request, identifier);
-}
+    private String buildLoginRateLimitKey(HttpServletRequest request, String email) {
+        return buildRateLimitKey("login", request, email);
+    }
 
-private String buildLoginRateLimitKey(HttpServletRequest request, String email) {
-    return buildRateLimitKey("login", request, email);
-}
-
-private String buildRateLimitKey(String prefix, HttpServletRequest request, String identifier) {
-
-    private String buildSaltRateLimitKey (HttpServletRequest request, String identifier){
+    private String buildRateLimitKey(String prefix, HttpServletRequest request, String identifier) {
         String remoteAddr = request != null && request.getRemoteAddr() != null
                 ? request.getRemoteAddr()
                 : "unknown";
@@ -585,7 +582,7 @@ private String buildRateLimitKey(String prefix, HttpServletRequest request, Stri
         return prefix + ":" + remoteAddr + ":" + Integer.toHexString(identifierHash);
     }
 
-    private static String placeholderEmailFor (String identifier){
+    private static String placeholderEmailFor(String identifier) {
         if (identifier == null || identifier.isBlank()) {
             return "invalid@example.invalid";
         }
