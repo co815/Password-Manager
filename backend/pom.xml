@@ -59,6 +59,11 @@
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.github.vladimir-bukhtoyarov</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+        <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
             <version>0.12.5</version>
@@ -119,6 +124,10 @@
         </plugins>
     </build>
     <repositories>
+        <repository>
+            <id>local-bucket4j</id>
+            <url>file://${project.basedir}/local-repo</url>
+        </repository>
         <repository>
             <id>central-ipv4</id>
             <url>https://repo1.maven.org/maven2</url>

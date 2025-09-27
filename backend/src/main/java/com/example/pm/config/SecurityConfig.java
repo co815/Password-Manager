@@ -27,6 +27,7 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final AuthRateLimitingFilter authRateLimitingFilter;
     private final ObjectMapper objectMapper;
     private final CorsProps corsProps;
     private final CsrfTokenRepository csrfTokenRepository;
@@ -35,11 +36,12 @@ public class SecurityConfig {
     private boolean sslEnabled;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, ObjectMapper objectMapper, CorsProps corsProps,
-                          CsrfTokenRepository csrfTokenRepository) {
+                          CsrfTokenRepository csrfTokenRepository, AuthRateLimitingFilter authRateLimitingFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.objectMapper = objectMapper;
         this.corsProps = corsProps;
         this.csrfTokenRepository = csrfTokenRepository;
+        this.authRateLimitingFilter = authRateLimitingFilter;
     }
 
     @Bean
@@ -77,6 +79,7 @@ public class SecurityConfig {
                 .httpBasic(b -> b.disable())
                 .formLogin(f -> f.disable())
                 .logout(l -> l.disable())
+                .addFilterBefore(authRateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(sslEnabled), CsrfFilter.class)
                 .exceptionHandling(ex -> ex
