@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.TimeMeter;
+import io.github.bucket4j.Refill;
 import io.github.bucket4j.local.LocalBucketBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,8 +38,8 @@ class AuthRateLimitingFilterTest {
         timeMeter = new TestTimeMeter();
         Supplier<Bucket> supplier = () -> new LocalBucketBuilder()
                 .withCustomTimePrecision(timeMeter)
-                .addLimit(Bandwidth.builder().capacity(10).refillGreedy(10, Duration.ofMinutes(1)).build())
-                .addLimit(Bandwidth.builder().capacity(50).refillIntervally(50, Duration.ofHours(1)).build())
+                .addLimit(Bandwidth.classic(10, Refill.greedy(10, Duration.ofMinutes(1))))
+                .addLimit(Bandwidth.classic(50, Refill.intervally(50, Duration.ofHours(1))))
                 .build();
         filter = new AuthRateLimitingFilter(new ObjectMapper(), supplier);
         mockMvc = MockMvcBuilders.standaloneSetup(new TestAuthController())

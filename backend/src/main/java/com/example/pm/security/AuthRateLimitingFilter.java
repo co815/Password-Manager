@@ -4,6 +4,7 @@ import com.example.pm.exceptions.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Refill;
 import io.github.bucket4j.local.LocalBucketBuilder;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -47,14 +48,8 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
     }
 
     private static Bucket createDefaultBucket() {
-        Bandwidth perMinute = Bandwidth.builder()
-                .capacity(10)
-                .refillGreedy(10, Duration.ofMinutes(1))
-                .build();
-        Bandwidth perHour = Bandwidth.builder()
-                .capacity(50)
-                .refillIntervally(50, Duration.ofHours(1))
-                .build();
+        Bandwidth perMinute = Bandwidth.classic(10, Refill.greedy(10, Duration.ofMinutes(1)));
+        Bandwidth perHour = Bandwidth.classic(50, Refill.intervally(50, Duration.ofHours(1)));
 
         return new LocalBucketBuilder()
                 .addLimit(perMinute)
