@@ -56,7 +56,6 @@ public class SecurityConfig {
                 .requestCache(rc -> rc.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/health",
                                 "/api/auth/csrf",
                                 "/api/auth/salt"
                         ).permitAll()
