@@ -9,3 +9,9 @@ export async function createAccountMaterial(masterPassword: string){
     const { ct: dekEncrypted, iv: dekNonce } = await enc(KEK, rawDEK);
     return { saltClient, dekEncrypted, dekNonce };
 }
+
+export async function encryptDekWithKek(dek: CryptoKey, kek: CryptoKey) {
+    const rawDek = new Uint8Array(await aesExportRaw(dek));
+    const { ct: dekEncrypted, iv: dekNonce } = await enc(kek, rawDek);
+    return { dekEncrypted, dekNonce };
+}

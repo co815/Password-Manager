@@ -246,6 +246,34 @@ export interface MfaDisableRequest {
     recoveryCode?: string | null;
 }
 
+export interface RotateMasterPasswordRequest {
+    currentVerifier: string;
+    newVerifier: string;
+    newSaltClient: string;
+    newDekEncrypted: string;
+    newDekNonce: string;
+    invalidateSessions: boolean;
+}
+
+export interface RotateMasterPasswordResponse {
+    rotatedAt: string;
+    sessionsInvalidated: boolean;
+}
+
+export interface ResetMasterPasswordRequest {
+    email: string;
+    recoveryCode: string;
+    newVerifier: string;
+    newSaltClient: string;
+    newDekEncrypted: string;
+    newDekNonce: string;
+    disableMfa: boolean;
+}
+
+export interface RevokeSessionsResponse {
+    tokenVersion: number;
+}
+
 export interface VaultItem {
     id?: string;
     userId?: string;
@@ -341,6 +369,18 @@ export const api = {
                 recoveryCode: body.recoveryCode ?? null,
             }),
         }),
+    rotateMasterPassword: (body: RotateMasterPasswordRequest) =>
+        req<RotateMasterPasswordResponse>(`/auth/master/rotate`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        }),
+    resetMasterPassword: (body: ResetMasterPasswordRequest) =>
+        req<{ message: string }>(`/auth/master/reset`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        }),
+    revokeSessions: () =>
+        req<RevokeSessionsResponse>(`/auth/sessions/revoke`, { method: 'POST' }),
     listVault: () => req<VaultItem[]>(`/vault`),
     createVault: (body: Partial<VaultItem>) =>
         req<VaultItem>(`/vault`, { method: 'POST', body: JSON.stringify(body) }),

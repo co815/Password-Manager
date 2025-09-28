@@ -1,24 +1,40 @@
 import {useMemo, useState, useEffect, useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
-import type {ChangeEvent, MouseEvent} from 'react';
+import type {ChangeEvent, FormEvent, MouseEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
 import {useCrypto} from '../lib/crypto/crypto-context';
 import {api, type MfaEnrollmentResponse, type MfaStatusResponse, type PublicCredential} from '../lib/api';
 import {isAuditAdminEmail} from '../lib/accessControl';
 import Alert from '@mui/material/Alert';
-import {deriveKEK} from '../lib/crypto/argon2';
+import {deriveKEK, makeVerifier} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
+import {encryptDekWithKek} from '../lib/crypto/keys';
 
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
     Avatar, TextField, IconButton, Card, CardContent, Button, InputAdornment, Tooltip,
     Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Snackbar, Stack, LinearProgress,
-    Menu, MenuItem, Chip
+    Menu, MenuItem, Chip, FormControlLabel, Checkbox
 } from '@mui/material';
 
 import {
-    Search, Note, Key, Star, StarBorder, Edit, Delete,
-    Add as AddIcon, Visibility, VisibilityOff, Link as LinkIcon, Settings, Upload, DeleteOutline, ListAlt, ContentCopy, AutoFixHigh,
+    Search,
+    Note,
+    Key,
+    Star,
+    StarBorder,
+    Edit,
+    Delete,
+    Add as AddIcon,
+    Visibility,
+    VisibilityOff,
+    Link as LinkIcon,
+    Settings,
+    Upload,
+    DeleteOutline,
+    ListAlt,
+    ContentCopy,
+    AutoFixHigh,
 } from '@mui/icons-material';
 import {passwordTemplates} from '../lib/passwordTemplates';
 
@@ -158,6 +174,14 @@ export default function Dashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY_ID);
 
+    const [rotateCurrentPassword, setRotateCurrentPassword] = useState('');
+    const [rotateNewPassword, setRotateNewPassword] = useState('');
+    const [rotateConfirmPassword, setRotateConfirmPassword] = useState('');
+    const [rotateInvalidateSessions, setRotateInvalidateSessions] = useState(false);
+    const [rotateBusy, setRotateBusy] = useState(false);
+    const [rotateMessage, setRotateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [revokeBusy, setRevokeBusy] = useState(false);
+
     const isAuditAdmin = useMemo(() => isAuditAdminEmail(user?.email ?? null), [user?.email]);
 
     const avatarInitials = useMemo(() => {
@@ -183,6 +207,14 @@ export default function Dashboard() {
 
     const pwdScore = useMemo(() => scorePassword(password), [password]);
     const saveDisabled = busy || !title.trim() || !username.trim() || !password;
+    const rotateDisabled =
+        rotateBusy
+        || locked
+        || !dek
+        || !user
+        || !rotateCurrentPassword.trim()
+        || !rotateNewPassword.trim()
+        || rotateNewPassword !== rotateConfirmPassword;
 
     useEffect(() => {
         if (!locked && dek) return;
@@ -207,6 +239,11 @@ export default function Dashboard() {
         setDeleteTarget(null);
         setSearchQuery('');
         setSelectedCategory(ALL_CATEGORY_ID);
+        setRotateCurrentPassword('');
+        setRotateNewPassword('');
+        setRotateConfirmPassword('');
+        setRotateInvalidateSessions(false);
+        setRotateMessage(null);
     }, [dek, locked]);
 
     useEffect(() => {
@@ -302,7 +339,7 @@ export default function Dashboard() {
             } catch (error) {
                 if (!cancelled) {
                     const message = error instanceof Error ? error.message : 'Failed to load MFA status';
-                    setMfaMessage({ type: 'error', text: message || 'Failed to load MFA status' });
+                    setMfaMessage({type: 'error', text: message || 'Failed to load MFA status'});
                     setMfaStatus(null);
                 }
             } finally {
@@ -482,6 +519,95 @@ export default function Dashboard() {
         }
     };
 
+    const handleRotateMasterPassword = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setRotateMessage(null);
+
+        if (!user) {
+            setRotateMessage({type: 'error', text: 'User profile unavailable. Try refreshing the page.'});
+            return;
+        }
+        if (!dek || locked) {
+            setRotateMessage({type: 'error', text: 'Unlock your vault before rotating the master password.'});
+            return;
+        }
+
+        const current = rotateCurrentPassword.trim();
+        const next = rotateNewPassword.trim();
+        const confirm = rotateConfirmPassword.trim();
+
+        if (!current) {
+            setRotateMessage({type: 'error', text: 'Enter your current master password.'});
+            return;
+        }
+        if (!next) {
+            setRotateMessage({type: 'error', text: 'Enter a new master password.'});
+            return;
+        }
+        if (next !== confirm) {
+            setRotateMessage({type: 'error', text: 'New master passwords do not match.'});
+            return;
+        }
+
+        setRotateBusy(true);
+        try {
+            const currentVerifier = await makeVerifier(user.email, current, user.saltClient);
+            const newSaltClient = toB64(crypto.getRandomValues(new Uint8Array(16)));
+            const newVerifier = await makeVerifier(user.email, next, newSaltClient);
+            const newKek = await deriveKEK(next, newSaltClient);
+            const {dekEncrypted, dekNonce} = await encryptDekWithKek(dek, newKek);
+
+            await api.rotateMasterPassword({
+                currentVerifier,
+                newVerifier,
+                newSaltClient,
+                newDekEncrypted: dekEncrypted,
+                newDekNonce: dekNonce,
+                invalidateSessions: rotateInvalidateSessions,
+            });
+
+            setRotateMessage({
+                type: 'success',
+                text: rotateInvalidateSessions
+                    ? 'Master password rotated. Sessions were revoked; sign in again everywhere.'
+                    : 'Master password rotated successfully.',
+            });
+            setRotateCurrentPassword('');
+            setRotateNewPassword('');
+            setRotateConfirmPassword('');
+            setRotateInvalidateSessions(false);
+            await refresh();
+        } catch (error) {
+            const message = messageFromError(error, 'Failed to rotate master password');
+            setRotateMessage({type: 'error', text: message});
+        } finally {
+            setRotateBusy(false);
+        }
+    };
+
+    const handleRevokeSessions = async () => {
+        if (revokeBusy) return;
+        const confirmed = typeof window === 'undefined'
+            ? true
+            : window.confirm('Revoke all sessions? You will need to sign in again on every device.');
+        if (!confirmed) return;
+
+        setRevokeBusy(true);
+        try {
+            await api.revokeSessions();
+            setToast({
+                type: 'success',
+                msg: 'All sessions revoked. Please sign in again on this device and others.',
+            });
+            await refresh();
+        } catch (error) {
+            const message = messageFromError(error, 'Failed to revoke sessions');
+            setToast({type: 'error', msg: message});
+        } finally {
+            setRevokeBusy(false);
+        }
+    };
+
     const messageFromError = (error: unknown, fallback: string) =>
         error instanceof Error ? error.message || fallback : fallback;
 
@@ -505,7 +631,7 @@ export default function Dashboard() {
             });
         } catch (error) {
             const message = messageFromError(error, 'Failed to start MFA enrollment');
-            setMfaMessage({ type: 'error', text: message });
+            setMfaMessage({type: 'error', text: message});
         } finally {
             setMfaActionBusy(false);
         }
@@ -533,7 +659,7 @@ export default function Dashboard() {
             await refresh();
         } catch (error) {
             const message = messageFromError(error, 'Failed to activate MFA');
-            setMfaMessage({ type: 'error', text: message });
+            setMfaMessage({type: 'error', text: message});
         } finally {
             setMfaActionBusy(false);
         }
@@ -568,7 +694,7 @@ export default function Dashboard() {
             await refresh();
         } catch (error) {
             const message = messageFromError(error, 'Failed to disable MFA');
-            setMfaMessage({ type: 'error', text: message });
+            setMfaMessage({type: 'error', text: message});
         } finally {
             setMfaActionBusy(false);
         }
@@ -934,7 +1060,7 @@ export default function Dashboard() {
                         <Avatar
                             alt={user?.email ?? 'User'}
                             src={avatarLoadError ? undefined : avatarSrc ?? undefined}
-                            slotProps={{ img: { onError: () => setAvatarLoadError(true) } }}
+                            slotProps={{img: {onError: () => setAvatarLoadError(true)}}}
                         >
                             {avatarInitials}
                         </Avatar>
@@ -1068,7 +1194,8 @@ export default function Dashboard() {
                                             disabled={!selected}
                                             title={showSelectedPassword ? 'Hide password' : 'Show password'}
                                         >
-                                            {showSelectedPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}
+                                            {showSelectedPassword ? <VisibilityOff fontSize="small"/> :
+                                                <Visibility fontSize="small"/>}
                                         </IconButton>
                                         <IconButton
                                             size="small"
@@ -1186,172 +1313,284 @@ export default function Dashboard() {
                             </Stack>
                         </Stack>
                         <Divider/>
-                        <Stack spacing={1.5}>
-                            <Box display="flex" alignItems="center" justifyContent="space-between">
-                                <Box>
-                                    <Typography variant="h6" fontWeight={700}>Security</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Manage multi-factor authentication for your account.
-                                    </Typography>
+                        <Stack spacing={3}>
+                            <Stack spacing={1.5}>
+                                <Box display="flex" alignItems="center" justifyContent="space-between">
+                                    <Box>
+                                        <Typography variant="h6" fontWeight={700}>Account security</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Rotate your master password and manage active sessions.
+                                        </Typography>
+                                    </Box>
                                 </Box>
-                                <Chip
-                                    label={
-                                        mfaLoading
-                                            ? 'Loading…'
-                                            : mfaStatus
-                                                ? mfaStatus.enabled
-                                                    ? 'MFA enabled'
-                                                    : 'MFA disabled'
-                                                : 'Status unavailable'
-                                    }
-                                    color={
-                                        mfaStatus
-                                            ? mfaStatus.enabled
-                                                ? 'success'
-                                                : 'default'
-                                            : mfaLoading
-                                                ? 'default'
-                                                : 'warning'
-                                    }
-                                    variant={mfaStatus?.enabled ? 'filled' : 'outlined'}
-                                    size="small"
-                                />
-                            </Box>
-                            {mfaMessage ? (
-                                <Alert
-                                    severity={mfaMessage.type}
-                                    onClose={() => setMfaMessage(null)}
-                                >
-                                    {mfaMessage.text}
-                                </Alert>
-                            ) : null}
-                            {mfaLoading ? (
-                                <LinearProgress/>
-                            ) : mfaStatus?.enabled ? (
-                                <Stack spacing={1.5}>
-                                    <Typography variant="body2">
-                                        Multi-factor authentication is active
-                                        {mfaStatus.enabledAt
-                                            ? ` since ${new Date(mfaStatus.enabledAt).toLocaleString()}`
-                                            : ''}.
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Recovery codes remaining: {mfaStatus.recoveryCodesRemaining}
-                                    </Typography>
-                                    {mfaEnrollment?.recoveryCodes?.length ? (
-                                        <>
-                                            <Alert severity="info">
-                                                Save the recovery codes shown below. They were generated during your most recent
-                                                enrollment and will not be displayed again.
-                                            </Alert>
-                                            {renderRecoveryCodes(mfaEnrollment.recoveryCodes)}
-                                        </>
-                                    ) : null}
-                                    <Typography variant="body2">
-                                        To disable MFA, provide a current authenticator code or one of your recovery codes.
-                                    </Typography>
-                                    <TextField
-                                        label="Authenticator code"
-                                        value={mfaDisableCode}
-                                        onChange={(e) => setMfaDisableCode(e.target.value)}
-                                        size="small"
-                                        fullWidth
-                                        autoComplete="one-time-code"
-                                        disabled={mfaActionBusy}
-                                    />
-                                    <TextField
-                                        label="Recovery code"
-                                        helperText="Optional — use this if you no longer have access to your authenticator."
-                                        value={mfaDisableRecoveryCode}
-                                        onChange={(e) => setMfaDisableRecoveryCode(e.target.value)}
-                                        size="small"
-                                        fullWidth
-                                        disabled={mfaActionBusy}
-                                    />
-                                    <Box display="flex" justifyContent="flex-end" gap={1}>
-                                        <Button
-                                            onClick={() => {
-                                                setMfaDisableCode('');
-                                                setMfaDisableRecoveryCode('');
+                                {rotateMessage ? (
+                                    <Alert severity={rotateMessage.type}>{rotateMessage.text}</Alert>
+                                ) : null}
+                                <Box component="form" onSubmit={handleRotateMasterPassword}>
+                                    <Stack spacing={1.5}>
+                                        <TextField
+                                            label="Current master password"
+                                            type="password"
+                                            autoComplete="current-password"
+                                            value={rotateCurrentPassword}
+                                            onChange={(event) => {
+                                                setRotateCurrentPassword(event.target.value);
+                                                setRotateMessage(null);
                                             }}
-                                            disabled={mfaActionBusy || (!mfaDisableCode && !mfaDisableRecoveryCode)}
-                                        >
-                                            Clear
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                void handleDisableMfa();
+                                            size="small"
+                                            fullWidth
+                                            disabled={rotateBusy}
+                                        />
+                                        <TextField
+                                            label="New master password"
+                                            type="password"
+                                            autoComplete="new-password"
+                                            value={rotateNewPassword}
+                                            onChange={(event) => {
+                                                setRotateNewPassword(event.target.value);
+                                                setRotateMessage(null);
                                             }}
-                                            variant="outlined"
-                                            color="error"
-                                            disabled={
-                                                mfaActionBusy
-                                                || (!mfaDisableCode.trim() && !mfaDisableRecoveryCode.trim())
+                                            size="small"
+                                            fullWidth
+                                            disabled={rotateBusy}
+                                        />
+                                        <TextField
+                                            label="Confirm new master password"
+                                            type="password"
+                                            autoComplete="new-password"
+                                            value={rotateConfirmPassword}
+                                            onChange={(event) => {
+                                                setRotateConfirmPassword(event.target.value);
+                                                setRotateMessage(null);
+                                            }}
+                                            size="small"
+                                            fullWidth
+                                            disabled={rotateBusy}
+                                            error={
+                                                !!rotateConfirmPassword
+                                                && rotateNewPassword !== rotateConfirmPassword
+                                            }
+                                            helperText={
+                                                rotateConfirmPassword
+                                                && rotateNewPassword !== rotateConfirmPassword
+                                                    ? 'Passwords do not match.'
+                                                    : undefined
+                                            }
+                                        />
+                                        <FormControlLabel
+                                            control={(
+                                                <Checkbox
+                                                    checked={rotateInvalidateSessions}
+                                                    onChange={(event) => setRotateInvalidateSessions(event.target.checked)}
+                                                    disabled={rotateBusy}
+                                                />
+                                            )}
+                                            label="Revoke other sessions after rotation"
+                                        />
+                                        <Button
+                                            type="submit"
+                                            variant="contained"
+                                            disabled={rotateDisabled}
                                             }
                                         >
-                                            {mfaActionBusy ? 'Disabling…' : 'Disable MFA'}
+                                            {rotateBusy ? 'Rotating…' : 'Rotate master password'}
                                         </Button>
-                                    </Box>
-                                </Stack>
-                            ) : (
-                                <Stack spacing={1.5}>
-                                    <Typography variant="body2">
-                                        Protect your account with an extra verification step. Start enrollment to generate
-                                        an authenticator secret and recovery codes.
+                                    </Stack>
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Last rotated:{' '}
+                                    {user?.masterPasswordLastRotated
+                                        ? new Date(user.masterPasswordLastRotated).toLocaleString()
+                                        : 'Never'}
+                                </Typography>
+                                <Stack spacing={1}>
+                                    <Typography variant="subtitle2" fontWeight={600}>Active sessions</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Revoking all sessions signs you out everywhere and requires signing in again.
                                     </Typography>
-                                    {mfaEnrollment ? (
-                                        <Stack spacing={1.5}>
-                                            <TextField
-                                                label="Authenticator secret"
-                                                value={mfaEnrollment.secret}
-                                                fullWidth
-                                                size="small"
-                                                InputProps={{readOnly: true}}
-                                            />
-                                            <TextField
-                                                label="otpauth URL"
-                                                value={mfaEnrollment.otpauthUrl}
-                                                fullWidth
-                                                size="small"
-                                                InputProps={{readOnly: true}}
-                                                multiline
-                                                minRows={2}
-                                            />
-                                            <Alert severity="info">
-                                                Save these recovery codes somewhere safe. They are only shown once.
-                                            </Alert>
-                                            {renderRecoveryCodes(mfaEnrollment.recoveryCodes)}
-                                            <TextField
-                                                label="Authenticator code"
-                                                value={mfaCodeInput}
-                                                onChange={(e) => setMfaCodeInput(e.target.value)}
-                                                size="small"
-                                                fullWidth
-                                                autoComplete="one-time-code"
-                                                disabled={mfaActionBusy}
-                                            />
+                                    <Button
+                                        onClick={handleRevokeSessions}
+                                        variant="outlined"
+                                        color="error"
+                                        disabled={revokeBusy}
+                                    >
+                                        {revokeBusy ? 'Revoking…' : 'Revoke all sessions'}
+                                    </Button>
+                                </Stack>
+                            </Stack>
+                            <Divider/>
+                            <Stack spacing={1.5}>
+                                <Box display="flex" alignItems="center" justifyContent="space-between">
+                                    <Box>
+                                        <Typography variant="h6" fontWeight={700}>Multi-factor
+                                            authentication</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Manage multi-factor authentication for your account.
+                                        </Typography>
+                                    </Box>
+                                    <Chip
+                                        label={
+                                            mfaLoading
+                                                ? 'Loading…'
+                                                : mfaStatus
+                                                    ? mfaStatus.enabled
+                                                        ? 'MFA enabled'
+                                                        : 'MFA disabled'
+                                                    : 'Status unavailable'
+                                        }
+                                        color={
+                                            mfaStatus
+                                                ? mfaStatus.enabled
+                                                    ? 'success'
+                                                    : 'default'
+                                                : mfaLoading
+                                                    ? 'default'
+                                                    : 'warning'
+                                        }
+                                        variant={mfaStatus?.enabled ? 'filled' : 'outlined'}
+                                        size="small"
+                                    />
+                                </Box>
+                                {mfaMessage ? (
+                                    <Alert
+                                        severity={mfaMessage.type}
+                                        onClose={() => setMfaMessage(null)}
+                                    >
+                                        {mfaMessage.text}
+                                    </Alert>
+                                ) : null}
+                                {mfaLoading ? (
+                                    <LinearProgress/>
+                                ) : mfaStatus?.enabled ? (
+                                    <Stack spacing={1.5}>
+                                        <Typography variant="body2">
+                                            Multi-factor authentication is active
+                                            {mfaStatus.enabledAt
+                                                ? ` since ${new Date(mfaStatus.enabledAt).toLocaleString()}`
+                                                : ''}.
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Recovery codes remaining: {mfaStatus.recoveryCodesRemaining}
+                                        </Typography>
+                                        {mfaEnrollment?.recoveryCodes?.length ? (
+                                            <>
+                                                <Alert severity="info">
+                                                    Save the recovery codes shown below. They were generated during your
+                                                    most recent
+                                                    enrollment and will not be displayed again.
+                                                </Alert>
+                                                {renderRecoveryCodes(mfaEnrollment.recoveryCodes)}
+                                            </>
+                                        ) : null}
+                                        <Typography variant="body2">
+                                            To disable MFA, provide a current authenticator code or one of your recovery
+                                            codes.
+                                        </Typography>
+                                        <TextField
+                                            label="Authenticator code"
+                                            value={mfaDisableCode}
+                                            onChange={(e) => setMfaDisableCode(e.target.value)}
+                                            size="small"
+                                            fullWidth
+                                            autoComplete="one-time-code"
+                                            disabled={mfaActionBusy}
+                                        />
+                                        <TextField
+                                            label="Recovery code"
+                                            helperText="Optional — use this if you no longer have access to your authenticator."
+                                            value={mfaDisableRecoveryCode}
+                                            onChange={(e) => setMfaDisableRecoveryCode(e.target.value)}
+                                            size="small"
+                                            fullWidth
+                                            disabled={mfaActionBusy}
+                                        />
+                                        <Box display="flex" justifyContent="flex-end" gap={1}>
                                             <Button
                                                 onClick={() => {
-                                                    void handleActivateMfa();
+                                                    setMfaDisableCode('');
+                                                    setMfaDisableRecoveryCode('');
+                                                }}
+                                                disabled={mfaActionBusy || (!mfaDisableCode && !mfaDisableRecoveryCode)}
+                                            >
+                                                Clear
+                                            </Button>
+                                            <Button
+                                                onClick={() => {
+                                                    void handleDisableMfa();
+                                                }}
+                                                variant="outlined"
+                                                color="error"
+                                                disabled={
+                                                    mfaActionBusy
+                                                    || (!mfaDisableCode.trim() && !mfaDisableRecoveryCode.trim())
+                                                }
+                                            >
+                                                {mfaActionBusy ? 'Disabling…' : 'Disable MFA'}
+                                            </Button>
+                                        </Box>
+                                    </Stack>
+                                ) : (
+                                    <Stack spacing={1.5}>
+                                        <Typography variant="body2">
+                                            Protect your account with an extra verification step. Start enrollment to
+                                            generate
+                                            an authenticator secret and recovery codes.
+                                        </Typography>
+                                        {mfaEnrollment ? (
+                                            <Stack spacing={1.5}>
+                                                <TextField
+                                                    label="Authenticator secret"
+                                                    value={mfaEnrollment.secret}
+                                                    fullWidth
+                                                    size="small"
+                                                    InputProps={{readOnly: true}}
+                                                />
+                                                <TextField
+                                                    label="otpauth URL"
+                                                    value={mfaEnrollment.otpauthUrl}
+                                                    fullWidth
+                                                    size="small"
+                                                    InputProps={{readOnly: true}}
+                                                    multiline
+                                                    minRows={2}
+                                                />
+                                                <Alert severity="info">
+                                                    Save these recovery codes somewhere safe. They are only shown once.
+                                                </Alert>
+                                                {renderRecoveryCodes(mfaEnrollment.recoveryCodes)}
+                                                <TextField
+                                                    label="Authenticator code"
+                                                    value={mfaCodeInput}
+                                                    onChange={(e) => setMfaCodeInput(e.target.value)}
+                                                    size="small"
+                                                    fullWidth
+                                                    autoComplete="one-time-code"
+                                                    disabled={mfaActionBusy}
+                                                />
+                                                <Button
+                                                    onClick={() => {
+                                                        void handleActivateMfa();
+                                                    }}
+                                                    variant="contained"
+                                                    disabled={mfaActionBusy || !mfaCodeInput.trim()}
+                                                >
+                                                    {mfaActionBusy ? 'Activating…' : 'Activate MFA'}
+                                                </Button>
+                                            </Stack>
+                                        ) : (
+                                            <Button
+                                                onClick={() => {
+                                                    void handleStartMfaEnrollment();
                                                 }}
                                                 variant="contained"
-                                                disabled={mfaActionBusy || !mfaCodeInput.trim()}
+                                                disabled={mfaActionBusy}
                                             >
-                                                {mfaActionBusy ? 'Activating…' : 'Activate MFA'}
+                                                {mfaActionBusy ? 'Starting…' : 'Enable MFA'}
                                             </Button>
-                                        </Stack>
-                                    ) : (
-                                        <Button
-                                            onClick={() => {
-                                                void handleStartMfaEnrollment();
-                                            }}
-                                            variant="contained"
-                                            disabled={mfaActionBusy}
-                                        >
-                                            {mfaActionBusy ? 'Starting…' : 'Enable MFA'}
-                                        </Button>
-                                    )}
-                                </Stack>
+                                        )}
+                                    </Stack>
+                                )}
+                            </Stack>
                             )}
                         </Stack>
                     </Stack>
@@ -1433,7 +1672,8 @@ export default function Dashboard() {
                                                         size="small"
                                                         aria-label={showPwd ? 'Hide password' : 'Show password'}
                                                     >
-                                                        {showPwd ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}
+                                                        {showPwd ? <VisibilityOff fontSize="small"/> :
+                                                            <Visibility fontSize="small"/>}
                                                     </IconButton>
                                                 </Tooltip>
                                             </InputAdornment>
