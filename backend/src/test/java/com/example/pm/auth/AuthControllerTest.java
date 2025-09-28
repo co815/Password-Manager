@@ -56,7 +56,9 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -108,7 +110,9 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -159,7 +163,9 @@ class AuthControllerTest {
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -195,8 +201,9 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         props.setSameSite("Strict");
 
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit,
-                csrfTokenRepository, true);
+                csrfTokenRepository, placeholderSaltService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -235,7 +242,9 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -265,7 +274,9 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -279,7 +290,7 @@ class AuthControllerTest {
     }
 
     @Test
-    void saltReturnsDifferentFakeValuesForUnknownEmail() {
+    void saltReturnsStableFakeValueForUnknownEmail() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
@@ -294,7 +305,9 @@ class AuthControllerTest {
         AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository, true);
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -310,6 +323,6 @@ class AuthControllerTest {
         assertThat(second.email()).isEqualTo("ghost@example.com");
         assertThat(first.saltClient()).isNotBlank();
         assertThat(second.saltClient()).isNotBlank();
-        assertThat(first.saltClient()).isNotEqualTo(second.saltClient());
+        assertThat(first.saltClient()).isEqualTo(second.saltClient());
     }
 }

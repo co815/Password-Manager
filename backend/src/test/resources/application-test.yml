@@ -18,5 +18,6 @@ app:
   auth:
     cookie:
       same-site: Strict
+    placeholder-salt-secret: test-placeholder-secret
   cors:
-    origins: []
+    origins: [ ]

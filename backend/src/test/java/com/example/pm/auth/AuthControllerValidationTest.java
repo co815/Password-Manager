@@ -33,6 +33,7 @@ class AuthControllerValidationTest {
     @MockBean TotpService totpService;
     @MockBean SecurityAuditService auditService;
     @MockBean org.springframework.security.web.csrf.CsrfTokenRepository csrfTokenRepository;
+    @MockBean PlaceholderSaltService placeholderSaltService;
 
     @Test
     void registerMissingFieldsReturnsBadRequestWithValidationDetails() throws Exception {

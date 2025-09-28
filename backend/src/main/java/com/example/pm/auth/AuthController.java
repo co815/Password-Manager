@@ -12,6 +12,7 @@ import com.example.pm.security.TotpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +20,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -47,6 +47,7 @@ public class AuthController {
     private final SecurityAuditService auditService;
     private final boolean sslEnabled;
     private final CsrfTokenRepository csrfTokenRepository;
+    private final PlaceholderSaltService placeholderSaltService;
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
             "^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$",
@@ -54,7 +55,6 @@ public class AuthController {
     );
     private static final int MAX_AVATAR_BYTES = 256 * 1024;
 
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final SecureRandom RECOVERY_RANDOM = new SecureRandom();
     private static final char[] RECOVERY_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
 
@@ -62,6 +62,7 @@ public class AuthController {
                           RateLimiterService rateLimiterService, TotpService totpService,
                           SecurityAuditService auditService,
                           CsrfTokenRepository csrfTokenRepository,
+                          PlaceholderSaltService placeholderSaltService,
                           @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
         this.users = users;
         this.jwt = jwt;
@@ -70,6 +71,7 @@ public class AuthController {
         this.totpService = totpService;
         this.auditService = auditService;
         this.csrfTokenRepository = csrfTokenRepository;
+        this.placeholderSaltService = placeholderSaltService;
         this.sslEnabled = sslEnabled;
     }
 
@@ -108,7 +110,7 @@ public class AuthController {
         if (trimmed.isEmpty()) {
             return ResponseEntity.ok(new SaltResponse(
                     placeholderEmailFor(trimmed),
-                    fakeSalt()
+                    placeholderSaltService.fakeSaltFor(trimmed)
             ));
         }
 
@@ -122,7 +124,7 @@ public class AuthController {
                 .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new SaltResponse(u.getEmail(), u.getSaltClient())))
                 .orElseGet(() -> ResponseEntity.ok(new SaltResponse(
                         normalizedEmail != null ? normalizedEmail : placeholderEmailFor(trimmed),
-                        fakeSalt()
+                        placeholderSaltService.fakeSaltFor(normalizedEmail != null ? normalizedEmail : trimmed)
                 )));
     }
 
@@ -479,12 +481,6 @@ public class AuthController {
         }
 
         return false;
-    }
-
-    private static String fakeSalt() {
-        byte[] saltBytes = new byte[16];
-        SECURE_RANDOM.nextBytes(saltBytes);
-        return Base64.getEncoder().encodeToString(saltBytes);
     }
 
     private List<String> generateRecoveryCodes() {
