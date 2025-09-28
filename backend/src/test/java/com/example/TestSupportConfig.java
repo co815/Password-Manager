@@ -24,4 +24,10 @@ public class TestSupportConfig {
             }
         };
     }
+
+    @Bean
+    @Primary
+    public com.example.pm.config.RateLimitProps rateLimitProps() {
+        return new com.example.pm.config.RateLimitProps();
+    }
 }
