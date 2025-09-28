@@ -558,7 +558,11 @@ public class AuthController {
         if (left == null || right == null) {
             return false;
         }
-        return left.trim().equals(right.trim());
+        String normalizedLeft = left.trim();
+        String normalizedRight = right.trim();
+        byte[] leftBytes = normalizedLeft.getBytes(StandardCharsets.UTF_8);
+        byte[] rightBytes = normalizedRight.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(leftBytes, rightBytes);
     }
 
     private String buildSaltRateLimitKey(HttpServletRequest request, String identifier) {

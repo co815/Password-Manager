@@ -82,6 +82,95 @@ class AuthControllerTest {
     }
 
     @Test
+    void loginSucceedsWhenVerifierMatchesAfterTrimmingWhitespace() {
+        UserRepository users = mock(UserRepository.class);
+        JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
+        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
+
+        User user = new User();
+        user.setId("user-123");
+        user.setEmail("user@example.com");
+        user.setUsername("john");
+        user.setVerifier("  verifier  ");
+        user.setSaltClient("salt");
+        user.setDekEncrypted("dek");
+        user.setDekNonce("nonce");
+
+        when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(jwt.generate("user-123", 0)).thenReturn("token-value");
+        when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
+
+        AuthCookieProps props = new AuthCookieProps();
+        props.setSameSite("Lax");
+
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
+
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setScheme("https");
+        request.setSecure(true);
+        MockHttpServletResponse responseServlet = new MockHttpServletResponse();
+
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier   ", null, null), request,
+                responseServlet);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN")).isEqualTo("csrf-token-value");
+    }
+
+    @Test
+    void loginFailsWhenVerifierDoesNotMatchAfterTrimmingWhitespace() {
+        UserRepository users = mock(UserRepository.class);
+        JwtService jwt = mock(JwtService.class);
+        RateLimiterService rateLimiter = mock(RateLimiterService.class);
+        TotpService totp = mock(TotpService.class);
+        SecurityAuditService audit = mock(SecurityAuditService.class);
+        CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+
+        User user = new User();
+        user.setId("user-123");
+        user.setEmail("user@example.com");
+        user.setUsername("john");
+        user.setVerifier("verifier");
+        user.setSaltClient("salt");
+        user.setDekEncrypted("dek");
+        user.setDekNonce("nonce");
+
+        when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+
+        AuthCookieProps props = new AuthCookieProps();
+        props.setSameSite("Lax");
+
+        when(rateLimiter.isAllowed(anyString())).thenReturn(true);
+
+        PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
+        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setScheme("https");
+        request.setSecure(true);
+
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "   wrong   ", null, null), request,
+                new MockHttpServletResponse());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+        assertThat(response.getBody()).isInstanceOf(ErrorResponse.class);
+        ErrorResponse error = (ErrorResponse) response.getBody();
+        assertThat(error.error()).isEqualTo("UNAUTHORIZED");
+        verify(audit).recordLoginFailure("user@example.com");
+    }
+
+    @Test
     void loginKeepsSecureCookieEvenWhenOriginIsHttp() {
         UserRepository users = mock(UserRepository.class);
         JwtService jwt = mock(JwtService.class);
