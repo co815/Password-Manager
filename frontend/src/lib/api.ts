@@ -229,6 +229,23 @@ export interface LoginRequest {
 export interface LoginResponse { user: PublicUser; }
 export interface SaltResponse { email: string; saltClient: string; }
 
+export interface MfaStatusResponse {
+    enabled: boolean;
+    enabledAt: string | null;
+    recoveryCodesRemaining: number;
+}
+
+export interface MfaEnrollmentResponse {
+    secret: string;
+    otpauthUrl: string;
+    recoveryCodes: string[];
+}
+
+export interface MfaDisableRequest {
+    code?: string | null;
+    recoveryCode?: string | null;
+}
+
 export interface VaultItem {
     id?: string;
     userId?: string;
@@ -308,6 +325,21 @@ export const api = {
         req<PublicUser>(`/auth/profile/avatar`, {
             method: 'PUT',
             body: JSON.stringify({ avatarData }),
+        }),
+    mfaStatus: () => req<MfaStatusResponse>(`/auth/mfa/status`),
+    mfaEnroll: () => req<MfaEnrollmentResponse>(`/auth/mfa/enroll`, { method: 'POST' }),
+    mfaActivate: (code: string) =>
+        req<MfaStatusResponse>(`/auth/mfa/activate`, {
+            method: 'POST',
+            body: JSON.stringify({ code }),
+        }),
+    mfaDisable: (body: MfaDisableRequest) =>
+        req<MfaStatusResponse>(`/auth/mfa/disable`, {
+            method: 'POST',
+            body: JSON.stringify({
+                code: body.code ?? null,
+                recoveryCode: body.recoveryCode ?? null,
+            }),
         }),
     listVault: () => req<VaultItem[]>(`/vault`),
     createVault: (body: Partial<VaultItem>) =>

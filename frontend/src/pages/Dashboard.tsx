@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import type {ChangeEvent, MouseEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
 import {useCrypto} from '../lib/crypto/crypto-context';
-import {api, type PublicCredential} from '../lib/api';
+import {api, type MfaEnrollmentResponse, type MfaStatusResponse, type PublicCredential} from '../lib/api';
 import {isAuditAdminEmail} from '../lib/accessControl';
 import Alert from '@mui/material/Alert';
 import {deriveKEK} from '../lib/crypto/argon2';
@@ -13,7 +13,7 @@ import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
     Avatar, TextField, IconButton, Card, CardContent, Button, InputAdornment, Tooltip,
     Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Snackbar, Stack, LinearProgress,
-    Menu, MenuItem
+    Menu, MenuItem, Chip
 } from '@mui/material';
 
 import {
@@ -97,7 +97,7 @@ function scorePassword(p: string) {
 }
 
 export default function Dashboard() {
-    const {user, logout, login} = useAuth();
+    const {user, logout, login, refresh} = useAuth();
     const {dek, locked, setDEK} = useCrypto();
     const navigate = useNavigate();
 
@@ -147,6 +147,14 @@ export default function Dashboard() {
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarDialogError, setAvatarDialogError] = useState<string | null>(null);
     const [avatarSaving, setAvatarSaving] = useState(false);
+    const [mfaStatus, setMfaStatus] = useState<MfaStatusResponse | null>(null);
+    const [mfaLoading, setMfaLoading] = useState(false);
+    const [mfaActionBusy, setMfaActionBusy] = useState(false);
+    const [mfaEnrollment, setMfaEnrollment] = useState<MfaEnrollmentResponse | null>(null);
+    const [mfaCodeInput, setMfaCodeInput] = useState('');
+    const [mfaDisableCode, setMfaDisableCode] = useState('');
+    const [mfaDisableRecoveryCode, setMfaDisableRecoveryCode] = useState('');
+    const [mfaMessage, setMfaMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY_ID);
 
@@ -268,6 +276,47 @@ export default function Dashboard() {
         setShowSelectedPassword(false);
     }, [selected?.id]);
 
+    useEffect(() => {
+        if (!profileDialogOpen) {
+            return;
+        }
+        if (!user) {
+            setMfaStatus(null);
+            setMfaLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setMfaEnrollment(null);
+        setMfaCodeInput('');
+        setMfaDisableCode('');
+        setMfaDisableRecoveryCode('');
+        setMfaMessage(null);
+        setMfaLoading(true);
+
+        (async () => {
+            try {
+                const status = await api.mfaStatus();
+                if (!cancelled) {
+                    setMfaStatus(status);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    const message = error instanceof Error ? error.message : 'Failed to load MFA status';
+                    setMfaMessage({ type: 'error', text: message || 'Failed to load MFA status' });
+                    setMfaStatus(null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setMfaLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [profileDialogOpen, user]);
+
     const categoryItems = useMemo<CategoryItem[]>(() => {
         const counts = new Map<string, number>();
         for (const credential of credentials) {
@@ -366,6 +415,14 @@ export default function Dashboard() {
         setProfileDialogOpen(false);
         setAvatarPreview(null);
         setAvatarDialogError(null);
+        setMfaStatus(null);
+        setMfaEnrollment(null);
+        setMfaCodeInput('');
+        setMfaDisableCode('');
+        setMfaDisableRecoveryCode('');
+        setMfaMessage(null);
+        setMfaLoading(false);
+        setMfaActionBusy(false);
     };
 
     const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -424,6 +481,116 @@ export default function Dashboard() {
             setAvatarSaving(false);
         }
     };
+
+    const messageFromError = (error: unknown, fallback: string) =>
+        error instanceof Error ? error.message || fallback : fallback;
+
+    const handleStartMfaEnrollment = async () => {
+        setMfaMessage(null);
+        setMfaActionBusy(true);
+        try {
+            const enrollment = await api.mfaEnroll();
+            setMfaEnrollment(enrollment);
+            setMfaStatus({
+                enabled: false,
+                enabledAt: null,
+                recoveryCodesRemaining: enrollment.recoveryCodes.length,
+            });
+            setMfaCodeInput('');
+            setMfaDisableCode('');
+            setMfaDisableRecoveryCode('');
+            setMfaMessage({
+                type: 'success',
+                text: 'Add the secret below to your authenticator, then enter the generated code to activate multi-factor authentication.',
+            });
+        } catch (error) {
+            const message = messageFromError(error, 'Failed to start MFA enrollment');
+            setMfaMessage({ type: 'error', text: message });
+        } finally {
+            setMfaActionBusy(false);
+        }
+    };
+
+    const handleActivateMfa = async () => {
+        const code = mfaCodeInput.trim();
+        if (!code) {
+            setMfaMessage({
+                type: 'error',
+                text: 'Enter the code from your authenticator app to activate MFA.',
+            });
+            return;
+        }
+        setMfaMessage(null);
+        setMfaActionBusy(true);
+        try {
+            const status = await api.mfaActivate(code);
+            setMfaStatus(status);
+            setMfaMessage({
+                type: 'success',
+                text: 'Multi-factor authentication is now enabled. Store your recovery codes in a safe place.',
+            });
+            setMfaCodeInput('');
+            await refresh();
+        } catch (error) {
+            const message = messageFromError(error, 'Failed to activate MFA');
+            setMfaMessage({ type: 'error', text: message });
+        } finally {
+            setMfaActionBusy(false);
+        }
+    };
+
+    const handleDisableMfa = async () => {
+        const code = mfaDisableCode.trim();
+        const recovery = mfaDisableRecoveryCode.trim();
+        if (!code && !recovery) {
+            setMfaMessage({
+                type: 'error',
+                text: 'Provide either an authenticator code or a recovery code to disable MFA.',
+            });
+            return;
+        }
+        setMfaMessage(null);
+        setMfaActionBusy(true);
+        try {
+            const status = await api.mfaDisable({
+                code: code || undefined,
+                recoveryCode: recovery || undefined,
+            });
+            setMfaStatus(status);
+            setMfaEnrollment(null);
+            setMfaCodeInput('');
+            setMfaDisableCode('');
+            setMfaDisableRecoveryCode('');
+            setMfaMessage({
+                type: 'success',
+                text: 'Multi-factor authentication has been disabled.',
+            });
+            await refresh();
+        } catch (error) {
+            const message = messageFromError(error, 'Failed to disable MFA');
+            setMfaMessage({ type: 'error', text: message });
+        } finally {
+            setMfaActionBusy(false);
+        }
+    };
+
+    const renderRecoveryCodes = (codes: string[]) => (
+        <Stack
+            component="ul"
+            spacing={0.5}
+            sx={{listStyle: 'none', pl: 0, mb: 0}}
+        >
+            {codes.map((code) => (
+                <Typography
+                    key={code}
+                    component="li"
+                    sx={{fontFamily: 'monospace', fontSize: 14}}
+                >
+                    {code}
+                </Typography>
+            ))}
+        </Stack>
+    );
     const openAddDialog = () => {
         resetFormFields();
         setDialogMode('add');
@@ -1017,6 +1184,175 @@ export default function Dashboard() {
                                     Remove avatar
                                 </Button>
                             </Stack>
+                        </Stack>
+                        <Divider/>
+                        <Stack spacing={1.5}>
+                            <Box display="flex" alignItems="center" justifyContent="space-between">
+                                <Box>
+                                    <Typography variant="h6" fontWeight={700}>Security</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Manage multi-factor authentication for your account.
+                                    </Typography>
+                                </Box>
+                                <Chip
+                                    label={
+                                        mfaLoading
+                                            ? 'Loading…'
+                                            : mfaStatus
+                                                ? mfaStatus.enabled
+                                                    ? 'MFA enabled'
+                                                    : 'MFA disabled'
+                                                : 'Status unavailable'
+                                    }
+                                    color={
+                                        mfaStatus
+                                            ? mfaStatus.enabled
+                                                ? 'success'
+                                                : 'default'
+                                            : mfaLoading
+                                                ? 'default'
+                                                : 'warning'
+                                    }
+                                    variant={mfaStatus?.enabled ? 'filled' : 'outlined'}
+                                    size="small"
+                                />
+                            </Box>
+                            {mfaMessage ? (
+                                <Alert
+                                    severity={mfaMessage.type}
+                                    onClose={() => setMfaMessage(null)}
+                                >
+                                    {mfaMessage.text}
+                                </Alert>
+                            ) : null}
+                            {mfaLoading ? (
+                                <LinearProgress/>
+                            ) : mfaStatus?.enabled ? (
+                                <Stack spacing={1.5}>
+                                    <Typography variant="body2">
+                                        Multi-factor authentication is active
+                                        {mfaStatus.enabledAt
+                                            ? ` since ${new Date(mfaStatus.enabledAt).toLocaleString()}`
+                                            : ''}.
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Recovery codes remaining: {mfaStatus.recoveryCodesRemaining}
+                                    </Typography>
+                                    {mfaEnrollment?.recoveryCodes?.length ? (
+                                        <>
+                                            <Alert severity="info">
+                                                Save the recovery codes shown below. They were generated during your most recent
+                                                enrollment and will not be displayed again.
+                                            </Alert>
+                                            {renderRecoveryCodes(mfaEnrollment.recoveryCodes)}
+                                        </>
+                                    ) : null}
+                                    <Typography variant="body2">
+                                        To disable MFA, provide a current authenticator code or one of your recovery codes.
+                                    </Typography>
+                                    <TextField
+                                        label="Authenticator code"
+                                        value={mfaDisableCode}
+                                        onChange={(e) => setMfaDisableCode(e.target.value)}
+                                        size="small"
+                                        fullWidth
+                                        autoComplete="one-time-code"
+                                        disabled={mfaActionBusy}
+                                    />
+                                    <TextField
+                                        label="Recovery code"
+                                        helperText="Optional — use this if you no longer have access to your authenticator."
+                                        value={mfaDisableRecoveryCode}
+                                        onChange={(e) => setMfaDisableRecoveryCode(e.target.value)}
+                                        size="small"
+                                        fullWidth
+                                        disabled={mfaActionBusy}
+                                    />
+                                    <Box display="flex" justifyContent="flex-end" gap={1}>
+                                        <Button
+                                            onClick={() => {
+                                                setMfaDisableCode('');
+                                                setMfaDisableRecoveryCode('');
+                                            }}
+                                            disabled={mfaActionBusy || (!mfaDisableCode && !mfaDisableRecoveryCode)}
+                                        >
+                                            Clear
+                                        </Button>
+                                        <Button
+                                            onClick={() => {
+                                                void handleDisableMfa();
+                                            }}
+                                            variant="outlined"
+                                            color="error"
+                                            disabled={
+                                                mfaActionBusy
+                                                || (!mfaDisableCode.trim() && !mfaDisableRecoveryCode.trim())
+                                            }
+                                        >
+                                            {mfaActionBusy ? 'Disabling…' : 'Disable MFA'}
+                                        </Button>
+                                    </Box>
+                                </Stack>
+                            ) : (
+                                <Stack spacing={1.5}>
+                                    <Typography variant="body2">
+                                        Protect your account with an extra verification step. Start enrollment to generate
+                                        an authenticator secret and recovery codes.
+                                    </Typography>
+                                    {mfaEnrollment ? (
+                                        <Stack spacing={1.5}>
+                                            <TextField
+                                                label="Authenticator secret"
+                                                value={mfaEnrollment.secret}
+                                                fullWidth
+                                                size="small"
+                                                InputProps={{readOnly: true}}
+                                            />
+                                            <TextField
+                                                label="otpauth URL"
+                                                value={mfaEnrollment.otpauthUrl}
+                                                fullWidth
+                                                size="small"
+                                                InputProps={{readOnly: true}}
+                                                multiline
+                                                minRows={2}
+                                            />
+                                            <Alert severity="info">
+                                                Save these recovery codes somewhere safe. They are only shown once.
+                                            </Alert>
+                                            {renderRecoveryCodes(mfaEnrollment.recoveryCodes)}
+                                            <TextField
+                                                label="Authenticator code"
+                                                value={mfaCodeInput}
+                                                onChange={(e) => setMfaCodeInput(e.target.value)}
+                                                size="small"
+                                                fullWidth
+                                                autoComplete="one-time-code"
+                                                disabled={mfaActionBusy}
+                                            />
+                                            <Button
+                                                onClick={() => {
+                                                    void handleActivateMfa();
+                                                }}
+                                                variant="contained"
+                                                disabled={mfaActionBusy || !mfaCodeInput.trim()}
+                                            >
+                                                {mfaActionBusy ? 'Activating…' : 'Activate MFA'}
+                                            </Button>
+                                        </Stack>
+                                    ) : (
+                                        <Button
+                                            onClick={() => {
+                                                void handleStartMfaEnrollment();
+                                            }}
+                                            variant="contained"
+                                            disabled={mfaActionBusy}
+                                        >
+                                            {mfaActionBusy ? 'Starting…' : 'Enable MFA'}
+                                        </Button>
+                                    )}
+                                </Stack>
+                            )}
                         </Stack>
                     </Stack>
                 </DialogContent>

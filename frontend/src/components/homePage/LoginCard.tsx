@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
     Box,
@@ -15,11 +15,13 @@ import {
 import type { Theme } from '@mui/material/styles';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
+import PhonelinkLock from '@mui/icons-material/PhonelinkLock';
+import Security from '@mui/icons-material/Security';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
 
-import { api, primeCsrfToken, type PublicUser } from '../../lib/api';
+import { ApiError, api, primeCsrfToken, type LoginRequest, type PublicUser } from '../../lib/api';
 import { makeVerifier, deriveKEK } from '../../lib/crypto/argon2';
 import { unwrapDEK } from '../../lib/crypto/unwrap';
 import { useAuth } from '../../auth/auth-context';
@@ -84,13 +86,28 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
     const [show, setShow] = useState(false);
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [pendingLogin, setPendingLogin] = useState<{ email: string; saltClient: string } | null>(null);
+    const [mfaRequired, setMfaRequired] = useState(false);
+    const [mfaCode, setMfaCode] = useState('');
+    const [recoveryCode, setRecoveryCode] = useState('');
 
     const { login } = useAuth();
     const { setDEK, disarm, lockNow } = useCrypto();
     const navigate = useNavigate();
 
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
-    const disabled = busy || !trimmedIdentifier || !mp;
+    const disabled = busy
+        || !trimmedIdentifier
+        || !mp
+        || (mfaRequired && !mfaCode.trim() && !recoveryCode.trim());
+
+    useEffect(() => {
+        setPendingLogin(null);
+        setMfaRequired(false);
+        setMfaCode('');
+        setRecoveryCode('');
+        setMsg(null);
+    }, [trimmedIdentifier]);
 
     async function handleSubmit() {
         if (disabled) return;
@@ -100,10 +117,36 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
             lockNow();
             disarm();
 
-            const { saltClient, email: canonicalEmail } = await api.getSalt(trimmedIdentifier);
-            const verifier = await makeVerifier(canonicalEmail, mp, saltClient);
+            let loginEmail = pendingLogin?.email ?? null;
+            let saltClient = pendingLogin?.saltClient ?? null;
+
+            if (!loginEmail || !saltClient || !mfaRequired) {
+                const { saltClient: fetchedSalt, email: canonicalEmail } = await api.getSalt(trimmedIdentifier);
+                loginEmail = canonicalEmail;
+                saltClient = fetchedSalt;
+                setPendingLogin({ email: canonicalEmail, saltClient: fetchedSalt });
+            }
+
+            if (!loginEmail || !saltClient) {
+                throw new Error('Unable to determine login credentials');
+            }
+
+            const verifier = await makeVerifier(loginEmail, mp, saltClient);
             await primeCsrfToken();
-            const data = await api.login({ email: canonicalEmail, verifier });
+
+            const payload: LoginRequest = {
+                email: loginEmail,
+                verifier,
+            };
+
+            if (mfaRequired) {
+                const trimmedMfa = mfaCode.trim();
+                const trimmedRecovery = recoveryCode.trim();
+                if (trimmedMfa) payload.mfaCode = trimmedMfa;
+                if (trimmedRecovery) payload.recoveryCode = trimmedRecovery;
+            }
+
+            const data = await api.login(payload);
 
             login(data.user);
 
@@ -112,12 +155,47 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
             setDEK(dek);
 
             await primeCsrfToken();
+            setPendingLogin(null);
+            setMfaRequired(false);
+            setMfaCode('');
+            setRecoveryCode('');
             onSuccess?.(data.user, mp);
             await Promise.resolve();
             navigate('/dashboard', { replace: true });
         } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : 'Something went wrong';
-            setMsg({ type: 'error', text: message || 'Something went wrong' });
+            if (e instanceof ApiError) {
+                const message = typeof e.message === 'string' ? e.message : '';
+                const details = typeof e.data === 'object' && e.data && 'message' in e.data
+                    ? String((e.data as { message?: unknown }).message ?? '')
+                    : '';
+                const normalized = (message || details || '').trim();
+                if (e.status === 401 && normalized === 'Invalid MFA challenge') {
+                    const alreadyPrompted = mfaRequired;
+                    setMfaRequired(true);
+                    setMsg({
+                        type: 'error',
+                        text: alreadyPrompted
+                            ? 'Invalid multi-factor authentication code. Try again or use a recovery code.'
+                            : 'Multi-factor authentication required. Enter a code from your authenticator app or one of your recovery codes to continue.',
+                    });
+                } else {
+                    setPendingLogin(null);
+                    setMfaRequired(false);
+                    setMfaCode('');
+                    setRecoveryCode('');
+                    setMsg({
+                        type: 'error',
+                        text: normalized || 'Something went wrong',
+                    });
+                }
+            } else {
+                setPendingLogin(null);
+                setMfaRequired(false);
+                setMfaCode('');
+                setRecoveryCode('');
+                const message = e instanceof Error ? e.message : 'Something went wrong';
+                setMsg({ type: 'error', text: message || 'Something went wrong' });
+            }
         } finally {
             setBusy(false);
         }
@@ -125,6 +203,15 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
 
     const submitOnEnter = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !disabled) handleSubmit();
+    };
+
+    const handleSwitchToSignupClick = () => {
+        setPendingLogin(null);
+        setMfaRequired(false);
+        setMfaCode('');
+        setRecoveryCode('');
+        setMsg(null);
+        onSwitchToSignup?.();
     };
 
     return (
@@ -201,6 +288,61 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
                             label="Master Password *"
                         />
                     </FormControl>
+                    {mfaRequired ? (
+                        <Stack spacing={1.5}>
+                            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                Enter a verification code from your authenticator app or a recovery code to finish
+                                signing in.
+                            </Typography>
+                            <FormControl fullWidth variant="outlined" sx={(theme) => fieldStyles(theme)}>
+                                <InputLabel htmlFor="login-mfa-code">Authenticator code</InputLabel>
+                                <OutlinedInput
+                                    id="login-mfa-code"
+                                    type="text"
+                                    value={mfaCode}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setMfaCode(value);
+                                        if (value.trim()) {
+                                            setRecoveryCode('');
+                                        }
+                                    }}
+                                    onKeyDown={submitOnEnter}
+                                    startAdornment={
+                                        <InputAdornment position="start">
+                                            <PhonelinkLock fontSize="small" />
+                                        </InputAdornment>
+                                    }
+                                    label="Authenticator code"
+                                />
+                            </FormControl>
+                            <Typography variant="caption" sx={{ textAlign: 'center', opacity: 0.8 }}>
+                                or
+                            </Typography>
+                            <FormControl fullWidth variant="outlined" sx={(theme) => fieldStyles(theme)}>
+                                <InputLabel htmlFor="login-recovery-code">Recovery code</InputLabel>
+                                <OutlinedInput
+                                    id="login-recovery-code"
+                                    type="text"
+                                    value={recoveryCode}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setRecoveryCode(value);
+                                        if (value.trim()) {
+                                            setMfaCode('');
+                                        }
+                                    }}
+                                    onKeyDown={submitOnEnter}
+                                    startAdornment={
+                                        <InputAdornment position="start">
+                                            <Security fontSize="small" />
+                                        </InputAdornment>
+                                    }
+                                    label="Recovery code"
+                                />
+                            </FormControl>
+                        </Stack>
+                    ) : null}
                 </Stack>
 
                 <Stack spacing={2}>
@@ -246,7 +388,7 @@ export default function LoginCard({ onSuccess, onSwitchToSignup }: Props) {
                             Need an account?
                         </Typography>
                         <Button
-                            onClick={onSwitchToSignup}
+                            onClick={handleSwitchToSignupClick}
                             color="inherit"
                             size="small"
                             sx={{ textTransform: 'none', fontWeight: 700, px: 0, minWidth: 0 }}
