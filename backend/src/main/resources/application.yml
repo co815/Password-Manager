@@ -25,6 +25,8 @@ app:
     cookie:
       same-site: none
     placeholder-salt-secret: ${APP_AUTH_PLACEHOLDER_SALT_SECRET}
+    rate-limit:
+      trusted-proxies: [ ]
   jwt:
     secret: ${APP_JWT_SECRET}
     expiryMinutes: 15

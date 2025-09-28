@@ -1,5 +1,6 @@
 package com.example.pm.security;
 
+import com.example.pm.config.RateLimitProps;
 import com.example.pm.exceptions.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bandwidth;
@@ -19,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Enumeration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,15 +37,17 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
     private final ConcurrentMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final RateLimitProps rateLimitProps;
     private final Supplier<Bucket> bucketSupplier;
 
     @Autowired
-    public AuthRateLimitingFilter(ObjectMapper objectMapper) {
-        this(objectMapper, AuthRateLimitingFilter::createDefaultBucket);
+    public AuthRateLimitingFilter(ObjectMapper objectMapper, RateLimitProps rateLimitProps) {
+        this(objectMapper, rateLimitProps, AuthRateLimitingFilter::createDefaultBucket);
     }
 
-    AuthRateLimitingFilter(ObjectMapper objectMapper, Supplier<Bucket> bucketSupplier) {
+    AuthRateLimitingFilter(ObjectMapper objectMapper, RateLimitProps rateLimitProps, Supplier<Bucket> bucketSupplier) {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+        this.rateLimitProps = Objects.requireNonNull(rateLimitProps, "rateLimitProps");
         this.bucketSupplier = Objects.requireNonNull(bucketSupplier, "bucketSupplier");
     }
 
@@ -138,17 +142,40 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
     }
 
     private String extractClientIp(HttpServletRequest request) {
+        String remoteAddr = normalizeIp(request.getRemoteAddr());
+        if (remoteAddr.isEmpty()) {
+            remoteAddr = "unknown";
+        }
+
+        if (!rateLimitProps.isTrustedProxy(remoteAddr)) {
+            return remoteAddr;
+        }
+
         String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            String[] parts = forwardedFor.split(",");
-            if (parts.length > 0) {
-                String candidate = parts[0].trim();
-                if (!candidate.isEmpty()) {
-                    return candidate;
-                }
+        if (forwardedFor == null || forwardedFor.isBlank()) {
+            return remoteAddr;
+        }
+
+        String[] parts = forwardedFor.split(",");
+        for (String part : parts) {
+            String candidate = normalizeIp(part);
+            if (!candidate.isEmpty()) {
+                return candidate;
             }
         }
-        return Optional.ofNullable(request.getRemoteAddr()).orElse("unknown");
+
+        return remoteAddr;
+    }
+
+    private String normalizeIp(String ip) {
+        if (ip == null) {
+            return "";
+        }
+        String trimmed = ip.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        return trimmed.toLowerCase(Locale.ROOT);
     }
 
     private String resolvePath(HttpServletRequest request) {
