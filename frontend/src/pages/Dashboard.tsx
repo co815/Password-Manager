@@ -1391,7 +1391,6 @@ export default function Dashboard() {
                                             type="submit"
                                             variant="contained"
                                             disabled={rotateDisabled}
-                                            }
                                         >
                                             {rotateBusy ? 'Rotating…' : 'Rotate master password'}
                                         </Button>
@@ -1591,7 +1590,6 @@ export default function Dashboard() {
                                     </Stack>
                                 )}
                             </Stack>
-                            )}
                         </Stack>
                     </Stack>
                 </DialogContent>
