@@ -65,7 +65,7 @@ function rememberCsrfToken(token: string) {
 }
 
 async function fetchAndRememberCsrf(path: string): Promise<string | null> {
-    const res = await fetch(`${API_BASE}${path}`, { credentials: CSRF_FETCH_CREDENTIALS });
+    const res = await fetch(`${API_BASE}${path}`, {credentials: CSRF_FETCH_CREDENTIALS});
     if (!res.ok) {
         return null;
     }
@@ -146,7 +146,15 @@ function emitAuthCleared() {
         window.dispatchEvent(new CustomEvent(AUTH_CLEARED_EVENT));
     }
 }
-function safeJson(s: string) { try { return JSON.parse(s); } catch { return null; } }
+
+function safeJson(s: string) {
+    try {
+        return JSON.parse(s);
+    } catch {
+        return null;
+    }
+}
+
 function mergeHeaders(init: RequestInit, extras?: Record<string, string | null | undefined>): Headers {
     const h = new Headers(init.headers || {});
     if (!h.has('Content-Type')) h.set('Content-Type', 'application/json');
@@ -174,7 +182,7 @@ async function req<T>(
         return fetch(`${API_BASE}${path}`, {
             ...init,
             method,
-            headers: mergeHeaders(init, { [CSRF_HEADER]: csrfToken ?? undefined }),
+            headers: mergeHeaders(init, {[CSRF_HEADER]: csrfToken ?? undefined}),
             credentials: init.credentials ?? 'include',
         });
     };
@@ -220,14 +228,26 @@ export interface RegisterRequest {
     dekNonce: string;
     avatarData?: string | null;
 }
+
 export interface LoginRequest {
     email: string;
     verifier: string;
     mfaCode?: string | null;
     recoveryCode?: string | null;
 }
-export interface LoginResponse { user: PublicUser; }
-export interface SaltResponse { email: string; saltClient: string; }
+
+export interface LoginResponse {
+    user: PublicUser;
+}
+
+export interface SaltResponse {
+    email: string;
+    saltClient: string;
+}
+
+export interface SimpleMessageResponse {
+    message: string;
+}
 
 export interface MfaStatusResponse {
     enabled: boolean;
@@ -277,12 +297,17 @@ export interface RevokeSessionsResponse {
 export interface VaultItem {
     id?: string;
     userId?: string;
-    titleCipher: string;   titleNonce: string;
-    usernameCipher: string; usernameNonce: string;
-    passwordCipher: string; passwordNonce: string;
+    titleCipher: string;
+    titleNonce: string;
+    usernameCipher: string;
+    usernameNonce: string;
+    passwordCipher: string;
+    passwordNonce: string;
     url?: string;
-    notesCipher?: string;  notesNonce?: string;
-    createdAt?: string;    updatedAt?: string;
+    notesCipher?: string;
+    notesNonce?: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export type CreateCredentialRequest = {
@@ -344,22 +369,27 @@ export const api = {
     getSalt: (identifier: string) =>
         req<SaltResponse>(`/auth/salt?identifier=${encodeURIComponent(identifier)}`),
     register: (body: RegisterRequest) =>
-        req<{ id: string }>(`/auth/register`, { method: 'POST', body: JSON.stringify(body) }),
+        req<{ id: string }>(`/auth/register`, {method: 'POST', body: JSON.stringify(body)}),
     login: (body: LoginRequest) =>
-        req<LoginResponse>(`/auth/login`, { method: 'POST', body: JSON.stringify(body) }),
-    logout: () => req<void>(`/auth/logout`, { method: 'POST' }),
-    currentUser: () => req<PublicUser>(`/auth/me`, {}, { suppressAuthCleared: true }),
+        req<LoginResponse>(`/auth/login`, {method: 'POST', body: JSON.stringify(body)}),
+    resendVerification: (email: string) =>
+        req<SimpleMessageResponse>(`/auth/resend-verification`, {
+            method: 'POST',
+            body: JSON.stringify({email}),
+        }),
+    logout: () => req<void>(`/auth/logout`, {method: 'POST'}),
+    currentUser: () => req<PublicUser>(`/auth/me`, {}, {suppressAuthCleared: true}),
     updateAvatar: (avatarData: string | null) =>
         req<PublicUser>(`/auth/profile/avatar`, {
             method: 'PUT',
-            body: JSON.stringify({ avatarData }),
+            body: JSON.stringify({avatarData}),
         }),
     mfaStatus: () => req<MfaStatusResponse>(`/auth/mfa/status`),
-    mfaEnroll: () => req<MfaEnrollmentResponse>(`/auth/mfa/enroll`, { method: 'POST' }),
+    mfaEnroll: () => req<MfaEnrollmentResponse>(`/auth/mfa/enroll`, {method: 'POST'}),
     mfaActivate: (code: string) =>
         req<MfaStatusResponse>(`/auth/mfa/activate`, {
             method: 'POST',
-            body: JSON.stringify({ code }),
+            body: JSON.stringify({code}),
         }),
     mfaDisable: (body: MfaDisableRequest) =>
         req<MfaStatusResponse>(`/auth/mfa/disable`, {
@@ -380,22 +410,22 @@ export const api = {
             body: JSON.stringify(body),
         }),
     revokeSessions: () =>
-        req<RevokeSessionsResponse>(`/auth/sessions/revoke`, { method: 'POST' }),
+        req<RevokeSessionsResponse>(`/auth/sessions/revoke`, {method: 'POST'}),
     listVault: () => req<VaultItem[]>(`/vault`),
     createVault: (body: Partial<VaultItem>) =>
-        req<VaultItem>(`/vault`, { method: 'POST', body: JSON.stringify(body) }),
+        req<VaultItem>(`/vault`, {method: 'POST', body: JSON.stringify(body)}),
     updateVault: (id: string, body: Partial<VaultItem>) =>
-        req<VaultItem>(`/vault/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+        req<VaultItem>(`/vault/${id}`, {method: 'PUT', body: JSON.stringify(body)}),
     deleteVault: (id: string) =>
-        req<{ ok: boolean }>(`/vault/${id}`, { method: 'DELETE' }),
+        req<{ ok: boolean }>(`/vault/${id}`, {method: 'DELETE'}),
 
     createCredential: (body: CreateCredentialRequest) =>
-        req<PublicCredential>(`/credential`, { method: 'POST', body: JSON.stringify(body) }),
+        req<PublicCredential>(`/credential`, {method: 'POST', body: JSON.stringify(body)}),
 
     updateCredential: (id: string, body: UpdateCredentialRequest) =>
-        req<PublicCredential>(`/credential/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+        req<PublicCredential>(`/credential/${id}`, {method: 'PUT', body: JSON.stringify(body)}),
     deleteCredential: (id: string) =>
-        req<void>(`/credential/${id}`, { method: 'DELETE' }),
+        req<void>(`/credential/${id}`, {method: 'DELETE'}),
 
     fetchCredentials: () => req<GetAllCredentialResponse>(`/credentials`),
 
