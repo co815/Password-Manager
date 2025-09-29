@@ -35,7 +35,17 @@ app:
       - http://localhost:5173
       - https://localhost:5173
   audit:
-    admin-emails: ${APP_AUDIT_ADMIN_EMAILS:}
+    admin-emails: ${APP_AUDIT_ADMIN_EMAILS}
+  mail:
+    host: ${APP_MAIL_HOST:localhost}
+    port: ${APP_MAIL_PORT:1025}
+    username: ${APP_MAIL_USERNAME:test}
+    password: ${APP_MAIL_PASSWORD:test}
+    from: ${APP_MAIL_FROM:no-reply@example.com}
+    subject-template: ${APP_MAIL_SUBJECT_TEMPLATE:Verify your Password Manager account, %s}
+    body-template: ${APP_MAIL_BODY_TEMPLATE:Hello %s,\n\nPlease confirm your email address by visiting %s\n\nIf you did not request this email you can safely ignore it.}
+    auth: ${APP_MAIL_SMTP_AUTH:true}
+    start-tls: ${APP_MAIL_SMTP_STARTTLS:true}
 
 logging:
   level:
