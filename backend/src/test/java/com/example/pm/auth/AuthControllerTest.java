@@ -334,6 +334,7 @@ class AuthControllerTest {
         user.setSaltClient("salt");
         user.setDekEncrypted("dek");
         user.setDekNonce("nonce");
+        user.setEmailVerified(true);
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(jwt.generate("user-123", 0)).thenReturn("token-value");
