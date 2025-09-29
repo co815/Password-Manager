@@ -12,7 +12,7 @@ describe('accessControl', () => {
     it('normalizes configured audit admin emails', async () => {
         vi.stubEnv('VITE_AUDIT_ADMIN_EMAILS', 'Alice@example.com, bob@example.com , BOB@EXAMPLE.COM ,');
 
-        const { AUDIT_ADMIN_EMAILS, isAuditAdminEmail } = await import('./accessControl');
+        const { AUDIT_ADMIN_EMAILS, isAuditAdminEmail } = await import('../lib/accessControl.ts');
 
         expect(AUDIT_ADMIN_EMAILS).toEqual(['alice@example.com', 'bob@example.com']);
         expect(isAuditAdminEmail('alice@example.com')).toBe(true);
@@ -22,7 +22,7 @@ describe('accessControl', () => {
     it('treats missing or blank values as non-admins', async () => {
         vi.stubEnv('VITE_AUDIT_ADMIN_EMAILS', '');
 
-        const { AUDIT_ADMIN_EMAILS, isAuditAdminEmail } = await import('./accessControl');
+        const { AUDIT_ADMIN_EMAILS, isAuditAdminEmail } = await import('../lib/accessControl.ts');
 
         expect(AUDIT_ADMIN_EMAILS).toEqual([]);
         expect(isAuditAdminEmail('')).toBe(false);
