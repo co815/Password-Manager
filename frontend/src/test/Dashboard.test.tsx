@@ -3,21 +3,31 @@ import {fireEvent, render, screen, waitFor, within} from '@testing-library/react
 import Dashboard from '../pages/Dashboard';
 import {AuthContext, type AuthContextValue} from '../auth/auth-context';
 import {CryptoContext, type CryptoContextValue} from '../lib/crypto/crypto-context';
-import type {
-    CreateCredentialRequest,
-    PublicCredential,
-    PublicUser,
-    UpdateCredentialRequest,
-} from '../lib/api';
+import type {CreateCredentialRequest, PublicCredential, PublicUser} from '../lib/api';
 import {describe, beforeAll, beforeEach, vi, it, expect} from 'vitest';
 
-var fetchCredentialsMock: vi.Mock;
-var createCredentialMock: vi.Mock;
-var updateCredentialMock: vi.Mock;
-var deleteCredentialMock: vi.Mock;
-
-var deriveKekMock: vi.Mock;
-var unwrapDekMock: vi.Mock;
+const {
+    fetchCredentialsMock,
+    createCredentialMock,
+    updateCredentialMock,
+    deleteCredentialMock,
+    deriveKekMock,
+    unwrapDekMock,
+} = vi.hoisted(() => ({
+    fetchCredentialsMock: vi.fn(),
+    createCredentialMock: vi.fn(),
+    updateCredentialMock: vi.fn(),
+    deleteCredentialMock: vi.fn(),
+    deriveKekMock: vi.fn(),
+    unwrapDekMock: vi.fn(),
+})) as {
+    fetchCredentialsMock: vi.Mock;
+    createCredentialMock: vi.Mock;
+    updateCredentialMock: vi.Mock;
+    deleteCredentialMock: vi.Mock;
+    deriveKekMock: vi.Mock;
+    unwrapDekMock: vi.Mock;
+};
 
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -28,11 +38,6 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('../lib/api', async () => {
-    fetchCredentialsMock = vi.fn();
-    createCredentialMock = vi.fn();
-    updateCredentialMock = vi.fn();
-    deleteCredentialMock = vi.fn();
-
     const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api');
     return {
         ...actual,
@@ -47,7 +52,6 @@ vi.mock('../lib/api', async () => {
 });
 
 vi.mock('../lib/crypto/argon2', async () => {
-    deriveKekMock = vi.fn();
     const actual = await vi.importActual<typeof import('../lib/crypto/argon2')>('../lib/crypto/argon2');
     return {
         ...actual,
@@ -56,7 +60,6 @@ vi.mock('../lib/crypto/argon2', async () => {
 });
 
 vi.mock('../lib/crypto/unwrap', async () => {
-    unwrapDekMock = vi.fn();
     const actual = await vi.importActual<typeof import('../lib/crypto/unwrap')>('../lib/crypto/unwrap');
     return {
         ...actual,
@@ -172,6 +175,12 @@ describe('Dashboard', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         window.localStorage.clear();
+        fetchCredentialsMock.mockReset();
+        createCredentialMock.mockReset();
+        updateCredentialMock.mockReset();
+        deleteCredentialMock.mockReset();
+        deriveKekMock.mockReset();
+        unwrapDekMock.mockReset();
         fetchCredentialsMock.mockResolvedValue({credentials: []});
         createCredentialMock.mockResolvedValue({
             credentialId: 'cred-1',
