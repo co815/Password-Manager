@@ -1,4 +1,4 @@
-import {useMemo, useState, useEffect, useCallback} from 'react';
+import {useMemo, useState, useEffect, useCallback, useRef} from 'react';
 import {useNavigate} from 'react-router-dom';
 import type {ChangeEvent, FormEvent, MouseEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
@@ -9,6 +9,7 @@ import Alert from '@mui/material/Alert';
 import {deriveKEK, makeVerifier} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
 import {encryptDekWithKek} from '../lib/crypto/keys';
+import {deserializeVaultCredentials, serializeVaultCredentials} from '../lib/vault/pack';
 
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
@@ -26,11 +27,13 @@ import {
     Edit,
     Delete,
     Add as AddIcon,
+    Download,
     Visibility,
     VisibilityOff,
     Link as LinkIcon,
     Settings,
     Upload,
+    UploadFile,
     DeleteOutline,
     ListAlt,
     ContentCopy,
@@ -157,6 +160,8 @@ export default function Dashboard() {
     const [busy, setBusy] = useState(false);
     const [deleteBusy, setDeleteBusy] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<Credential | null>(null);
+    const [exportBusy, setExportBusy] = useState(false);
+    const [importBusy, setImportBusy] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
     const [avatarLoadError, setAvatarLoadError] = useState(false);
     const [profileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -181,6 +186,8 @@ export default function Dashboard() {
     const [rotateBusy, setRotateBusy] = useState(false);
     const [rotateMessage, setRotateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [revokeBusy, setRevokeBusy] = useState(false);
+
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const isAuditAdmin = useMemo(() => isAuditAdminEmail(user?.email ?? null), [user?.email]);
 
@@ -921,6 +928,174 @@ export default function Dashboard() {
         setDeleteTarget(null);
     };
 
+    const handleExportVault = async () => {
+        if (!dek) {
+            setToast({type: 'error', msg: 'Unlock your vault to export credentials.'});
+            return;
+        }
+        if (exportBusy) return;
+
+        setExportBusy(true);
+        try {
+            const payload = await serializeVaultCredentials(dek, credentials);
+            const blob = new Blob([payload], {type: 'application/json'});
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `vault-${timestamp}.pmvault`;
+
+            if (typeof window === 'undefined') {
+                throw new Error('Export is not available in this environment.');
+            }
+
+            const urlObject = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = urlObject;
+            anchor.download = filename;
+            anchor.style.display = 'none';
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            window.URL.revokeObjectURL(urlObject);
+
+            const count = credentials.length;
+            setToast({
+                type: 'success',
+                msg: count === 0
+                    ? 'Exported an empty vault file.'
+                    : `Vault exported with ${count} credential${count === 1 ? '' : 's'}.`,
+            });
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Failed to export vault.';
+            setToast({type: 'error', msg: message || 'Failed to export vault.'});
+        } finally {
+            setExportBusy(false);
+        }
+    };
+
+    const handleImportClick = () => {
+        if (!dek) {
+            setToast({type: 'error', msg: 'Unlock your vault to import credentials.'});
+            return;
+        }
+        if (importBusy) return;
+        fileInputRef.current?.click();
+    };
+
+    const handleImportFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        if (!dek) {
+            setToast({type: 'error', msg: 'Unlock your vault to import credentials.'});
+            return;
+        }
+
+        setImportBusy(true);
+        try {
+            const raw = await file.text();
+            const imported = await deserializeVaultCredentials(dek, raw);
+            if (imported.length === 0) {
+                setToast({type: 'success', msg: 'Vault file contained no credentials.'});
+                return;
+            }
+
+            let nextCredentials = [...credentials];
+            let nextSelected = selected;
+            let updatedCount = 0;
+            let createdCount = 0;
+
+            for (const cred of imported) {
+                const trimmedTitle = cred.name.trim();
+                const sanitizedTitle = trimmedTitle || cred.name;
+                const trimmedUrl = cred.url?.trim();
+                const sanitizedUrl = trimmedUrl && trimmedUrl.length > 0 ? trimmedUrl : undefined;
+                const trimmedUsername = cred.username.trim();
+                const sanitizedUsername = trimmedUsername || cred.username;
+
+                const {cipher: usernameCipher, nonce: usernameNonce} = await encryptField(dek, sanitizedUsername);
+                const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, cred.password);
+
+                const existingIndex = nextCredentials.findIndex((c) => c.id === cred.id);
+                if (existingIndex >= 0) {
+                    await api.updateCredential(cred.id, {
+                        service: sanitizedTitle,
+                        websiteLink: sanitizedUrl,
+                        usernameEncrypted: usernameCipher,
+                        usernameNonce,
+                        passwordEncrypted: passwordCipher,
+                        passwordNonce,
+                    });
+
+                    const updatedCredential: Credential = {
+                        id: cred.id,
+                        name: sanitizedTitle,
+                        url: sanitizedUrl,
+                        username: sanitizedUsername,
+                        password: cred.password,
+                    };
+
+                    nextCredentials[existingIndex] = updatedCredential;
+                    if (nextSelected?.id === cred.id) {
+                        nextSelected = updatedCredential;
+                    }
+                    updatedCount++;
+                } else {
+                    const created = await api.createCredential({
+                        title: sanitizedTitle,
+                        url: sanitizedUrl,
+                        usernameCipher,
+                        usernameNonce,
+                        passwordCipher,
+                        passwordNonce,
+                    });
+
+                    const newCredential: Credential = {
+                        id: created.credentialId,
+                        name: sanitizedTitle,
+                        url: sanitizedUrl,
+                        username: sanitizedUsername,
+                        password: cred.password,
+                    };
+
+                    nextCredentials = [...nextCredentials, newCredential];
+                    if (!nextSelected) {
+                        nextSelected = newCredential;
+                    }
+                    createdCount++;
+                }
+            }
+
+            setCredentials(nextCredentials);
+            setSelected((prevSelected) => {
+                if (nextSelected) {
+                    return nextSelected;
+                }
+                if (prevSelected) {
+                    const stillExists = nextCredentials.find((cred) => cred.id === prevSelected.id);
+                    if (stillExists) {
+                        return stillExists;
+                    }
+                }
+                return nextCredentials[0] ?? null;
+            });
+
+            const total = imported.length;
+            setToast({
+                type: 'success',
+                msg: `Imported ${total} credential${total === 1 ? '' : 's'} (${updatedCount} updated, ${createdCount} created).`,
+            });
+        } catch (error: unknown) {
+            let message = 'Failed to import vault.';
+            if (error instanceof DOMException) {
+                message = 'Unable to decrypt vault file with the current key.';
+            } else if (error instanceof Error) {
+                message = error.message || message;
+            }
+            setToast({type: 'error', msg: message});
+        } finally {
+            setImportBusy(false);
+        }
+    };
+
     const selectedIsFavorite = selected ? favoriteIds.includes(selected.id) : false;
 
     const handleToggleFavorite = () => {
@@ -980,6 +1155,13 @@ export default function Dashboard() {
 
     return (
         <Box display="flex" minHeight="100vh" sx={{bgcolor: 'background.default'}}>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pmvault,application/json"
+                hidden
+                onChange={handleImportFileChange}
+            />
             <Drawer
                 variant="permanent"
                 anchor="left"
@@ -1140,6 +1322,22 @@ export default function Dashboard() {
                                                 title="Add credential"
                                             >
                                                 <AddIcon/>
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleExportVault}
+                                                title="Export vault"
+                                                disabled={!dek || exportBusy}
+                                            >
+                                                <Download/>
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleImportClick}
+                                                title="Import vault"
+                                                disabled={!dek || importBusy}
+                                            >
+                                                <UploadFile/>
                                             </IconButton>
                                             <IconButton
                                                 size="small"
