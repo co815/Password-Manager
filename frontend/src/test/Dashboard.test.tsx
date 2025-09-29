@@ -5,7 +5,21 @@ import {AuthContext, type AuthContextValue} from '../auth/auth-context';
 import {CryptoContext, type CryptoContextValue} from '../lib/crypto/crypto-context';
 import type {CreateCredentialRequest, PublicCredential, PublicUser} from '../lib/api';
 import {describe, beforeAll, beforeEach, vi, it, expect, type Mock} from 'vitest';
-import {Buffer} from 'node:buffer';
+import {MemoryRouter} from 'react-router-dom';
+
+type BufferEncoding = 'utf-8' | 'binary' | 'base64';
+
+type MinimalBuffer = {
+    from: (input: string, encoding?: BufferEncoding) => { toString: (encoding: BufferEncoding) => string };
+};
+
+function getBuffer(): MinimalBuffer {
+    const buffer = (globalThis as {Buffer?: MinimalBuffer}).Buffer;
+    if (!buffer) {
+        throw new Error('Buffer is not available in this environment.');
+    }
+    return buffer;
+}
 
 const {
     fetchCredentialsMock,
@@ -29,14 +43,6 @@ const {
     deriveKekMock: Mock;
     unwrapDekMock: Mock;
 };
-
-vi.mock('react-router-dom', async () => {
-    const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-    return {
-        ...actual,
-        useNavigate: () => vi.fn(),
-    };
-});
 
 vi.mock('../lib/api', async () => {
     const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api');
@@ -114,9 +120,11 @@ function TestProviders({children, options = {}}: {children: ReactNode; options?:
     };
 
     return (
-        <AuthContext.Provider value={authValue}>
-            <CryptoContext.Provider value={cryptoValue}>{children}</CryptoContext.Provider>
-        </AuthContext.Provider>
+        <MemoryRouter>
+            <AuthContext.Provider value={authValue}>
+                <CryptoContext.Provider value={cryptoValue}>{children}</CryptoContext.Provider>
+            </AuthContext.Provider>
+        </MemoryRouter>
     );
 }
 
@@ -129,7 +137,10 @@ function renderDashboard(options?: RenderOptions) {
 }
 
 function base64Encode(text: string): string {
-    return Buffer.from(text, 'utf-8').toString('base64');
+    if (typeof globalThis.btoa === 'function') {
+        return globalThis.btoa(text);
+    }
+    return getBuffer().from(text, 'utf-8').toString('base64');
 }
 
 describe('Dashboard', () => {
@@ -174,10 +185,10 @@ describe('Dashboard', () => {
         });
 
         if (typeof globalThis.atob !== 'function') {
-            globalThis.atob = (value: string) => Buffer.from(value, 'base64').toString('binary');
+            globalThis.atob = (value: string) => getBuffer().from(value, 'base64').toString('binary');
         }
         if (typeof globalThis.btoa !== 'function') {
-            globalThis.btoa = (value: string) => Buffer.from(value, 'binary').toString('base64');
+            globalThis.btoa = (value: string) => getBuffer().from(value, 'binary').toString('base64');
         }
     });
 
@@ -209,7 +220,7 @@ describe('Dashboard', () => {
             passwordEncrypted: '',
             passwordNonce: '',
         });
-        deleteCredentialMock.mockResolvedValue();
+        deleteCredentialMock.mockResolvedValue(undefined);
         deriveKekMock.mockResolvedValue('derived-kek' as unknown as CryptoKey);
         unwrapDekMock.mockResolvedValue(fakeDek);
     });
