@@ -153,6 +153,7 @@ class SecurityIntegrationTests {
                         .saltClient("client-salt")
                         .dekEncrypted("dek")
                         .dekNonce("nonce")
+                        .emailVerified(true)
                         .build()));
 
         mockMvc.perform(post("/api/auth/login")

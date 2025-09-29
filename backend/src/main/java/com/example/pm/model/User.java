@@ -11,7 +11,6 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
@@ -38,6 +37,10 @@ public class User {
     private String mfaSecret;
     private List<String> mfaRecoveryCodes;
     private int tokenVersion;
+    private boolean emailVerified;
+    @Indexed(unique = true, sparse = true)
+    private String emailVerificationToken;
+    private Instant emailVerificationSentAt;
 
     public static User fromRegisterRequest(AuthDtos.RegisterRequest req) {
         String normalizedEmail = req.email() != null ? req.email().trim().toLowerCase(Locale.ROOT) : null;
@@ -53,6 +56,7 @@ public class User {
                 .createdAt(Instant.now())
                 .masterPasswordLastRotated(Instant.now())
                 .tokenVersion(0)
+                .emailVerified(false)
                 .build();
     }
 }

@@ -187,6 +187,8 @@ class CredentialControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isOk());
 
+        userStore.values().forEach(user -> user.setEmailVerified(true));
+
         var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier(), null, null);
 
         MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))

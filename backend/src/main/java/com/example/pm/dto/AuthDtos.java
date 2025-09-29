@@ -3,7 +3,6 @@ import com.example.pm.model.User;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import org.springframework.data.annotation.Id;
 
 public class AuthDtos {
 
@@ -17,7 +16,8 @@ public class AuthDtos {
             String avatarData,
             boolean mfaEnabled,
             java.time.Instant masterPasswordLastRotated,
-            java.time.Instant mfaEnabledAt
+            java.time.Instant mfaEnabledAt,
+            boolean emailVerified
     ) {
         public static PublicUser fromUser(User user) {
             return new PublicUser(
@@ -30,7 +30,8 @@ public class AuthDtos {
                     user.getAvatarData(),
                     user.isMfaEnabled(),
                     user.getMasterPasswordLastRotated(),
-                    user.getMfaEnabledAt()
+                    user.getMfaEnabledAt(),
+                    user.isEmailVerified()
             );
         }
     }
@@ -43,10 +44,6 @@ public class AuthDtos {
             @NotBlank String dekEncrypted,
             @NotBlank String dekNonce,
             String avatarData
-    ) {}
-
-    public record RegisterResponse(
-            @Id String id
     ) {}
 
     public record LoginRequest(
@@ -94,6 +91,10 @@ public class AuthDtos {
     ) {}
 
     public record SimpleMessageResponse(String message) {}
+
+    public record ResendVerificationRequest(
+            @NotBlank @Email String email
+    ) {}
 
     public record MfaEnrollmentResponse(
             String secret,

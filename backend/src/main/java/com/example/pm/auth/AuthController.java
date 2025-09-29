@@ -48,6 +48,7 @@ public class AuthController {
     private final boolean sslEnabled;
     private final CsrfTokenRepository csrfTokenRepository;
     private final PlaceholderSaltService placeholderSaltService;
+    private final EmailVerificationService emailVerificationService;
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
             "^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$",
@@ -63,6 +64,7 @@ public class AuthController {
                           SecurityAuditService auditService,
                           CsrfTokenRepository csrfTokenRepository,
                           PlaceholderSaltService placeholderSaltService,
+                          EmailVerificationService emailVerificationService,
                           @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
         this.users = users;
         this.jwt = jwt;
@@ -72,6 +74,7 @@ public class AuthController {
         this.auditService = auditService;
         this.csrfTokenRepository = csrfTokenRepository;
         this.placeholderSaltService = placeholderSaltService;
+        this.emailVerificationService = emailVerificationService;
         this.sslEnabled = sslEnabled;
     }
 
@@ -92,9 +95,9 @@ public class AuthController {
 
         if (users.findByUsername(newUser.getUsername()).isPresent())
             return ResponseEntity.status(409).body(new ErrorResponse(409, "CONFLICT", "Username already exists"));
-        users.save(newUser);
+        emailVerificationService.registerPendingUser(newUser);
 
-        return ResponseEntity.ok(new RegisterResponse(newUser.getId()));
+        return ResponseEntity.ok(new SimpleMessageResponse("Check your inbox to verify your email."));
     }
 
     @GetMapping("/salt")
@@ -155,6 +158,13 @@ public class AuthController {
 
         User user = userOpt.get();
 
+        if (!user.isEmailVerified()) {
+            auditService.recordLoginFailure(normalizedEmail);
+            return ResponseEntity.status(403)
+                    .body(new ErrorResponse(403, "EMAIL_NOT_VERIFIED",
+                            "Please verify your email address before logging in."));
+        }
+
         if (user.isMfaEnabled()) {
             boolean usedRecovery = false;
             boolean verified = false;
@@ -188,6 +198,34 @@ public class AuthController {
                 .header(csrfToken.getHeaderName(), csrfToken.getToken())
                 .body(new LoginResponse(publicUser));
 
+    }
+
+    @GetMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestParam("token") String token) {
+        EmailVerificationService.VerificationResult result = emailVerificationService.verifyToken(token);
+        return switch (result) {
+            case VERIFIED -> ResponseEntity.ok(new SimpleMessageResponse("Email address verified."));
+            case INVALID_TOKEN -> ResponseEntity.badRequest()
+                    .body(new ErrorResponse(400, "INVALID_TOKEN", "Verification link is invalid."));
+            case EXPIRED -> ResponseEntity.status(410)
+                    .body(new ErrorResponse(410, "TOKEN_EXPIRED", "Verification link has expired."));
+        };
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<?> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        EmailVerificationService.ResendResult result = emailVerificationService.resendVerification(request.email());
+        return switch (result) {
+            case SENT -> ResponseEntity.accepted()
+                    .body(new SimpleMessageResponse("If an account exists, a verification email has been sent."));
+            case USER_NOT_FOUND -> ResponseEntity.accepted()
+                    .body(new SimpleMessageResponse("If an account exists, a verification email has been sent."));
+            case ALREADY_VERIFIED -> ResponseEntity.status(409)
+                    .body(new ErrorResponse(409, "EMAIL_ALREADY_VERIFIED", "Email already verified."));
+            case RATE_LIMITED -> ResponseEntity.status(429)
+                    .body(new ErrorResponse(429, "TOO_MANY_REQUESTS",
+                            "Please wait before requesting another verification email."));
+        };
     }
 
     @GetMapping("/csrf")
@@ -595,7 +633,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me (Authentication authentication){
+    public ResponseEntity<?> me(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -609,8 +647,8 @@ public class AuthController {
     }
 
     @PutMapping("/profile/avatar")
-    public ResponseEntity<?> updateAvatar (Authentication authentication,
-            @RequestBody AvatarUploadRequest request){
+    public ResponseEntity<?> updateAvatar(Authentication authentication,
+                                          @RequestBody AvatarUploadRequest request) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -635,7 +673,7 @@ public class AuthController {
                         .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
     }
 
-    private String normalizeAvatarData (String avatarData){
+    private String normalizeAvatarData(String avatarData) {
         if (avatarData == null) {
             return null;
         }
