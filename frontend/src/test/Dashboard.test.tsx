@@ -4,7 +4,8 @@ import Dashboard from '../pages/Dashboard';
 import {AuthContext, type AuthContextValue} from '../auth/auth-context';
 import {CryptoContext, type CryptoContextValue} from '../lib/crypto/crypto-context';
 import type {CreateCredentialRequest, PublicCredential, PublicUser} from '../lib/api';
-import {describe, beforeAll, beforeEach, vi, it, expect} from 'vitest';
+import {describe, beforeAll, beforeEach, vi, it, expect, type Mock} from 'vitest';
+import {Buffer} from 'node:buffer';
 
 const {
     fetchCredentialsMock,
@@ -21,12 +22,12 @@ const {
     deriveKekMock: vi.fn(),
     unwrapDekMock: vi.fn(),
 })) as {
-    fetchCredentialsMock: vi.Mock;
-    createCredentialMock: vi.Mock;
-    updateCredentialMock: vi.Mock;
-    deleteCredentialMock: vi.Mock;
-    deriveKekMock: vi.Mock;
-    unwrapDekMock: vi.Mock;
+    fetchCredentialsMock: Mock;
+    createCredentialMock: Mock;
+    updateCredentialMock: Mock;
+    deleteCredentialMock: Mock;
+    deriveKekMock: Mock;
+    unwrapDekMock: Mock;
 };
 
 vi.mock('react-router-dom', async () => {
@@ -144,13 +145,21 @@ describe('Dashboard', () => {
                 return arr;
             },
             subtle: {
-                encrypt: async (_algo, _key, data: ArrayBuffer | Uint8Array) => {
+                encrypt: async (
+                    _algo: AlgorithmIdentifier,
+                    _key: CryptoKey,
+                    data: ArrayBuffer | Uint8Array,
+                ) => {
                     if (data instanceof ArrayBuffer) {
                         return data;
                     }
                     return data.buffer;
                 },
-                decrypt: async (_algo, _key, data: ArrayBuffer | Uint8Array) => {
+                decrypt: async (
+                    _algo: AlgorithmIdentifier,
+                    _key: CryptoKey,
+                    data: ArrayBuffer | Uint8Array,
+                ) => {
                     if (data instanceof ArrayBuffer) {
                         return data;
                     }
