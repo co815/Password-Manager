@@ -70,7 +70,7 @@ class AuthControllerTest {
         request.addHeader("Origin", "https://app.example.com");
         MockHttpServletResponse responseServlet = new MockHttpServletResponse();
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request, responseServlet);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null, null), request, responseServlet);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -125,7 +125,7 @@ class AuthControllerTest {
         request.setSecure(true);
         MockHttpServletResponse responseServlet = new MockHttpServletResponse();
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier   ", null, null), request,
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier   ", null, null, null), request,
                 responseServlet);
 
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
@@ -168,7 +168,7 @@ class AuthControllerTest {
         request.setScheme("https");
         request.setSecure(true);
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "   wrong   ", null, null), request,
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "   wrong   ", null, null, null), request,
                 new MockHttpServletResponse());
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
@@ -213,7 +213,7 @@ class AuthControllerTest {
         request.setScheme("https");
         request.setSecure(true);
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request,
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null, null), request,
                 new MockHttpServletResponse());
 
         assertThat(response.getStatusCode().value()).isEqualTo(403);
@@ -356,7 +356,7 @@ class AuthControllerTest {
         request.addHeader("Origin", "http://localhost:5173");
         MockHttpServletResponse responseServlet = new MockHttpServletResponse();
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request, responseServlet);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null, null), request, responseServlet);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -411,7 +411,7 @@ class AuthControllerTest {
         request.addHeader("X-Forwarded-Proto", "http");
         MockHttpServletResponse responseServlet = new MockHttpServletResponse();
 
-        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null), request, responseServlet);
+        ResponseEntity<?> response = controller.login(new LoginRequest("user@example.com", "verifier", null, null, null), request, responseServlet);
 
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie)
@@ -449,7 +449,7 @@ class AuthControllerTest {
         request.setSecure(true);
 
         ResponseEntity<?> response = controller.login(
-                new LoginRequest("user@example.com", "verifier", null, null),
+                new LoginRequest("user@example.com", "verifier", null, null, null),
                 request,
                 new MockHttpServletResponse()
         );

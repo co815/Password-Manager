@@ -169,6 +169,7 @@ class CredentialControllerIntegrationTest {
                 "clientSalt",
                 "encryptedDek",
                 "dekNonce",
+                null,
                 null
         );
 
@@ -189,7 +190,7 @@ class CredentialControllerIntegrationTest {
 
         userStore.values().forEach(user -> user.setEmailVerified(true));
 
-        var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier(), null, null);
+        var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier(), null, null, null);
 
         MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
                 .andExpect(status().isOk())
