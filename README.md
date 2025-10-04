@@ -63,20 +63,12 @@ If the SMTP server cannot be reached, the backend now logs the verification link
 
 The Maven wrapper reads additional options from `backend/.mvn/maven.config`.  By default the
 configuration disables any proxy so Maven can connect to repositories directly.  If your
-environment requires an HTTP(S) proxy you can enable it by providing the following system
-properties when invoking Maven (or by exporting them via `MAVEN_OPTS`):
+environment requires an HTTP(S) proxy you can either:
 
-```bash
-mvn \
-  -DMAVEN_PROXY_ACTIVE=true \
-  -DMAVEN_PROXY_PROTOCOL=https \
-  -DMAVEN_PROXY_HOST=my-proxy-host \
-  -DMAVEN_PROXY_PORT=8080 \
-  -DMAVEN_PROXY_NON_PROXY_HOSTS="localhost|127.0.0.1|::1" \
-  test
-```
+* Edit `backend/.mvn/settings.xml` and replace the proxy values with the host, port, and
+  non-proxy hosts that match your network; or
+* Export the standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment variables before
+  running Maven.
 
-All fields are optional—leave `MAVEN_PROXY_ACTIVE` as `false` (the default) to force a direct
-connection even if your shell exports `http_proxy`/`https_proxy`.  This avoids failures such as
-`proxy: nodename nor servname provided, or not known` when a corporate proxy configuration is not
-reachable from your current network.
+The default `settings.xml` keeps the proxy disabled (`active` is set to `false`) so builds continue
+to work even when a proxy configuration is not reachable from your current network.
