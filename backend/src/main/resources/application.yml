@@ -27,6 +27,13 @@ app:
     placeholder-salt-secret: ${APP_AUTH_PLACEHOLDER_SALT_SECRET}
     rate-limit:
       trusted-proxies: [ ]
+      login:
+        per-minute: 10
+        per-hour: 50
+      captcha:
+        provider: ${APP_AUTH_CAPTCHA_PROVIDER:none}
+        secret-key: ${APP_AUTH_CAPTCHA_SECRET:}
+        verify-url: ${APP_AUTH_CAPTCHA_VERIFY_URL:}
   jwt:
     secret: ${APP_JWT_SECRET}
     expiryMinutes: 15

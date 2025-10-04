@@ -2,15 +2,14 @@ package com.example.pm.security;
 
 import com.example.pm.config.RateLimitProps;
 import com.example.pm.exceptions.ErrorResponse;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
-import io.github.bucket4j.local.LocalBucketBuilder;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,47 +17,31 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Enumeration;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.function.Supplier;
 
 @Component
 public class AuthRateLimitingFilter extends OncePerRequestFilter {
 
-    static final String CAPTCHA_FLAG = "CAPTCHA_VALID";
+    private static final Logger log = LoggerFactory.getLogger(AuthRateLimitingFilter.class);
     private static final String LOGIN_PATH = "/api/auth/login";
     private static final String REGISTER_PATH = "/api/auth/register";
+    private static final String CAPTCHA_FIELD = "captchaToken";
 
     private final ObjectMapper objectMapper;
-    private final ConcurrentMap<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final RateLimitProps rateLimitProps;
-    private final Supplier<Bucket> bucketSupplier;
+    private final LoginThrottleService loginThrottleService;
+    private final CaptchaValidationService captchaValidationService;
 
-    @Autowired
-    public AuthRateLimitingFilter(ObjectMapper objectMapper, RateLimitProps rateLimitProps) {
-        this(objectMapper, rateLimitProps, AuthRateLimitingFilter::createDefaultBucket);
-    }
-
-    AuthRateLimitingFilter(ObjectMapper objectMapper, RateLimitProps rateLimitProps, Supplier<Bucket> bucketSupplier) {
-        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
-        this.rateLimitProps = Objects.requireNonNull(rateLimitProps, "rateLimitProps");
-        this.bucketSupplier = Objects.requireNonNull(bucketSupplier, "bucketSupplier");
-    }
-
-    private static Bucket createDefaultBucket() {
-        Bandwidth perMinute = Bandwidth.classic(10, Refill.greedy(10, Duration.ofMinutes(1)));
-        Bandwidth perHour = Bandwidth.classic(50, Refill.intervally(50, Duration.ofHours(1)));
-
-        return new LocalBucketBuilder()
-                .addLimit(perMinute)
-                .addLimit(perHour)
-                .build();
+    public AuthRateLimitingFilter(ObjectMapper objectMapper,
+                                  RateLimitProps rateLimitProps,
+                                  LoginThrottleService loginThrottleService,
+                                  CaptchaValidationService captchaValidationService) {
+        this.objectMapper = objectMapper;
+        this.rateLimitProps = rateLimitProps;
+        this.loginThrottleService = loginThrottleService;
+        this.captchaValidationService = captchaValidationService;
     }
 
     @Override
@@ -74,71 +57,93 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String clientIp = extractClientIp(request);
-        Bucket bucket = buckets.computeIfAbsent(clientIp, key -> bucketSupplier.get());
-
-        boolean allowed = bucket.tryConsume(1);
-        if (!allowed && !isCaptchaValid(request)) {
-            writeTooManyRequests(response);
-            return;
+        HttpServletRequest workingRequest = request;
+        JsonNode body = null;
+        try {
+            CachedBodyHttpServletRequest cached = new CachedBodyHttpServletRequest(request);
+            workingRequest = cached;
+            body = readBody(cached);
+        } catch (IOException ex) {
+            log.debug("Unable to cache request body: {}", ex.getMessage());
         }
 
-        filterChain.doFilter(request, response);
-    }
+        String clientIp = extractClientIp(workingRequest);
+        String path = resolvePath(workingRequest);
+        String identifier = extractIdentifier(path, body);
 
-    protected boolean isCaptchaValid(HttpServletRequest request) {
-        if (hasTrueAttribute(request)) {
-            return true;
-        }
-        if (hasTrueHeader(request)) {
-            return true;
-        }
-        return hasTrueParameter(request);
-    }
-
-    private boolean hasTrueAttribute(HttpServletRequest request) {
-        Enumeration<String> names = request.getAttributeNames();
-        while (names.hasMoreElements()) {
-            String name = names.nextElement();
-            if (CAPTCHA_FLAG.equalsIgnoreCase(name)) {
-                Object value = request.getAttribute(name);
-                if (value != null && Boolean.parseBoolean(value.toString())) {
-                    return true;
-                }
+        boolean allowed = loginThrottleService.tryAcquire(path, clientIp, identifier);
+        if (!allowed) {
+            String captchaToken = extractCaptchaToken(workingRequest, body);
+            if (!captchaValidationService.validateCaptcha(captchaToken, clientIp)) {
+                writeTooManyRequests(response);
+                return;
             }
         }
-        return false;
+
+        filterChain.doFilter(workingRequest, response);
     }
 
-    private boolean hasTrueHeader(HttpServletRequest request) {
-        Enumeration<String> names = request.getHeaderNames();
-        while (names != null && names.hasMoreElements()) {
-            String name = names.nextElement();
-            if (CAPTCHA_FLAG.equalsIgnoreCase(name)) {
+    private JsonNode readBody(CachedBodyHttpServletRequest request) {
+        byte[] content = request.getCachedBody();
+        if (content.length == 0) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(content);
+        } catch (IOException e) {
+            log.debug("Unable to parse auth request body: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String extractIdentifier(String path, JsonNode body) {
+        if (body == null) {
+            return "";
+        }
+        if (LOGIN_PATH.equals(path)) {
+            return getText(body, "email");
+        }
+        if (REGISTER_PATH.equals(path)) {
+            String email = getText(body, "email");
+            if (!email.isBlank()) {
+                return email;
+            }
+            return getText(body, "username");
+        }
+        return "";
+    }
+
+    private String extractCaptchaToken(HttpServletRequest request, JsonNode body) {
+        if (body != null) {
+            String value = getText(body, CAPTCHA_FIELD);
+            if (!value.isBlank()) {
+                return value;
+            }
+        }
+        String explicitHeader = request.getHeader("X-Captcha-Token");
+        if (explicitHeader != null && !explicitHeader.isBlank()) {
+            return explicitHeader.trim();
+        }
+        Enumeration<String> headerNames = request.getHeaderNames();
+        while (headerNames != null && headerNames.hasMoreElements()) {
+            String name = headerNames.nextElement();
+            if (CAPTCHA_FIELD.equalsIgnoreCase(name)) {
                 String value = request.getHeader(name);
-                if (value != null && Boolean.parseBoolean(value)) {
-                    return true;
+                if (value != null && !value.isBlank()) {
+                    return value.trim();
                 }
             }
         }
-        return false;
+        String param = request.getParameter(CAPTCHA_FIELD);
+        return param == null ? null : param.trim();
     }
 
-    private boolean hasTrueParameter(HttpServletRequest request) {
-        Map<String, String[]> params = request.getParameterMap();
-        for (Map.Entry<String, String[]> entry : params.entrySet()) {
-            if (CAPTCHA_FLAG.equalsIgnoreCase(entry.getKey())) {
-                String[] values = entry.getValue();
-                if (values != null) {
-                    for (String value : values) {
-                        if (value != null && Boolean.parseBoolean(value)) {
-                            return true;
-                        }
-                    }
-                }
-            }
+    private String getText(JsonNode body, String field) {
+        JsonNode node = body.get(field);
+        if (node == null || node.isNull()) {
+            return "";
         }
-        return false;
+        return node.asText("").trim();
     }
 
     private String extractClientIp(HttpServletRequest request) {
@@ -193,9 +198,5 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
         objectMapper.writeValue(response.getWriter(),
                 new ErrorResponse(HttpStatus.TOO_MANY_REQUESTS.value(), "TOO_MANY_REQUESTS",
                         "Too many authentication attempts"));
-    }
-
-    ConcurrentMap<String, Bucket> getBuckets() {
-        return buckets;
     }
 }

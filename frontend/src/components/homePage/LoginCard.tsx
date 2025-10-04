@@ -1,10 +1,11 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {
     Alert,
     Box,
     Button,
     CircularProgress,
     FormControl,
+    FormHelperText,
     IconButton,
     InputAdornment,
     InputLabel,
@@ -20,6 +21,7 @@ import Security from '@mui/icons-material/Security';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {useNavigate} from 'react-router-dom';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 import {ApiError, api, primeCsrfToken, type LoginRequest, type PublicUser} from '../../lib/api';
 import {makeVerifier, deriveKEK} from '../../lib/crypto/argon2';
@@ -92,16 +94,23 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
     const [recoveryCode, setRecoveryCode] = useState('');
     const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
     const [resendBusy, setResendBusy] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+    const [captchaError, setCaptchaError] = useState<string | null>(null);
 
     const {login} = useAuth();
     const {setDEK, disarm, lockNow} = useCrypto();
     const navigate = useNavigate();
+    const captchaRef = useRef<ReCAPTCHA | null>(null);
+
+    const siteKey = import.meta.env.VITE_CAPTCHA_SITE_KEY ?? '';
+    const captchaEnabled = Boolean(siteKey);
 
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
     const disabled = busy
         || !trimmedIdentifier
         || !mp
-        || (mfaRequired && !mfaCode.trim() && !recoveryCode.trim());
+        || (mfaRequired && !mfaCode.trim() && !recoveryCode.trim())
+        || (captchaEnabled && !captchaToken);
 
     useEffect(() => {
         setPendingLogin(null);
@@ -110,10 +119,20 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         setRecoveryCode('');
         setMsg(null);
         setUnverifiedEmail(null);
-    }, [trimmedIdentifier]);
+        if (captchaEnabled) {
+            captchaRef.current?.reset();
+            setCaptchaToken(null);
+            setCaptchaError(null);
+        }
+    }, [trimmedIdentifier, captchaEnabled]);
 
     async function handleSubmit() {
-        if (disabled) return;
+        if (disabled) {
+            if (captchaEnabled && !captchaToken) {
+                setCaptchaError('Please complete the CAPTCHA challenge.');
+            }
+            return;
+        }
         setMsg(null);
         setBusy(true);
         let attemptedEmail: string | null = null;
@@ -141,6 +160,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
             const payload: LoginRequest = {
                 email: loginEmail,
                 verifier,
+                ...(captchaEnabled ? {captchaToken} : {}),
             };
 
             if (mfaRequired) {
@@ -223,6 +243,10 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                 setMsg({type: 'error', text: message || 'Something went wrong'});
             }
         } finally {
+            if (captchaEnabled) {
+                captchaRef.current?.reset();
+                setCaptchaToken(null);
+            }
             setBusy(false);
         }
     }
@@ -268,6 +292,11 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         setMfaCode('');
         setRecoveryCode('');
         setMsg(null);
+        if (captchaEnabled) {
+            captchaRef.current?.reset();
+            setCaptchaToken(null);
+            setCaptchaError(null);
+        }
         onSwitchToSignup?.();
     };
 
@@ -346,6 +375,26 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                             label="Master Password *"
                         />
                     </FormControl>
+                    {captchaEnabled ? (
+                        <Stack spacing={1} alignItems="center">
+                            <ReCAPTCHA
+                                ref={captchaRef}
+                                sitekey={siteKey}
+                                onChange={(token) => {
+                                    setCaptchaToken(token);
+                                    if (token) setCaptchaError(null);
+                                }}
+                                onExpired={() => {
+                                    setCaptchaToken(null);
+                                    setCaptchaError('Please complete the CAPTCHA challenge.');
+                                }}
+                                onErrored={() => setCaptchaError('Unable to load CAPTCHA. Try again.')}
+                            />
+                            {captchaError ? (
+                                <FormHelperText error>{captchaError}</FormHelperText>
+                            ) : null}
+                        </Stack>
+                    ) : null}
                     {mfaRequired ? (
                         <Stack spacing={1.5}>
                             <Typography variant="body2" sx={{opacity: 0.9}}>

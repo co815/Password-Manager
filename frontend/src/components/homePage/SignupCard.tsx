@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {
     Alert,
     Box,
@@ -14,16 +14,17 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
+import type {Theme} from '@mui/material/styles';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import PersonOutline from '@mui/icons-material/PersonOutline';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
-import { api, primeCsrfToken } from '../../lib/api';
-import { createAccountMaterial } from '../../lib/crypto/keys';
-import { makeVerifier } from '../../lib/crypto/argon2';
+import {api, primeCsrfToken} from '../../lib/api';
+import {createAccountMaterial} from '../../lib/crypto/keys';
+import {makeVerifier} from '../../lib/crypto/argon2';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
@@ -87,7 +88,7 @@ function scorePassword(p: string) {
     return Math.min(score, 5);
 }
 
-export default function SignupCard({ onSwitchToLogin }: Props) {
+export default function SignupCard({onSwitchToLogin}: Props) {
     const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [mp, setMp] = useState('');
@@ -95,14 +96,25 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
     const [show, setShow] = useState(false);
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+    const [captchaError, setCaptchaError] = useState<string | null>(null);
 
     const trimmedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
     const trimmedUsername = useMemo(() => username.trim(), [username]);
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
     const usernameError = !!trimmedUsername && trimmedUsername.length < 4;
     const confirmError = !!mp2 && mp2 !== mp;
+    const captchaRef = useRef<ReCAPTCHA | null>(null);
+    const siteKey = import.meta.env.VITE_CAPTCHA_SITE_KEY ?? '';
+    const captchaEnabled = Boolean(siteKey);
     const disabled =
-        busy || !trimmedEmail || !trimmedUsername || trimmedUsername.length < 4 || !mp || mp !== mp2;
+        busy
+        || !trimmedEmail
+        || !trimmedUsername
+        || trimmedUsername.length < 4
+        || !mp
+        || mp !== mp2
+        || (captchaEnabled && !captchaToken);
 
     useEffect(() => {
         if (msg?.type === 'success') {
@@ -115,11 +127,16 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
     }, [msg, onSwitchToLogin]);
 
     async function handleSubmit() {
-        if (disabled) return;
+        if (disabled) {
+            if (captchaEnabled && !captchaToken) {
+                setCaptchaError('Please complete the CAPTCHA challenge.');
+            }
+            return;
+        }
         setMsg(null);
         setBusy(true);
         try {
-            const { saltClient, dekEncrypted, dekNonce } = await createAccountMaterial(mp);
+            const {saltClient, dekEncrypted, dekNonce} = await createAccountMaterial(mp);
             const verifier = await makeVerifier(trimmedEmail, mp, saltClient);
             await primeCsrfToken();
             await api.register({
@@ -129,16 +146,26 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                 saltClient,
                 dekEncrypted,
                 dekNonce,
+                ...(captchaEnabled ? {captchaToken} : {}),
             });
-            setMsg({ type: 'success', text: 'Account created successfully! Redirecting to login…' });
+            setMsg({type: 'success', text: 'Account created successfully! Redirecting to login…'});
             setUsername('');
             setEmail('');
             setMp('');
             setMp2('');
+            if (captchaEnabled) {
+                captchaRef.current?.reset();
+                setCaptchaToken(null);
+                setCaptchaError(null);
+            }
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Something went wrong';
-            setMsg({ type: 'error', text: message || 'Something went wrong' });
+            setMsg({type: 'error', text: message || 'Something went wrong'});
         } finally {
+            if (captchaEnabled) {
+                captchaRef.current?.reset();
+                setCaptchaToken(null);
+            }
             setBusy(false);
         }
     }
@@ -151,9 +178,9 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
         <Box
             sx={(theme) => ({
                 width: '100%',
-                maxWidth: { xs: 600, sm: 600 },
+                maxWidth: {xs: 600, sm: 600},
                 mx: 'auto',
-                p: { xs: 3, sm: 4 },
+                p: {xs: 3, sm: 4},
                 borderRadius: 4,
                 background:
                     theme.palette.mode === 'dark'
@@ -169,13 +196,13 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
         >
             <Stack spacing={3}>
                 <Stack spacing={1}>
-                    <Typography variant="overline" sx={{ letterSpacing: 1.6, fontWeight: 700, opacity: 0.85 }}>
+                    <Typography variant="overline" sx={{letterSpacing: 1.6, fontWeight: 700, opacity: 0.85}}>
                         Create your vault
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+                    <Typography variant="h4" sx={{fontWeight: 800, lineHeight: 1.1}}>
                         Join Password Manager
                     </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    <Typography variant="body2" sx={{opacity: 0.9}}>
                         Choose a username and a strong master password to keep your secrets safe.
                     </Typography>
                 </Stack>
@@ -191,7 +218,7 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                             onKeyDown={submitOnEnter}
                             startAdornment={
                                 <InputAdornment position="start">
-                                    <EmailOutlined fontSize="small" />
+                                    <EmailOutlined fontSize="small"/>
                                 </InputAdornment>
                             }
                             label="Email *"
@@ -208,7 +235,7 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                             onKeyDown={submitOnEnter}
                             startAdornment={
                                 <InputAdornment position="start">
-                                    <PersonOutline fontSize="small" />
+                                    <PersonOutline fontSize="small"/>
                                 </InputAdornment>
                             }
                             label="Username *"
@@ -228,13 +255,14 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                             onKeyDown={submitOnEnter}
                             startAdornment={
                                 <InputAdornment position="start">
-                                    <LockOutlined fontSize="small" />
+                                    <LockOutlined fontSize="small"/>
                                 </InputAdornment>
                             }
                             endAdornment={
                                 <InputAdornment position="end">
-                                    <IconButton onClick={() => setShow((s) => !s)} edge="end" aria-label="toggle password visibility">
-                                        {show ? <VisibilityOff /> : <Visibility />}
+                                    <IconButton onClick={() => setShow((s) => !s)} edge="end"
+                                                aria-label="toggle password visibility">
+                                        {show ? <VisibilityOff/> : <Visibility/>}
                                     </IconButton>
                                 </InputAdornment>
                             }
@@ -268,6 +296,26 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                         />
                         <FormHelperText>{confirmError ? 'Passwords do not match' : ' '}</FormHelperText>
                     </FormControl>
+                    {captchaEnabled ? (
+                        <Stack spacing={1} alignItems="center">
+                            <ReCAPTCHA
+                                ref={captchaRef}
+                                sitekey={siteKey}
+                                onChange={(token) => {
+                                    setCaptchaToken(token);
+                                    if (token) setCaptchaError(null);
+                                }}
+                                onExpired={() => {
+                                    setCaptchaToken(null);
+                                    setCaptchaError('Please complete the CAPTCHA challenge.');
+                                }}
+                                onErrored={() => setCaptchaError('Unable to load CAPTCHA. Try again.')}
+                            />
+                            {captchaError ? (
+                                <FormHelperText error>{captchaError}</FormHelperText>
+                            ) : null}
+                        </Stack>
+                    ) : null}
                 </Stack>
 
                 <Stack spacing={2}>
@@ -282,12 +330,12 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                             background: gradientBtn,
                             color: '#fff',
                             boxShadow: '0 14px 32px rgba(129,140,248,0.38)',
-                            '&:hover': { background: gradientBtn, opacity: 0.95 },
-                            '&.Mui-disabled': { background: gradientBtn, opacity: 0.55 },
+                            '&:hover': {background: gradientBtn, opacity: 0.95},
+                            '&.Mui-disabled': {background: gradientBtn, opacity: 0.55},
                         }}
                         variant="contained"
                     >
-                        {busy ? <CircularProgress size={22} sx={{ color: '#fff' }} /> : 'Create account'}
+                        {busy ? <CircularProgress size={22} sx={{color: '#fff'}}/> : 'Create account'}
                     </Button>
 
                     {msg && (
@@ -308,7 +356,7 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                     <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
                         <Typography
                             variant="body2"
-                            sx={{ opacity: 0.85, display: 'flex', alignItems: 'center' }}
+                            sx={{opacity: 0.85, display: 'flex', alignItems: 'center'}}
                         >
                             Already have an account?
                         </Typography>
@@ -316,7 +364,7 @@ export default function SignupCard({ onSwitchToLogin }: Props) {
                             onClick={onSwitchToLogin}
                             color="inherit"
                             size="small"
-                            sx={{ textTransform: 'none', fontWeight: 700, px: 0, minWidth: 0 }}
+                            sx={{textTransform: 'none', fontWeight: 700, px: 0, minWidth: 0}}
                         >
                             Log in
                         </Button>

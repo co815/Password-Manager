@@ -13,6 +13,7 @@ import java.util.Locale;
 public class RateLimitProps {
 
     private final List<String> trustedProxies = new ArrayList<>();
+    private final Login login = new Login();
 
     public List<String> getTrustedProxies() {
         return Collections.unmodifiableList(trustedProxies);
@@ -39,6 +40,10 @@ public class RateLimitProps {
         return !normalized.isEmpty() && trustedProxies.contains(normalized);
     }
 
+    public Login getLogin() {
+        return login;
+    }
+
     private String normalize(String value) {
         if (value == null) {
             return "";
@@ -48,5 +53,27 @@ public class RateLimitProps {
             return "";
         }
         return trimmed.toLowerCase(Locale.ROOT);
+    }
+
+    public static class Login {
+
+        private int perMinute = 10;
+        private int perHour = 50;
+
+        public int getPerMinute() {
+            return perMinute;
+        }
+
+        public void setPerMinute(int perMinute) {
+            this.perMinute = Math.max(1, perMinute);
+        }
+
+        public int getPerHour() {
+            return perHour;
+        }
+
+        public void setPerHour(int perHour) {
+            this.perHour = Math.max(1, perHour);
+        }
     }
 }

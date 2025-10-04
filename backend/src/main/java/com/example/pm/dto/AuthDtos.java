@@ -43,14 +43,16 @@ public class AuthDtos {
             @NotBlank String saltClient,
             @NotBlank String dekEncrypted,
             @NotBlank String dekNonce,
-            String avatarData
+            String avatarData,
+            String captchaToken
     ) {}
 
     public record LoginRequest(
             @Email String email,
             @NotBlank String verifier,
             String mfaCode,
-            String recoveryCode
+            String recoveryCode,
+            String captchaToken
     ) {}
 
     public record LoginResponse(

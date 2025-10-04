@@ -227,6 +227,7 @@ export interface RegisterRequest {
     dekEncrypted: string;
     dekNonce: string;
     avatarData?: string | null;
+    captchaToken?: string | null;
 }
 
 export interface LoginRequest {
@@ -234,6 +235,7 @@ export interface LoginRequest {
     verifier: string;
     mfaCode?: string | null;
     recoveryCode?: string | null;
+    captchaToken?: string | null;
 }
 
 export interface LoginResponse {

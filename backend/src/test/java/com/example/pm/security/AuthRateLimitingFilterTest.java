@@ -1,12 +1,8 @@
 package com.example.pm.security;
 
+import com.example.pm.config.CaptchaProps;
 import com.example.pm.config.RateLimitProps;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.TimeMeter;
-import io.github.bucket4j.Refill;
-import io.github.bucket4j.local.LocalBucketBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -17,13 +13,17 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,39 +33,36 @@ class AuthRateLimitingFilterTest {
     private static final String CLIENT_IP = "203.0.113.10";
 
     private MockMvc mockMvc;
-    private TestTimeMeter timeMeter;
-    private AuthRateLimitingFilter filter;
+    private MutableClock clock;
     private RateLimitProps rateLimitProps;
+    private RecordingCaptchaValidationService captchaValidationService;
 
     @BeforeEach
     void setUp() {
-        timeMeter = new TestTimeMeter();
-        Supplier<Bucket> supplier = () -> new LocalBucketBuilder()
-                .withCustomTimePrecision(timeMeter)
-                .addLimit(Bandwidth.classic(10, Refill.greedy(10, Duration.ofMinutes(1))))
-                .addLimit(Bandwidth.classic(50, Refill.intervally(50, Duration.ofHours(1))))
-                .build();
+        clock = new MutableClock();
         rateLimitProps = new RateLimitProps();
-        filter = new AuthRateLimitingFilter(new ObjectMapper(), rateLimitProps, supplier);
+        captchaValidationService = new RecordingCaptchaValidationService();
+        LoginThrottleService loginThrottleService = new LoginThrottleService(
+                new InMemoryLoginThrottleRepository(), rateLimitProps, clock);
+        AuthRateLimitingFilter filter = new AuthRateLimitingFilter(
+                new ObjectMapper(), rateLimitProps, loginThrottleService, captchaValidationService);
         mockMvc = MockMvcBuilders.standaloneSetup(new TestAuthController())
                 .addFilters(filter)
                 .build();
-        filter.getBuckets().clear();
-        timeMeter.reset();
     }
 
     @Test
     void loginRateLimitPerMinute() throws Exception {
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .content("{}")
+                            .content(loginPayload("user@example.com", null))
                             .contentType(MediaType.APPLICATION_JSON)
                             .with(client(CLIENT_IP)))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/auth/login")
-                        .content("{}")
+                        .content(loginPayload("user@example.com", null))
                         .contentType(MediaType.APPLICATION_JSON)
                         .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
@@ -75,7 +72,7 @@ class AuthRateLimitingFilterTest {
     void registerRateLimitPerMinute() throws Exception {
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/register")
-                            .content("{}")
+                            .content(loginPayload("user@example.com", null))
                             .contentType(MediaType.APPLICATION_JSON)
                             .with(client(CLIENT_IP)))
                     .andExpect(status().isOk());
@@ -90,23 +87,23 @@ class AuthRateLimitingFilterTest {
 
     @Test
     void loginRateLimitPerHour() throws Exception {
-        for (int i = 0; i < 5; i++) {
-            for (int j = 0; j < 10; j++) {
+        for (int block = 0; block < 5; block++) {
+            for (int i = 0; i < 10; i++) {
                 mockMvc.perform(post("/api/auth/login")
-                                .content("{}")
+                                .content(loginPayload("user@example.com", null))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .with(client(CLIENT_IP)))
                         .andExpect(status().isOk());
             }
-            if (i < 4) {
-                timeMeter.advanceSeconds(61);
+            if (block < 4) {
+                clock.advanceSeconds(61);
             }
         }
 
-        timeMeter.advanceSeconds(61);
+        clock.advanceSeconds(61);
 
         mockMvc.perform(post("/api/auth/login")
-                        .content("{}")
+                        .content(loginPayload("user@example.com", null))
                         .contentType(MediaType.APPLICATION_JSON)
                         .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
@@ -114,23 +111,23 @@ class AuthRateLimitingFilterTest {
 
     @Test
     void registerRateLimitPerHour() throws Exception {
-        for (int i = 0; i < 5; i++) {
-            for (int j = 0; j < 10; j++) {
+        for (int block = 0; block < 5; block++) {
+            for (int i = 0; i < 10; i++) {
                 mockMvc.perform(post("/api/auth/register")
-                                .content("{}")
+                                .content(registerPayload("user@example.com"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .with(client(CLIENT_IP)))
                         .andExpect(status().isOk());
             }
-            if (i < 4) {
-                timeMeter.advanceSeconds(61);
+            if (block < 4) {
+                clock.advanceSeconds(61);
             }
         }
 
-        timeMeter.advanceSeconds(61);
+        clock.advanceSeconds(61);
 
         mockMvc.perform(post("/api/auth/register")
-                        .content("{}")
+                        .content(registerPayload("user@example.com"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
@@ -140,16 +137,23 @@ class AuthRateLimitingFilterTest {
     void captchaBypassesLimit() throws Exception {
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .content("{}")
+                            .content(loginPayload("user@example.com", null))
                             .contentType(MediaType.APPLICATION_JSON)
                             .with(client(CLIENT_IP)))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/auth/login")
-                        .content("{}")
+                        .content(loginPayload("user@example.com", null))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header(AuthRateLimitingFilter.CAPTCHA_FLAG, "true")
+                        .with(client(CLIENT_IP)))
+                .andExpect(status().isTooManyRequests());
+
+        captchaValidationService.allow("valid-token");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .content(loginPayload("user@example.com", "valid-token"))
+                        .contentType(MediaType.APPLICATION_JSON)
                         .with(client(CLIENT_IP)))
                 .andExpect(status().isOk());
     }
@@ -179,14 +183,19 @@ class AuthRateLimitingFilterTest {
         String proxyIp = "198.51.100.10";
         String spoofedIp = "203.0.113.20";
 
-        mockMvc.perform(post("/api/auth/login")
-                        .content("{}")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(proxyIp, spoofedIp)))
-                .andExpect(status().isOk());
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                            .content(loginPayload("user@example.com", null))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .with(client(proxyIp, spoofedIp)))
+                    .andExpect(status().isOk());
+        }
 
-        assertThat(filter.getBuckets()).containsKey(proxyIp);
-        assertThat(filter.getBuckets()).doesNotContainKey(spoofedIp);
+        mockMvc.perform(post("/api/auth/login")
+                        .content(loginPayload("user@example.com", null))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .with(client(proxyIp, "198.51.100.11")))
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test
@@ -195,14 +204,40 @@ class AuthRateLimitingFilterTest {
         String clientIp = "203.0.113.20";
         rateLimitProps.setTrustedProxies(List.of(proxyIp));
 
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                            .content(loginPayload("user@example.com", null))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .with(client(proxyIp, clientIp)))
+                    .andExpect(status().isOk());
+        }
+
         mockMvc.perform(post("/api/auth/login")
-                        .content("{}")
+                        .content(loginPayload("user@example.com", null))
                         .contentType(MediaType.APPLICATION_JSON)
                         .with(client(proxyIp, clientIp)))
-                .andExpect(status().isOk());
+                .andExpect(status().isTooManyRequests());
+    }
 
-        assertThat(filter.getBuckets()).containsKey(clientIp);
-        assertThat(filter.getBuckets()).doesNotContainKey(proxyIp);
+    private String loginPayload(String email, String captchaToken) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('{')
+                .append("\"email\":\"").append(email).append("\"");
+        if (captchaToken != null) {
+            builder.append(',').append("\"captchaToken\":\"").append(captchaToken).append("\"");
+        }
+        builder.append('}');
+        return builder.toString();
+    }
+
+    private String registerPayload(String email) {
+        return "{" +
+                "\"email\":\"" + email + "\"," +
+                "\"username\":\"user\"," +
+                "\"verifier\":\"ver\"," +
+                "\"saltClient\":\"salt\"," +
+                "\"dekEncrypted\":\"dek\"," +
+                "\"dekNonce\":\"nonce\"}";
     }
 
     private RequestPostProcessor client(String ip) {
@@ -244,26 +279,85 @@ class AuthRateLimitingFilterTest {
         }
     }
 
-    static class TestTimeMeter implements TimeMeter {
+    static class MutableClock extends Clock {
 
-        private final AtomicLong nanos = new AtomicLong();
-
-        @Override
-        public long currentTimeNanos() {
-            return nanos.get();
-        }
-
-        @Override
-        public boolean isWallClockBased() {
-            return false;
-        }
+        private Instant current = Instant.EPOCH;
+        private ZoneId zone = ZoneId.of("UTC");
 
         void advanceSeconds(long seconds) {
-            nanos.addAndGet(Duration.ofSeconds(seconds).toNanos());
+            current = current.plusSeconds(seconds);
         }
 
-        void reset() {
-            nanos.set(0L);
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            MutableClock copy = new MutableClock();
+            copy.current = this.current;
+            copy.zone = zone;
+            return copy;
+        }
+
+        @Override
+        public Instant instant() {
+            return current;
+        }
+    }
+
+    static class InMemoryLoginThrottleRepository implements LoginThrottleRepository {
+
+        private final Map<String, LoginThrottleEntry> store = new ConcurrentHashMap<>();
+
+        @Override
+        public Optional<LoginThrottleEntry> findById(String id) {
+            LoginThrottleEntry entry = store.get(id);
+            if (entry == null) {
+                return Optional.empty();
+            }
+            return Optional.of(copy(entry));
+        }
+
+        @Override
+        public LoginThrottleEntry save(LoginThrottleEntry entry) {
+            LoginThrottleEntry copy = copy(entry);
+            long nextVersion = entry.getVersion() == null ? 0L : entry.getVersion() + 1;
+            copy.setVersion(nextVersion);
+            entry.setVersion(nextVersion);
+            store.put(copy.getId(), copy);
+            return entry;
+        }
+
+        private LoginThrottleEntry copy(LoginThrottleEntry original) {
+            LoginThrottleEntry clone = new LoginThrottleEntry();
+            clone.setId(original.getId());
+            clone.setMinuteWindowStart(original.getMinuteWindowStart());
+            clone.setMinuteCount(original.getMinuteCount());
+            clone.setHourWindowStart(original.getHourWindowStart());
+            clone.setHourCount(original.getHourCount());
+            clone.setUpdatedAt(original.getUpdatedAt());
+            clone.setVersion(original.getVersion());
+            return clone;
+        }
+    }
+
+    static class RecordingCaptchaValidationService extends CaptchaValidationService {
+
+        private final Set<String> validTokens = ConcurrentHashMap.newKeySet();
+
+        RecordingCaptchaValidationService() {
+            super(new CaptchaProps(), RestClient.create());
+        }
+
+        void allow(String token) {
+            validTokens.add(token);
+        }
+
+        @Override
+        public boolean validateCaptcha(String token, String remoteIp) {
+            return token != null && validTokens.contains(token);
         }
     }
 }
