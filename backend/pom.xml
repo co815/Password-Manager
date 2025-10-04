@@ -10,7 +10,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <spring.boot.version>3.3.2</spring.boot.version>
+        <spring.boot.version>3.5.6</spring.boot.version>
         <spring.security.version>6.3.1</spring.security.version>
         <aspectj.version>1.9.22</aspectj.version>
     </properties>
