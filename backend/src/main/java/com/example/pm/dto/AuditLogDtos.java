@@ -48,5 +48,6 @@ public class AuditLogDtos {
 
     public record ListResponse(
             List<AuditLogEntry> logs
-    ) {}
+    ) {
+    }
 }

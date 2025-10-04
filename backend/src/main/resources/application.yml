@@ -2,7 +2,7 @@ server:
   port: 8443
   ssl:
     key-store: classpath:pass-man-keystore.p12
-    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:}
     key-store-type: PKCS12
     key-alias: PasswordManager
     enabled-protocols: TLSv1.3
@@ -35,7 +35,7 @@ app:
       - http://localhost:5173
       - https://localhost:5173
   audit:
-    admin-emails: ${APP_AUDIT_ADMIN_EMAILS}
+    admin-emails: ${APP_AUDIT_ADMIN_EMAILS:}
   mail:
     host: ${APP_MAIL_HOST:localhost}
     port: ${APP_MAIL_PORT:1025}
