@@ -23,6 +23,42 @@ Set the following environment variables (or edit `backend/src/main/resources/app
 
 When developing locally, the `dev` profile is active and the application logs the verification link instead of sending an email. In any other profile the `SmtpEmailSender` bean sends the message using the configured SMTP server.
 
+### Local development helpers
+
+### Verification links
+
+By default the backend generates verification links that point directly to the
+`/api/auth/verify-email` endpoint exposed on `https://localhost:8443`.  If you
+serve a web client from a different origin you can change the link target via
+the `APP_AUTH_EMAIL_VERIFICATION_VERIFICATION_BASE_URL` environment variable (or
+the `app.auth.email-verification.verification-base-url` property in
+`application.yml`).  Provide the full URL up to, but not including, the `token`
+value.  For example:
+
+```bash
+export APP_AUTH_EMAIL_VERIFICATION_VERIFICATION_BASE_URL="https://example.com/verify-email?token="
+```
+
+### Local development helpers
+
+When developing locally you can rely on the bundled [MailHog](https://github.com/mailhog/MailHog) container instead of provisioning a real SMTP server:
+
+```bash
+docker compose up mailhog
+```
+
+The backend defaults to `localhost:1025`, which matches MailHog's SMTP listener. The captured messages are available at <http://localhost:8025>.
+
+If the SMTP server cannot be reached, the backend now logs the verification link at `INFO` level so you can still confirm accounts during development or troubleshooting.
+
+```bash
+docker compose up mailhog
+```
+
+The backend defaults to `localhost:1025`, which matches MailHog's SMTP listener. The captured messages are available at <http://localhost:8025>.
+
+If the SMTP server cannot be reached, the backend now logs the verification link at `INFO` level so you can still confirm accounts during development or troubleshooting.
+
 ## Backend build proxy configuration
 
 The Maven wrapper reads additional options from `backend/.mvn/maven.config`.  By default the

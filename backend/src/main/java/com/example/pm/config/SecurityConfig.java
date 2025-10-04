@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
                                 "/api/auth/resend-verification").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
+                                "/api/auth/resend-verification").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()

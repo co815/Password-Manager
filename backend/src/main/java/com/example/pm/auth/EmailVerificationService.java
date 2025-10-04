@@ -5,6 +5,9 @@ import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import org.springframework.mail.MailException;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -21,6 +24,8 @@ import java.util.Locale;
 
 @Service
 public class EmailVerificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailVerificationService.class);
 
     private static final Logger log = LoggerFactory.getLogger(EmailVerificationService.class);
 
@@ -112,8 +117,12 @@ public class EmailVerificationService {
         String link = buildVerificationLink(rawToken);
         try {
             emailSender.sendVerificationEmail(saved.getEmail(), saved.getUsername(), link);
+        } catch (MailException ex) {
+            log.error("Failed to send verification email to {}: {}", saved.getEmail(), ex.getMessage());
+            log.debug("Mail exception details", ex);
+            log.info("Verification link for {}: {}", saved.getEmail(), link);
         } catch (Exception ex) {
-            log.error("Failed to send verification email to {}", saved.getEmail(), ex);
+            log.error("Unexpected error while sending verification email to {}", saved.getEmail(), ex);
         }
         return saved;
     }

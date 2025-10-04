@@ -9,7 +9,7 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "app.auth.email-verification")
 public class EmailVerificationProps {
 
-    private String verificationBaseUrl = "http://localhost:3000/verify-email";
+    private String verificationBaseUrl = "https://localhost:8443/api/auth/verify-email";
     private Duration tokenTtl = Duration.ofHours(24);
     private Duration resendCooldown = Duration.ofMinutes(5);
 
