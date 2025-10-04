@@ -4,11 +4,11 @@
     <proxies>
         <proxy>
             <id>configurable-proxy</id>
-            <active>${proxy.active}</active>
-            <protocol>${proxy.protocol}</protocol>
-            <host>${proxy.host}</host>
-            <port>${proxy.port}</port>
-            <nonProxyHosts>${proxy.nonProxyHosts}</nonProxyHosts>
+            <active>false</active>
+            <protocol>http</protocol>
+            <host>proxy</host>
+            <port>8080</port>
+            <nonProxyHosts>localhost|127.0.0.1|::1</nonProxyHosts>
         </proxy>
     </proxies>
 </settings>
