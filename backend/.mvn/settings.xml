@@ -4,7 +4,7 @@
     <proxies>
         <proxy>
             <id>configurable-proxy</id>
-            <active>false</active>
+            <active>true</active>
             <protocol>http</protocol>
             <host>proxy</host>
             <port>8080</port>
