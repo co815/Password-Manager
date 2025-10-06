@@ -21,7 +21,6 @@ import Security from '@mui/icons-material/Security';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {useNavigate} from 'react-router-dom';
-import ReCAPTCHA from 'react-google-recaptcha';
 
 import {ApiError, api, primeCsrfToken, type LoginRequest, type PublicUser} from '../../lib/api';
 import {makeVerifier, deriveKEK} from '../../lib/crypto/argon2';
@@ -29,6 +28,7 @@ import {unwrapDEK} from '../../lib/crypto/unwrap';
 import {useAuth} from '../../auth/auth-context';
 import {useCrypto} from '../../lib/crypto/crypto-context';
 import useCaptchaConfig from '../../lib/hooks/useCaptchaConfig';
+import CaptchaChallenge, {type CaptchaHandle} from './CaptchaChallenge';
 
 const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
@@ -101,15 +101,16 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
     const {login} = useAuth();
     const {setDEK, disarm, lockNow} = useCrypto();
     const navigate = useNavigate();
-    const captchaRef = useRef<ReCAPTCHA | null>(null);
+    const captchaRef = useRef<CaptchaHandle | null>(null);
 
     const {config: captchaConfig, loading: captchaLoading, error: captchaConfigError} = useCaptchaConfig();
     const captchaEnabled = Boolean(
         captchaConfig?.enabled
-        && captchaConfig.provider === 'RECAPTCHA'
+        && captchaConfig.provider !== 'NONE'
         && captchaConfig.siteKey
     );
     const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
+    const captchaProvider = captchaEnabled ? captchaConfig?.provider ?? 'NONE' : 'NONE';
 
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
     const disabled = busy
@@ -398,16 +399,17 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                     ) : null}
                     {captchaEnabled ? (
                         <Stack spacing={1} alignItems="center">
-                            <ReCAPTCHA
+                            <CaptchaChallenge
                                 ref={captchaRef}
-                                sitekey={siteKey}
+                                provider={captchaProvider}
+                                siteKey={siteKey}
                                 onChange={(token) => {
-                                    setCaptchaToken(token);
+                                    setCaptchaToken(token ?? null);
                                     if (token) setCaptchaError(null);
                                 }}
-                                onExpired={() => {
+                                onErrored={(message) => {
                                     setCaptchaToken(null);
-                                    setCaptchaError('Please complete the CAPTCHA challenge.');
+                                    setCaptchaError(message ?? 'Unable to load the CAPTCHA challenge. Please try again.');
                                 }}
                                 onErrored={() => {
                                     setCaptchaToken(null);

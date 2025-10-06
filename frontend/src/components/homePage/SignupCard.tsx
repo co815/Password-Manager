@@ -25,8 +25,8 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {api, primeCsrfToken} from '../../lib/api';
 import {createAccountMaterial} from '../../lib/crypto/keys';
 import {makeVerifier} from '../../lib/crypto/argon2';
-import ReCAPTCHA from 'react-google-recaptcha';
 import useCaptchaConfig from '../../lib/hooks/useCaptchaConfig';
+import CaptchaChallenge, {type CaptchaHandle} from './CaptchaChallenge';
 
 const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
@@ -100,7 +100,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [captchaError, setCaptchaError] = useState<string | null>(null);
-    const captchaRef = useRef<ReCAPTCHA | null>(null);
+    const captchaRef = useRef<CaptchaHandle | null>(null);
 
     const trimmedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
     const trimmedUsername = useMemo(() => username.trim(), [username]);
@@ -108,9 +108,14 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const usernameError = !!trimmedUsername && trimmedUsername.length < 4;
     const confirmError = !!mp2 && mp2 !== mp;
     const {config: captchaConfig, loading: captchaLoading, error: captchaConfigError} = useCaptchaConfig();
-    const isRecaptcha = captchaConfig?.provider === 'RECAPTCHA';
-    const siteKey = isRecaptcha ? captchaConfig?.siteKey ?? '' : '';
-    const captchaEnabled = Boolean(captchaConfig?.enabled && isRecaptcha && siteKey);
+    const captchaEnabled = Boolean(
+        captchaConfig?.enabled
+        && captchaConfig?.provider
+        && captchaConfig.provider !== 'NONE'
+        && captchaConfig.siteKey
+    );
+    const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
+    const captchaProvider = captchaEnabled ? captchaConfig?.provider ?? 'NONE' : 'NONE';
     const disabled =
         busy
         || captchaLoading
@@ -317,21 +322,22 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                     ) : null}
                     {captchaEnabled ? (
                         <Stack spacing={1} alignItems="center">
-                            <ReCAPTCHA
+                            <CaptchaChallenge
                                 ref={captchaRef}
-                                sitekey={siteKey}
+                                provider={captchaProvider}
+                                siteKey={siteKey}
                                 theme="dark"
                                 onChange={(token) => {
                                     setCaptchaToken(token ?? null);
-                                    setCaptchaError(null);
+                                    if (token) setCaptchaError(null);
                                 }}
                                 onExpired={() => {
                                     setCaptchaToken(null);
                                     setCaptchaError('Please complete the CAPTCHA challenge.');
                                 }}
-                                onErrored={() => {
+                                onErrored={(message) => {
                                     setCaptchaToken(null);
-                                    setCaptchaError('Unable to load the CAPTCHA challenge. Please try again.');
+                                    setCaptchaError(message ?? 'Unable to load the CAPTCHA challenge. Please try again.');
                                 }}
                             />
                             {captchaError ? (
