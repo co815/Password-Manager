@@ -1,4 +1,6 @@
 package com.example.pm.dto;
+
+import com.example.pm.config.CaptchaProps;
 import com.example.pm.model.User;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -120,4 +122,10 @@ public class AuthDtos {
     ) {}
 
     public record RevokeSessionsResponse(int tokenVersion) {}
+
+    public record CaptchaConfigResponse(
+            boolean enabled,
+            CaptchaProps.Provider provider,
+            String siteKey
+    ) {}
 }

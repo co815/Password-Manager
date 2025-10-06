@@ -247,6 +247,14 @@ export interface SaltResponse {
     saltClient: string;
 }
 
+export type CaptchaProvider = 'NONE' | 'RECAPTCHA' | 'HCAPTCHA';
+
+export interface CaptchaConfigResponse {
+    enabled: boolean;
+    provider: CaptchaProvider;
+    siteKey: string | null;
+}
+
 export interface SimpleMessageResponse {
     message: string;
 }
@@ -374,6 +382,7 @@ export const api = {
         req<{ id: string }>(`/auth/register`, {method: 'POST', body: JSON.stringify(body)}),
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, {method: 'POST', body: JSON.stringify(body)}),
+    getCaptchaConfig: () => req<CaptchaConfigResponse>(`/auth/captcha/config`),
     resendVerification: (email: string) =>
         req<SimpleMessageResponse>(`/auth/resend-verification`, {
             method: 'POST',

@@ -14,6 +14,7 @@ public class CaptchaProps {
     }
 
     private Provider provider = Provider.NONE;
+    private String siteKey;
     private String secretKey;
     private String verifyUrl;
 
@@ -27,6 +28,14 @@ public class CaptchaProps {
 
     public String getSecretKey() {
         return secretKey;
+    }
+
+    public String getSiteKey() {
+        return siteKey;
+    }
+
+    public void setSiteKey(String siteKey) {
+        this.siteKey = siteKey;
     }
 
     public void setSecretKey(String secretKey) {

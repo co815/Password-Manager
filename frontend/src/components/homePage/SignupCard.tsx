@@ -25,6 +25,7 @@ import {api, primeCsrfToken} from '../../lib/api';
 import {createAccountMaterial} from '../../lib/crypto/keys';
 import {makeVerifier} from '../../lib/crypto/argon2';
 import ReCAPTCHA from 'react-google-recaptcha';
+import useCaptchaConfig from '../../lib/hooks/useCaptchaConfig';
 
 const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
@@ -104,11 +105,18 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
     const usernameError = !!trimmedUsername && trimmedUsername.length < 4;
     const confirmError = !!mp2 && mp2 !== mp;
-    const captchaRef = useRef<ReCAPTCHA | null>(null);
-    const siteKey = import.meta.env.VITE_CAPTCHA_SITE_KEY ?? '';
+    const {config: captchaConfig, loading: captchaLoading, error: captchaConfigError} = useCaptchaConfig();
+    const captchaEnabled = Boolean(
+        captchaConfig?.enabled
+        && captchaConfig.provider === 'RECAPTCHA'
+        && captchaConfig.siteKey
+    );
+    const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
     const captchaEnabled = Boolean(siteKey);
     const disabled =
         busy
+        || captchaLoading
+        || Boolean(captchaConfigError)
         || !trimmedEmail
         || !trimmedUsername
         || trimmedUsername.length < 4
@@ -296,20 +304,37 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                         />
                         <FormHelperText>{confirmError ? 'Passwords do not match' : ' '}</FormHelperText>
                     </FormControl>
+                    {captchaLoading ? (
+                        <Stack spacing={1} alignItems="center">
+                            <CircularProgress size={32} color="inherit"/>
+                            <Typography variant="body2" sx={{opacity: 0.85}}>
+                                Preparing CAPTCHA challenge…
+                            </Typography>
+                        </Stack>
+                    ) : null}
+                    {captchaConfigError ? (
+                        <Alert severity="error">
+                            Unable to load the CAPTCHA challenge. Please refresh the page and try again.
+                        </Alert>
+                    ) : null}
                     {captchaEnabled ? (
                         <Stack spacing={1} alignItems="center">
                             <ReCAPTCHA
                                 ref={captchaRef}
                                 sitekey={siteKey}
+                                theme="dark"
                                 onChange={(token) => {
-                                    setCaptchaToken(token);
-                                    if (token) setCaptchaError(null);
+                                    setCaptchaToken(token ?? null);
+                                    setCaptchaError(null);
                                 }}
                                 onExpired={() => {
                                     setCaptchaToken(null);
                                     setCaptchaError('Please complete the CAPTCHA challenge.');
                                 }}
-                                onErrored={() => setCaptchaError('Unable to load CAPTCHA. Try again.')}
+                                onErrored={() => {
+                                    setCaptchaToken(null);
+                                    setCaptchaError('Unable to load the CAPTCHA challenge. Please try again.');
+                                }}
                             />
                             {captchaError ? (
                                 <FormHelperText error>{captchaError}</FormHelperText>

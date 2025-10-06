@@ -28,6 +28,7 @@ import {makeVerifier, deriveKEK} from '../../lib/crypto/argon2';
 import {unwrapDEK} from '../../lib/crypto/unwrap';
 import {useAuth} from '../../auth/auth-context';
 import {useCrypto} from '../../lib/crypto/crypto-context';
+import useCaptchaConfig from '../../lib/hooks/useCaptchaConfig';
 
 const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
 
@@ -102,11 +103,18 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
     const navigate = useNavigate();
     const captchaRef = useRef<ReCAPTCHA | null>(null);
 
-    const siteKey = import.meta.env.VITE_CAPTCHA_SITE_KEY ?? '';
-    const captchaEnabled = Boolean(siteKey);
+    const {config: captchaConfig, loading: captchaLoading, error: captchaConfigError} = useCaptchaConfig();
+    const captchaEnabled = Boolean(
+        captchaConfig?.enabled
+        && captchaConfig.provider === 'RECAPTCHA'
+        && captchaConfig.siteKey
+    );
+    const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
 
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
     const disabled = busy
+        || captchaLoading
+        || Boolean(captchaConfigError)
         || !trimmedIdentifier
         || !mp
         || (mfaRequired && !mfaCode.trim() && !recoveryCode.trim())
@@ -375,6 +383,19 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                             label="Master Password *"
                         />
                     </FormControl>
+                    {captchaLoading ? (
+                        <Stack spacing={1} alignItems="center">
+                            <CircularProgress size={32} color="inherit"/>
+                            <Typography variant="body2" sx={{opacity: 0.85}}>
+                                Preparing CAPTCHA challenge…
+                            </Typography>
+                        </Stack>
+                    ) : null}
+                    {captchaConfigError ? (
+                        <Alert severity="error">
+                            Unable to load the CAPTCHA challenge. Please refresh the page and try again.
+                        </Alert>
+                    ) : null}
                     {captchaEnabled ? (
                         <Stack spacing={1} alignItems="center">
                             <ReCAPTCHA
@@ -388,7 +409,10 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                     setCaptchaToken(null);
                                     setCaptchaError('Please complete the CAPTCHA challenge.');
                                 }}
-                                onErrored={() => setCaptchaError('Unable to load CAPTCHA. Try again.')}
+                                onErrored={() => {
+                                    setCaptchaToken(null);
+                                    setCaptchaError('Unable to load the CAPTCHA challenge. Please try again.');
+                                }}
                             />
                             {captchaError ? (
                                 <FormHelperText error>{captchaError}</FormHelperText>
