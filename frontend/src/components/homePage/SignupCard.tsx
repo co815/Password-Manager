@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
+import type {KeyboardEvent} from 'react';
 import {
     Alert,
     Box,
@@ -99,6 +100,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [captchaError, setCaptchaError] = useState<string | null>(null);
+    const captchaRef = useRef<ReCAPTCHA | null>(null);
 
     const trimmedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
     const trimmedUsername = useMemo(() => username.trim(), [username]);
@@ -106,13 +108,9 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const usernameError = !!trimmedUsername && trimmedUsername.length < 4;
     const confirmError = !!mp2 && mp2 !== mp;
     const {config: captchaConfig, loading: captchaLoading, error: captchaConfigError} = useCaptchaConfig();
-    const captchaEnabled = Boolean(
-        captchaConfig?.enabled
-        && captchaConfig.provider === 'RECAPTCHA'
-        && captchaConfig.siteKey
-    );
-    const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
-    const captchaEnabled = Boolean(siteKey);
+    const isRecaptcha = captchaConfig?.provider === 'RECAPTCHA';
+    const siteKey = isRecaptcha ? captchaConfig?.siteKey ?? '' : '';
+    const captchaEnabled = Boolean(captchaConfig?.enabled && isRecaptcha && siteKey);
     const disabled =
         busy
         || captchaLoading
@@ -178,7 +176,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
         }
     }
 
-    const submitOnEnter = (e: React.KeyboardEvent) => {
+    const submitOnEnter = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !disabled) handleSubmit();
     };
 
