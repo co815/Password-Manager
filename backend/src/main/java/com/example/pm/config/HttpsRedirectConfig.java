@@ -1,12 +1,14 @@
 package com.example.pm.config;
 
 import org.apache.catalina.connector.Connector;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@ConditionalOnProperty(prefix = "server.ssl", name = "enabled", havingValue = "true")
 public class HttpsRedirectConfig {
 
     @Bean
@@ -14,7 +16,6 @@ public class HttpsRedirectConfig {
         return server -> server.addAdditionalTomcatConnectors(createHttpConnector());
     }
 
-    // Creates a connector which listens for requests on port 8080(HTTP) and redirects them to port 8443(HTTPS)
     private Connector createHttpConnector() {
         Connector connector = new Connector(TomcatServletWebServerFactory.DEFAULT_PROTOCOL);
         connector.setScheme("http");

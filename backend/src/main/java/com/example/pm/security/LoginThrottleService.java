@@ -3,6 +3,7 @@ package com.example.pm.security;
 import com.example.pm.config.RateLimitProps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,7 @@ public class LoginThrottleService {
     private final RateLimitProps rateLimitProps;
     private final Clock clock;
 
+    @Autowired
     public LoginThrottleService(LoginThrottleRepository repository, RateLimitProps rateLimitProps) {
         this(repository, rateLimitProps, Clock.systemUTC());
     }

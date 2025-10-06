@@ -3,6 +3,7 @@ package com.example.pm.security;
 import com.example.pm.config.CaptchaProps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -21,6 +22,7 @@ public class CaptchaValidationService {
     private final CaptchaProps captchaProps;
     private final RestClient restClient;
 
+    @Autowired
     public CaptchaValidationService(CaptchaProps captchaProps) {
         this(captchaProps, RestClient.create());
     }
