@@ -36,9 +36,25 @@ public class LoginThrottleService {
     }
 
     public boolean tryAcquire(String path, String ip, String identifier) {
-        String key = buildKey(path, ip, identifier);
+        String normalizedPath = Optional.ofNullable(path).orElse("").trim().toLowerCase(Locale.ROOT);
+        String normalizedIp = Optional.ofNullable(ip).orElse("unknown").trim().toLowerCase(Locale.ROOT);
+        String normalizedIdentifier = Optional.ofNullable(identifier).orElse("").trim().toLowerCase(Locale.ROOT);
+
         int perMinute = Math.max(1, rateLimitProps.getLogin().getPerMinute());
         int perHour = Math.max(perMinute, rateLimitProps.getLogin().getPerHour());
+
+        if (!tryAcquireForKey(buildKey(normalizedPath, normalizedIp, ""), perMinute, perHour)) {
+            return false;
+        }
+
+        if (normalizedIdentifier.isEmpty()) {
+            return true;
+        }
+
+        return tryAcquireForKey(buildKey(normalizedPath, normalizedIp, normalizedIdentifier), perMinute, perHour);
+    }
+
+    private boolean tryAcquireForKey(String key, int perMinute, int perHour) {
 
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
             Instant now = clock.instant();
@@ -58,11 +74,16 @@ public class LoginThrottleService {
     }
 
     String buildKey(String path, String ip, String identifier) {
-        String normalizedPath = Optional.ofNullable(path).orElse("").trim().toLowerCase(Locale.ROOT);
-        String normalizedIp = Optional.ofNullable(ip).orElse("unknown").trim().toLowerCase(Locale.ROOT);
-        String normalizedIdentifier = Optional.ofNullable(identifier).orElse("").trim().toLowerCase(Locale.ROOT);
-        String hashedIdentifier = hashIdentifier(normalizedIdentifier);
-        return normalizedPath + "|" + normalizedIp + "|" + hashedIdentifier;
+        String normalizedPath = Optional.ofNullable(path).orElse("");
+        String normalizedIp = Optional.ofNullable(ip).orElse("unknown");
+        String normalizedIdentifier = Optional.ofNullable(identifier).orElse("");
+
+        String cleanedPath = normalizedPath.trim().toLowerCase(Locale.ROOT);
+        String cleanedIp = normalizedIp.trim().toLowerCase(Locale.ROOT);
+        String cleanedIdentifier = normalizedIdentifier.trim().toLowerCase(Locale.ROOT);
+
+        String hashedIdentifier = hashIdentifier(cleanedIdentifier);
+        return cleanedPath + "|" + cleanedIp + "|" + hashedIdentifier;
     }
 
     private String hashIdentifier(String identifier) {

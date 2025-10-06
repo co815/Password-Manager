@@ -1,11 +1,13 @@
 package com.example.pm.security;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 @Repository
+@ConditionalOnBean(MongoTemplate.class)
 class MongoLoginThrottleRepository implements LoginThrottleRepository {
 
     private final MongoTemplate mongoTemplate;

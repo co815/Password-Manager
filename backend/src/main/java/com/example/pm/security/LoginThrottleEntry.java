@@ -9,7 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 @Document(collection = "login_throttle")
-class LoginThrottleEntry {
+public class LoginThrottleEntry {
 
     private static final Duration MINUTE_WINDOW = Duration.ofMinutes(1);
     private static final Duration HOUR_WINDOW = Duration.ofHours(1);
@@ -66,11 +66,11 @@ class LoginThrottleEntry {
         }
     }
 
-    String getId() {
+    public String getId() {
         return id;
     }
 
-    void setId(String id) {
+    public void setId(String id) {
         this.id = id;
     }
 

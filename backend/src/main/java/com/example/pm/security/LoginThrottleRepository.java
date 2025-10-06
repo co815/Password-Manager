@@ -2,7 +2,7 @@ package com.example.pm.security;
 
 import java.util.Optional;
 
-interface LoginThrottleRepository {
+public interface LoginThrottleRepository {
 
     Optional<LoginThrottleEntry> findById(String id);
 
