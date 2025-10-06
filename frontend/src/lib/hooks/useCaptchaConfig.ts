@@ -2,12 +2,14 @@ import {useEffect, useState} from 'react';
 
 import {api, type CaptchaConfigResponse} from '../api';
 
+const DEFAULT_CONFIG: CaptchaConfigResponse = {enabled: false, provider: 'NONE', siteKey: null};
+
 let cachedConfig: CaptchaConfigResponse | null = null;
 let inflight: Promise<CaptchaConfigResponse> | null = null;
 
 async function loadCaptchaConfig(): Promise<CaptchaConfigResponse> {
     if (typeof fetch !== 'function') {
-        cachedConfig = {enabled: false, provider: 'NONE', siteKey: null};
+        cachedConfig = DEFAULT_CONFIG;
         return cachedConfig;
     }
     if (cachedConfig) {
@@ -15,6 +17,12 @@ async function loadCaptchaConfig(): Promise<CaptchaConfigResponse> {
     }
     if (!inflight) {
         inflight = api.getCaptchaConfig()
+            .catch((err) => {
+                if (import.meta.env.DEV) {
+                    console.warn('Failed to load CAPTCHA configuration, falling back to defaults.', err);
+                }
+                return DEFAULT_CONFIG;
+            })
             .then((config) => {
                 cachedConfig = config;
                 return config;
@@ -51,7 +59,11 @@ export default function useCaptchaConfig() {
             })
             .catch((err) => {
                 if (!cancelled) {
-                    setError(err);
+                    setConfig(DEFAULT_CONFIG);
+                    setError(null);
+                    if (import.meta.env.DEV) {
+                        console.warn('Failed to load CAPTCHA configuration, falling back to defaults.', err);
+                    }
                 }
             })
             .finally(() => {
@@ -73,8 +85,12 @@ export default function useCaptchaConfig() {
                 return data;
             })
             .catch((err) => {
-                setError(err);
-                throw err;
+                setConfig(DEFAULT_CONFIG);
+                setError(null);
+                if (import.meta.env.DEV) {
+                    console.warn('Failed to refresh CAPTCHA configuration, falling back to defaults.', err);
+                }
+                return DEFAULT_CONFIG;
             });
     };
 
