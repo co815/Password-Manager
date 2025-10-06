@@ -8,19 +8,24 @@ const recaptchaReset = vi.fn();
 const hcaptchaReset = vi.fn();
 
 type RecaptchaMockProps = {
+    sitekey?: string;
+    theme?: 'light' | 'dark';
     onChange?: (token: string | null) => void;
     onExpired?: () => void;
-    onErrored?: () => void;
+    onErrored?: (message?: string) => void;
 };
 
 type HCaptchaMockProps = {
+    sitekey?: string;
+    theme?: 'light' | 'dark';
     onVerify?: (token: string) => void;
     onExpire?: () => void;
+    onChalExpired?: () => void;
     onError?: (message: string) => void;
 };
 
 vi.mock('react-google-recaptcha', () => {
-    const MockRecaptcha = forwardRef<HTMLButtonElement, RecaptchaMockProps>((props, ref) => {
+    const MockRecaptcha = forwardRef< {reset: () => void}, RecaptchaMockProps>((props, ref) => {
         useImperativeHandle(ref, () => ({reset: recaptchaReset}));
         return (
             <button
@@ -39,7 +44,7 @@ vi.mock('react-google-recaptcha', () => {
 });
 
 vi.mock('@hcaptcha/react-hcaptcha', () => {
-    const MockHCaptcha = forwardRef<HTMLButtonElement, HCaptchaMockProps>((props, ref) => {
+    const MockHCaptcha = forwardRef<{ resetCaptcha: () => void }, HCaptchaMockProps>((props, ref) => {
         useImperativeHandle(ref, () => ({resetCaptcha: hcaptchaReset}));
         return (
             <button
@@ -47,6 +52,7 @@ vi.mock('@hcaptcha/react-hcaptcha', () => {
                 type="button"
                 onClick={() => props.onVerify?.('hcaptcha-token')}
                 onDoubleClick={() => props.onExpire?.()}
+                onMouseEnter={() => props.onChalExpired?.()}
                 onContextMenu={(event) => {
                     event.preventDefault();
                     props.onError?.('bad-request');

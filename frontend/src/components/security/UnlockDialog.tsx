@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import type { FormEvent } from 'react';
 import {
-    Dialog, DialogTitle, DialogContent, DialogActions,
-    Button, TextField, InputAdornment, IconButton, Typography
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    TextField,
+    InputAdornment,
+    IconButton,
+    Typography,
+    Box,
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -18,7 +27,7 @@ export default function UnlockDialog({ open }: { open: boolean }) {
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
 
-    const onUnlock = async () => {
+    const onUnlock = useCallback(async () => {
         if (!mp || busy) return;
         setBusy(true);
         setErr(null);
@@ -40,14 +49,23 @@ export default function UnlockDialog({ open }: { open: boolean }) {
         } finally {
             setBusy(false);
         }
-    };
+    }, [authUser, mp, busy, setDEK]);
+
+    const handleSubmit = useCallback(
+        (event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            if (busy) return;
+            void onUnlock();
+        },
+        [busy, onUnlock],
+    );
 
     return (
         <Dialog
             open={open}
             fullWidth
             maxWidth="xs"
-            onClose={() => {}} // forțăm rămânerea deschis
+            onClose={() => {}}
             slotProps={{
                 backdrop: {
                     sx: {
@@ -65,54 +83,50 @@ export default function UnlockDialog({ open }: { open: boolean }) {
             }}
         >
             <DialogTitle>Unlock vault</DialogTitle>
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                        Enter your master password to decrypt your vault.
+                    </Typography>
 
-            <DialogContent>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                    Enter your master password to decrypt your vault.
-                </Typography>
+                    <TextField
+                        fullWidth
+                        autoFocus
+                        label="Master password"
+                        type={show ? 'text' : 'password'}
+                        value={mp}
+                        onChange={(e) => setMp(e.target.value)}
+                        error={!!err}
+                        helperText={err || ' '}
+                        slotProps={{
+                            input: {
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            onClick={() => setShow((s) => !s)}
+                                            edge="end"
+                                            aria-label="toggle password visibility"
+                                        >
+                                            {show ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            },
+                        }}
+                    />
+                </DialogContent>
 
-                <TextField
-                    fullWidth
-                    autoFocus
-                    label="Master password"
-                    type={show ? 'text' : 'password'}
-                    value={mp}
-                    onChange={(e) => setMp(e.target.value)}
-                    error={!!err}
-                    helperText={err || ' '}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') onUnlock();
-                    }}
-                    slotProps={{
-                        input: {
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <IconButton
-                                        onClick={() => setShow((s) => !s)}
-                                        edge="end"
-                                        aria-label="toggle password visibility"
-                                    >
-                                        {show ? <VisibilityOff /> : <Visibility />}
-                                    </IconButton>
-                                </InputAdornment>
-                            ),
-                        },
-                    }}
-                />
-            </DialogContent>
-
-            <DialogActions>
-                <Button
-                    onClick={() => {
-                        void onUnlock();
-                    }}
-                    disabled={!mp || busy}
-                    variant="contained"
-                    sx={{ fontWeight: 800 }}
-                >
-                    {busy ? 'Unlocking…' : 'Unlock'}
-                </Button>
-            </DialogActions>
+                <DialogActions>
+                    <Button
+                        type="submit"
+                        disabled={!mp || busy}
+                        variant="contained"
+                        sx={{ fontWeight: 800 }}
+                    >
+                        {busy ? 'Unlocking…' : 'Unlock'}
+                    </Button>
+                </DialogActions>
+            </Box>
         </Dialog>
     );
 }

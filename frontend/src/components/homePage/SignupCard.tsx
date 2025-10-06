@@ -15,7 +15,7 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
-import type {Theme} from '@mui/material/styles';
+import {useTheme, type Theme} from '@mui/material/styles';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import PersonOutline from '@mui/icons-material/PersonOutline';
 import LockOutlined from '@mui/icons-material/LockOutlined';
@@ -101,6 +101,8 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [captchaError, setCaptchaError] = useState<string | null>(null);
     const captchaRef = useRef<CaptchaHandle | null>(null);
+    const them = useTheme();
+    const captchaTheme = them.palette.mode === 'dark' ? 'dark' : 'light';
 
     const trimmedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
     const trimmedUsername = useMemo(() => username.trim(), [username]);
@@ -326,18 +328,20 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                                 ref={captchaRef}
                                 provider={captchaProvider}
                                 siteKey={siteKey}
-                                theme="dark"
+                                theme={captchaTheme}
                                 onChange={(token) => {
                                     setCaptchaToken(token ?? null);
                                     if (token) setCaptchaError(null);
                                 }}
                                 onExpired={() => {
                                     setCaptchaToken(null);
-                                    setCaptchaError('Please complete the CAPTCHA challenge.');
+                                    setCaptchaError('The CAPTCHA challange expired. Please try again.');
                                 }}
                                 onErrored={(message) => {
                                     setCaptchaToken(null);
-                                    setCaptchaError(message ?? 'Unable to load the CAPTCHA challenge. Please try again.');
+                                    setCaptchaError(message
+                                        ?? 'Unable to load the CAPTCHA challenge. Please try again.'
+                                    );
                                 }}
                             />
                             {captchaError ? (
