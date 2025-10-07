@@ -382,7 +382,11 @@ export const api = {
         req<{ id: string }>(`/auth/register`, {method: 'POST', body: JSON.stringify(body)}),
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, {method: 'POST', body: JSON.stringify(body)}),
-    getCaptchaConfig: () => req<CaptchaConfigResponse>(`/auth/captcha/config`),
+    getCaptchaConfig: () => req<CaptchaConfigResponse>(
+        `/auth/captcha/config`,
+        {},
+        {suppressAuthCleared: true},
+    ),
     resendVerification: (email: string) =>
         req<SimpleMessageResponse>(`/auth/resend-verification`, {
             method: 'POST',

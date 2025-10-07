@@ -59,7 +59,8 @@ public class SecurityConfig {
                                 "/api/auth/csrf",
                                 "/api/auth/salt"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/verify-email",
+                                "/api/auth/captcha/config").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
                                 "/api/auth/resend-verification").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
