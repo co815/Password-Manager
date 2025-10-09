@@ -16,13 +16,8 @@ async function loadCaptchaConfig(): Promise<CaptchaConfigResponse> {
         return cachedConfig;
     }
     if (!inflight) {
-        inflight = api.getCaptchaConfig()
-            .catch((err) => {
-                if (import.meta.env.DEV) {
-                    console.warn('Failed to load CAPTCHA configuration, falling back to defaults.', err);
-                }
-                return DEFAULT_CONFIG;
-            })
+        inflight = api
+            .getCaptchaConfig()
             .then((config) => {
                 cachedConfig = config;
                 return config;
@@ -36,6 +31,7 @@ async function loadCaptchaConfig(): Promise<CaptchaConfigResponse> {
 
 export function resetCachedCaptchaConfig() {
     cachedConfig = null;
+    inflight = null;
 }
 
 export default function useCaptchaConfig() {
@@ -44,10 +40,12 @@ export default function useCaptchaConfig() {
     const [error, setError] = useState<unknown>(null);
 
     useEffect(() => {
-        if (config) {
+        if (cachedConfig) {
+            setConfig(cachedConfig);
             setLoading(false);
             return;
         }
+
         let cancelled = false;
         setLoading(true);
         loadCaptchaConfig()
@@ -60,7 +58,7 @@ export default function useCaptchaConfig() {
             .catch((err) => {
                 if (!cancelled) {
                     setConfig(DEFAULT_CONFIG);
-                    setError(null);
+                    setError(err);
                     if (import.meta.env.DEV) {
                         console.warn('Failed to load CAPTCHA configuration, falling back to defaults.', err);
                     }
@@ -71,13 +69,15 @@ export default function useCaptchaConfig() {
                     setLoading(false);
                 }
             });
+
         return () => {
             cancelled = true;
         };
-    }, [config]);
+    }, []);
 
     const refresh = () => {
         resetCachedCaptchaConfig();
+        setLoading(true);
         return loadCaptchaConfig()
             .then((data) => {
                 setConfig(data);
@@ -86,11 +86,14 @@ export default function useCaptchaConfig() {
             })
             .catch((err) => {
                 setConfig(DEFAULT_CONFIG);
-                setError(null);
+                setError(err);
                 if (import.meta.env.DEV) {
                     console.warn('Failed to refresh CAPTCHA configuration, falling back to defaults.', err);
                 }
                 return DEFAULT_CONFIG;
+            })
+            .finally(() => {
+                setLoading(false);
             });
     };
 
