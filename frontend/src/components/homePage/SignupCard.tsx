@@ -109,7 +109,12 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const pwdScore = useMemo(() => scorePassword(mp), [mp]);
     const usernameError = !!trimmedUsername && trimmedUsername.length < 4;
     const confirmError = !!mp2 && mp2 !== mp;
-    const {config: captchaConfig, loading: captchaLoading, error: captchaConfigError} = useCaptchaConfig();
+    const {
+        config: captchaConfig,
+        loading: captchaLoading,
+        error: captchaConfigError,
+        refresh: reloadCaptchaConfig,
+    } = useCaptchaConfig();
     const captchaEnabled = Boolean(
         captchaConfig?.enabled
         && captchaConfig?.provider
@@ -318,8 +323,22 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                         </Stack>
                     ) : null}
                     {captchaConfigError ? (
-                        <Alert severity="error">
-                            Unable to load the CAPTCHA challenge. Please refresh the page and try again.
+                        <Alert
+                            severity="error"
+                            action={(
+                                <Button
+                                    color="inherit"
+                                    size="small"
+                                    onClick={() => {
+                                        reloadCaptchaConfig().catch(() => undefined);
+                                    }}
+                                    disabled={captchaLoading}
+                                >
+                                    Retry
+                                </Button>
+                            )}
+                        >
+                            Unable to load the CAPTCHA challenge. Please try again.
                         </Alert>
                     ) : null}
                     {captchaEnabled ? (
@@ -335,7 +354,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                                 }}
                                 onExpired={() => {
                                     setCaptchaToken(null);
-                                    setCaptchaError('The CAPTCHA challange expired. Please try again.');
+                                    setCaptchaError('The CAPTCHA challenge expired. Please try again.');
                                 }}
                                 onErrored={(message) => {
                                     setCaptchaToken(null);

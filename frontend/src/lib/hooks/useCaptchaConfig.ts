@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 
 import {api, type CaptchaConfigResponse} from '../api';
 
@@ -38,6 +38,7 @@ export default function useCaptchaConfig() {
     const [config, setConfig] = useState<CaptchaConfigResponse | null>(cachedConfig);
     const [loading, setLoading] = useState(!cachedConfig);
     const [error, setError] = useState<unknown>(null);
+    const [retryCount, setRetryCount] = useState(0);
 
     useEffect(() => {
         if (cachedConfig) {
@@ -53,12 +54,14 @@ export default function useCaptchaConfig() {
                 if (!cancelled) {
                     setConfig(data);
                     setError(null);
+                    setRetryCount(0);
                 }
             })
             .catch((err) => {
                 if (!cancelled) {
                     setConfig(DEFAULT_CONFIG);
                     setError(err);
+                    setRetryCount((count) => count + 1);
                     if (import.meta.env.DEV) {
                         console.warn('Failed to load CAPTCHA configuration, falling back to defaults.', err);
                     }
@@ -75,18 +78,20 @@ export default function useCaptchaConfig() {
         };
     }, []);
 
-    const refresh = () => {
+    const refresh = useCallback(() => {
         resetCachedCaptchaConfig();
         setLoading(true);
         return loadCaptchaConfig()
             .then((data) => {
                 setConfig(data);
                 setError(null);
+                setRetryCount(0);
                 return data;
             })
             .catch((err) => {
                 setConfig(DEFAULT_CONFIG);
                 setError(err);
+                setRetryCount((count) => count + 1);
                 if (import.meta.env.DEV) {
                     console.warn('Failed to refresh CAPTCHA configuration, falling back to defaults.', err);
                 }
@@ -95,7 +100,31 @@ export default function useCaptchaConfig() {
             .finally(() => {
                 setLoading(false);
             });
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!error) {
+            return;
+        }
+        if (typeof window === 'undefined') {
+            return;
+        }
+        if (loading) {
+            return;
+        }
+        if (retryCount >= 3) {
+            return;
+        }
+
+        const delay = Math.min(4000, 1000 * (retryCount + 1));
+        const timer = window.setTimeout(() => {
+            refresh().catch(() => undefined);
+        }, delay);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [error, loading, refresh, retryCount]);
 
     return {config, loading, error, refresh};
 }
