@@ -25,16 +25,16 @@ app:
     cookie:
       same-site: none
     placeholder-salt-secret: ${APP_AUTH_PLACEHOLDER_SALT_SECRET}
+    captcha:
+      provider: ${APP_AUTH_CAPTCHA_PROVIDER:none}
+      site-key: ${APP_AUTH_CAPTCHA_SITE_KEY:}
+      secret-key: ${APP_AUTH_CAPTCHA_SECRET:}
+      verify-url: ${APP_AUTH_CAPTCHA_VERIFY_URL:}
     rate-limit:
       trusted-proxies: [ ]
       login:
         per-minute: 10
         per-hour: 50
-      captcha:
-        provider: ${APP_AUTH_CAPTCHA_PROVIDER:none}
-        site-key: ${APP_AUTH_CAPTCHA_SITE_KEY:}
-        secret-key: ${APP_AUTH_CAPTCHA_SECRET:}
-        verify-url: ${APP_AUTH_CAPTCHA_VERIFY_URL:}
   jwt:
     secret: ${APP_JWT_SECRET}
     expiryMinutes: 15
