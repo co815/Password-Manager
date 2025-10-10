@@ -1,8 +1,22 @@
 import {useCallback, useEffect, useState} from 'react';
 
-import {api, type CaptchaConfigResponse} from '../api';
+import {api, type CaptchaConfigResponse, type CaptchaProvider} from '../api';
 
 const DEFAULT_CONFIG: CaptchaConfigResponse = {enabled: false, provider: 'NONE', siteKey: null};
+
+function normalizeCaptchaConfig(config: CaptchaConfigResponse | null | undefined): CaptchaConfigResponse {
+    const rawProvider = typeof config?.provider === 'string' ? config.provider : 'NONE';
+    const upper = rawProvider.toUpperCase();
+    const provider: CaptchaProvider = upper === 'HCAPTCHA'
+        ? 'HCAPTCHA'
+        : upper === 'RECAPTCHA'
+            ? 'RECAPTCHA'
+            : 'NONE';
+    const rawSiteKey = typeof config?.siteKey === 'string' ? config.siteKey.trim() : '';
+    const siteKey = rawSiteKey ? rawSiteKey : null;
+    const enabled = Boolean(config?.enabled && provider !== 'NONE' && siteKey);
+    return {enabled, provider, siteKey};
+}
 
 let cachedConfig: CaptchaConfigResponse | null = null;
 let inflight: Promise<CaptchaConfigResponse> | null = null;
@@ -19,8 +33,9 @@ async function loadCaptchaConfig(): Promise<CaptchaConfigResponse> {
         inflight = api
             .getCaptchaConfig()
             .then((config) => {
-                cachedConfig = config;
-                return config;
+                const normalized = normalizeCaptchaConfig(config);
+                cachedConfig = normalized;
+                return normalized;
             })
             .finally(() => {
                 inflight = null;
