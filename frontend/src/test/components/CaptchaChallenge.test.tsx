@@ -1,46 +1,55 @@
 import {createRef} from 'react';
 import {render, waitFor} from '@testing-library/react';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import CaptchaChallenge, {type CaptchaHandle} from '../../components/homePage/CaptchaChallenge';
 
-let recaptchaProps: Record<string, unknown> | null = null;
-const recaptchaReset = vi.fn();
+type RecaptchaRenderOptions = {
+    sitekey: string;
+    theme?: string;
+    callback?: (token: string) => void;
+    'expired-callback'?: () => void;
+    'error-callback'?: () => void;
+};
 
-vi.mock('react-google-recaptcha', async () => {
-    const React = await import('react');
-    const {forwardRef, useImperativeHandle} = React;
-    const MockReCaptcha = forwardRef((props: Record<string, unknown>, ref) => {
-        recaptchaProps = props;
-        useImperativeHandle(ref, () => ({reset: recaptchaReset}));
-        return React.createElement('div', {'data-testid': 'recaptcha-mock'});
-    });
-    return {__esModule: true, default: MockReCaptcha};
-});
-
-let hcaptchaProps: Record<string, unknown> | null = null;
-const hcaptchaReset = vi.fn();
-
-vi.mock('@hcaptcha/react-hcaptcha', async () => {
-    const React = await import('react');
-    const {forwardRef, useImperativeHandle} = React;
-    const MockHCaptcha = forwardRef((props: Record<string, unknown>, ref) => {
-        hcaptchaProps = props;
-        useImperativeHandle(ref, () => ({resetCaptcha: hcaptchaReset}));
-        return React.createElement('div', {'data-testid': 'hcaptcha-mock'});
-    });
-    return {__esModule: true, default: MockHCaptcha};
-});
+type HcaptchaRenderOptions = {
+    sitekey: string;
+    theme?: string;
+    callback?: (token: string | null) => void;
+    'expired-callback'?: () => void;
+    'error-callback'?: (error?: string) => void;
+    'close-callback'?: () => void;
+};
 
 describe('CaptchaChallenge', () => {
     beforeEach(() => {
-        recaptchaProps = null;
-        hcaptchaProps = null;
-        recaptchaReset.mockClear();
-        hcaptchaReset.mockClear();
+        delete (window as typeof window & {grecaptcha?: unknown}).grecaptcha;
+        delete (window as typeof window & {hcaptcha?: unknown}).hcaptcha;
+    });
+
+    afterEach(() => {
+        delete (window as typeof window & {grecaptcha?: unknown}).grecaptcha;
+        delete (window as typeof window & {hcaptcha?: unknown}).hcaptcha;
     });
 
     it('renders reCAPTCHA and forwards events', async () => {
+        const ready = vi.fn((cb: () => void) => cb());
+        const reset = vi.fn();
+        const remove = vi.fn();
+        let renderOptions: RecaptchaRenderOptions | null = null;
+        const renderWidget = vi.fn((container: HTMLElement, options: RecaptchaRenderOptions) => {
+            renderOptions = options;
+            container.dataset.rendered = 'true';
+            return 7;
+        });
+
+        (window as typeof window & {grecaptcha?: unknown}).grecaptcha = {
+            ready,
+            render: renderWidget,
+            reset,
+            remove,
+        };
+
         const onChange = vi.fn();
         const onExpired = vi.fn();
         const onErrored = vi.fn();
@@ -59,32 +68,41 @@ describe('CaptchaChallenge', () => {
         );
 
         await waitFor(() => {
-            expect(recaptchaProps).not.toBeNull();
+            expect(renderWidget).toHaveBeenCalled();
         });
 
-        const props = recaptchaProps as {
-            sitekey: string;
-            theme?: string;
-            onChange?: (token: string | null) => void;
-            onExpired?: () => void;
-            onErrored?: () => void;
-        };
+        expect(ready).toHaveBeenCalledTimes(1);
+        expect(renderWidget).toHaveBeenCalledTimes(1);
+        expect(renderWidget.mock.calls[0][0]).toBeInstanceOf(HTMLElement);
+        expect(renderOptions?.sitekey).toBe('recaptcha-site');
+        expect(renderOptions?.theme).toBe('dark');
 
-        expect(props.sitekey).toBe('recaptcha-site');
-        expect(props.theme).toBe('dark');
-
-        props.onChange?.('recaptcha-token');
-        props.onExpired?.();
-        props.onErrored?.();
+        renderOptions?.callback?.('recaptcha-token');
+        renderOptions?.['expired-callback']?.();
+        renderOptions?.['error-callback']?.();
         ref.current?.reset();
 
         expect(onChange).toHaveBeenCalledWith('recaptcha-token');
         expect(onExpired).toHaveBeenCalledTimes(1);
         expect(onErrored).toHaveBeenCalledTimes(1);
-        expect(recaptchaReset).toHaveBeenCalledTimes(1);
+        expect(reset).toHaveBeenCalledWith(7);
     });
 
     it('renders hCaptcha and forwards events', async () => {
+        const reset = vi.fn();
+        const remove = vi.fn();
+        let renderOptions: HcaptchaRenderOptions | null = null;
+        const renderWidget = vi.fn((container: HTMLElement, options: HcaptchaRenderOptions) => {
+            renderOptions = options;
+            container.dataset.rendered = 'true';
+            return 'widget-id';
+        });
+
+        (window as typeof window & {hcaptcha?: unknown}).hcaptcha = {
+            render: renderWidget,
+            reset,
+            remove,
+        };
 
         const onChange = vi.fn();
         const onExpired = vi.fn();
@@ -96,6 +114,7 @@ describe('CaptchaChallenge', () => {
                 ref={ref}
                 provider="HCAPTCHA"
                 siteKey="hcaptcha-site"
+                theme="light"
                 onChange={onChange}
                 onExpired={onExpired}
                 onErrored={onErrored}
@@ -103,29 +122,24 @@ describe('CaptchaChallenge', () => {
         );
 
         await waitFor(() => {
-            expect(hcaptchaProps).not.toBeNull();
+            expect(renderWidget).toHaveBeenCalled();
         });
 
-        const props = hcaptchaProps as {
-            sitekey: string;
-            onVerify?: (token: string | null) => void;
-            onExpire?: () => void;
-            onError?: (error: unknown) => void;
-            onClose?: () => void;
-        };
+        expect(renderWidget).toHaveBeenCalledTimes(1);
+        expect(renderWidget.mock.calls[0][0]).toBeInstanceOf(HTMLElement);
+        expect(renderOptions?.sitekey).toBe('hcaptcha-site');
+        expect(renderOptions?.theme).toBe('light');
 
-        expect(props.sitekey).toBe('hcaptcha-site');
-
-        props.onVerify?.('hcaptcha-token');
-        props.onExpire?.();
-        props.onError?.('bad-request');
-        props.onClose?.();
+        renderOptions?.callback?.('hcaptcha-token');
+        renderOptions?.['expired-callback']?.();
+        renderOptions?.['error-callback']?.('bad-request');
+        renderOptions?.['close-callback']?.();
         ref.current?.reset();
 
         expect(onChange).toHaveBeenCalledWith('hcaptcha-token');
         expect(onExpired).toHaveBeenCalledTimes(2);
         expect(onErrored).toHaveBeenCalledWith('bad-request');
-        expect(hcaptchaReset).toHaveBeenCalledTimes(1);
+        expect(reset).toHaveBeenCalledWith('widget-id');
     });
 
     it('renders nothing when disabled', () => {

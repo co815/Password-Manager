@@ -1,6 +1,4 @@
-import {forwardRef, useImperativeHandle, useMemo, useRef, type CSSProperties} from 'react';
-import HCaptcha, {type HCaptchaHandle} from '@hcaptcha/react-hcaptcha';
-import ReCAPTCHA from 'react-google-recaptcha';
+import {forwardRef, useEffect, useImperativeHandle, useMemo, useRef, type CSSProperties} from 'react';
 
 import type {CaptchaProvider} from '../../lib/api';
 
@@ -17,6 +15,82 @@ interface CaptchaChallengeProps {
     onErrored: (message?: string) => void;
 }
 
+type CaptchaWindow = Window & {
+    grecaptcha?: {
+        ready?(cb: () => void): void;
+        render(container: HTMLElement, parameters: Record<string, unknown>): number;
+        reset(id?: number): void;
+        remove?(id?: number): void;
+    };
+    hcaptcha?: {
+        render(container: HTMLElement, parameters: Record<string, unknown>): string | number;
+        reset(id?: string | number): void;
+        remove?(id?: string | number): void;
+    };
+};
+
+const RECAPTCHA_SRC = 'https://www.google.com/recaptcha/api.js?render=explicit';
+const HCAPTCHA_SRC = 'https://hcaptcha.com/1/api.js?render=explicit';
+
+const scriptPromises = new Map<string, Promise<void>>();
+
+function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promise<void> {
+    if (typeof window === 'undefined') {
+        return Promise.reject(new Error('Window object is not available.'));
+    }
+
+    const typedWindow = window as CaptchaWindow;
+    if (globalName === 'grecaptcha' && typedWindow.grecaptcha) {
+        return Promise.resolve();
+    }
+    if (globalName === 'hcaptcha' && typedWindow.hcaptcha) {
+        return Promise.resolve();
+    }
+
+    if (scriptPromises.has(src)) {
+        return scriptPromises.get(src)!;
+    }
+
+    const promise = new Promise<void>((resolve, reject) => {
+        const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+
+        const script = existing ?? document.createElement('script');
+        const cleanup = () => {
+            script.removeEventListener('load', handleLoad);
+            script.removeEventListener('error', handleError);
+        };
+        const handleLoad = () => {
+            cleanup();
+            resolve();
+        };
+        const handleError = () => {
+            cleanup();
+            scriptPromises.delete(src);
+            reject(new Error(`Failed to load script: ${src}`));
+        };
+
+        script.addEventListener('load', handleLoad);
+        script.addEventListener('error', handleError);
+
+        if (!existing) {
+            script.async = true;
+            script.defer = true;
+            script.src = src;
+            document.head.appendChild(script);
+        }
+    });
+
+    scriptPromises.set(src, promise);
+    return promise;
+}
+
+function useLatest<T>(value: T) {
+    const ref = useRef(value);
+    ref.current = value;
+    return ref;
+}
+
+
 const WRAPPER_STYLE: CSSProperties = {
     display: 'flex',
     justifyContent: 'center',
@@ -26,91 +100,172 @@ const WRAPPER_STYLE: CSSProperties = {
 
 const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
     ({provider, siteKey, theme, onChange, onExpired, onErrored}, ref) => {
-        const recaptchaRef = useRef<ReCAPTCHA | null>(null);
-        const hcaptchaRef = useRef<HCaptchaHandle | null>(null);
+        const containerRef = useRef<HTMLDivElement | null>(null);
+        const widgetIdRef = useRef<number | string | null>(null);
+        const activeProviderRef = useRef<CaptchaProvider>('NONE');
 
-        useImperativeHandle(
-            ref,
-            () => ({
-                reset() {
+        const onChangeRef = useLatest(onChange);
+        const onExpiredRef = useLatest(onExpired);
+        const onErroredRef = useLatest(onErrored);
+
+        useImperativeHandle(ref, () => ({
+            reset() {
+                if (typeof window === 'undefined') {
+                    return;
+                }
+                const typedWindow = window as CaptchaWindow;
+                if (activeProviderRef.current === 'RECAPTCHA' && widgetIdRef.current != null) {
+                    typedWindow.grecaptcha?.reset(widgetIdRef.current as number);
+                } else if (activeProviderRef.current === 'HCAPTCHA' && widgetIdRef.current != null) {
+                    typedWindow.hcaptcha?.reset(widgetIdRef.current);
+                }
+            },
+        }), []);
+
+        useEffect(() => {
+            if (typeof window === 'undefined') {
+                return undefined;
+            }
+
+            widgetIdRef.current = null;
+            activeProviderRef.current = 'NONE';
+
+            if (!siteKey || provider === 'NONE') {
+                if (containerRef.current) {
+                    containerRef.current.innerHTML = '';
+                }
+                return undefined;
+            }
+
+            let cancelled = false;
+
+            const loadAndRender = async () => {
+                try {
                     if (provider === 'RECAPTCHA') {
-                        recaptchaRef.current?.reset();
+                        await ensureScript(RECAPTCHA_SRC, 'grecaptcha');
+                        if (cancelled) return;
+
+                        const typedWindow = window as CaptchaWindow;
+                        const api = typedWindow.grecaptcha;
+                        if (!api || typeof api.render !== 'function') {
+                            throw new Error('reCAPTCHA could not be initialized.');
+                        }
+
+                        const renderWidget = () => {
+                            if (cancelled || !containerRef.current) return;
+                            containerRef.current.innerHTML = '';
+                            widgetIdRef.current = api.render(containerRef.current, {
+                                sitekey: siteKey,
+                                theme,
+                                callback: (token: string) => {
+                                    onChangeRef.current(token ?? null);
+                                },
+                                'expired-callback': () => {
+                                    onExpiredRef.current();
+                                    onChangeRef.current(null);
+                                },
+                                'error-callback': () => {
+                                    onErroredRef.current();
+                                    onChangeRef.current(null);
+                                },
+                            });
+                            activeProviderRef.current = 'RECAPTCHA';
+                        };
+
+                        if (typeof api.ready === 'function') {
+                            api.ready(renderWidget);
+                        } else {
+                            renderWidget();
+                        }
+                    } else if (provider === 'HCAPTCHA') {
+                        await ensureScript(HCAPTCHA_SRC, 'hcaptcha');
+                        if (cancelled) return;
+
+                        const typedWindow = window as CaptchaWindow;
+                        const api = typedWindow.hcaptcha;
+                        if (!api || typeof api.render !== 'function') {
+                            throw new Error('hCaptcha could not be initialized.');
+                        }
+
+                        if (!containerRef.current) {
+                            return;
+                        }
+
+                        containerRef.current.innerHTML = '';
+                        widgetIdRef.current = api.render(containerRef.current, {
+                            sitekey: siteKey,
+                            theme,
+                            callback: (token: string | null) => {
+                                onChangeRef.current(token ?? null);
+                            },
+                            'expired-callback': () => {
+                                onExpiredRef.current();
+                                onChangeRef.current(null);
+                            },
+                            'error-callback': (error?: string) => {
+                                onErroredRef.current(error);
+                                onChangeRef.current(null);
+                            },
+                            'close-callback': () => {
+                                onExpiredRef.current();
+                                onChangeRef.current(null);
+                            },
+                        });
+                        activeProviderRef.current = 'HCAPTCHA';
+                    }
+                } catch (error) {
+                    if (cancelled) {
                         return;
                     }
-                    if (provider === 'HCAPTCHA') {
-                        hcaptchaRef.current?.resetCaptcha();
-                    }
-                },
-            }),
-            [provider],
-        );
+                    const message = error instanceof Error ? error.message : undefined;
+                    onErroredRef.current(message);
+                }
+            };
 
-        const content = useMemo(() => {
-            if (!siteKey || provider === 'NONE') {
-                return null;
-            }
+            loadAndRender().catch((error) => {
+                if (cancelled) {
+                    return;
+                }
+                const message = error instanceof Error ? error.message : undefined;
+                onErroredRef.current(message);
+            });
+
+            return () => {
+                cancelled = true;
+                if (typeof window === 'undefined') {
+                    return;
+                }
+                const typedWindow = window as CaptchaWindow;
+                if (activeProviderRef.current === 'RECAPTCHA' && widgetIdRef.current != null) {
+                    typedWindow.grecaptcha?.reset(widgetIdRef.current as number);
+                    typedWindow.grecaptcha?.remove?.(widgetIdRef.current as number);
+                } else if (activeProviderRef.current === 'HCAPTCHA' && widgetIdRef.current != null) {
+                    typedWindow.hcaptcha?.reset(widgetIdRef.current);
+                    typedWindow.hcaptcha?.remove?.(widgetIdRef.current);
+                }
+                widgetIdRef.current = null;
+                activeProviderRef.current = 'NONE';
+                if (containerRef.current) {
+                    containerRef.current.innerHTML = '';
+                }
+            };
+        }, [provider, siteKey, theme]);
+
+        const minHeight = useMemo(() => {
             if (provider === 'RECAPTCHA') {
-                return (
-                    <ReCAPTCHA
-                        ref={recaptchaRef}
-                        sitekey={siteKey}
-                        theme={theme}
-                        onChange={(token) => {
-                            onChange(token ?? null);
-                            if (!token) {
-                                onExpired();
-                            }
-                        }}
-                        onExpired={() => {
-                            onExpired();
-                            onChange(null);
-                        }}
-                        onErrored={() => {
-                            onErrored();
-                            onChange(null);
-                        }}
-                    />
-                );
+                return 78;
             }
+            if (provider === 'HCAPTCHA') {
+                return 82;
+            }
+            return undefined;
+        }, [provider]);
 
-
-            return (
-                <HCaptcha
-                    ref={hcaptchaRef}
-                    sitekey={siteKey}
-                    theme={theme}
-                    size="normal"
-                    onVerify={(token) => {
-                        onChange(token ?? null);
-                    }}
-                    onExpire={() => {
-                        onExpired();
-                        onChange(null);
-                    }}
-                    onError={(error) => {
-                        const message = typeof error === 'string' ? error : undefined;
-                        onErrored(message);
-                        onChange(null);
-                    }}
-                    onClose={() => {
-                        onExpired();
-                        onChange(null);
-                    }}
-                />
-            );
-        }, [provider, siteKey, theme, onChange, onExpired, onErrored]);
-
-        if (!content) {
+        if (!siteKey || provider === 'NONE') {
             return null;
         }
 
-        const minHeight = provider === 'RECAPTCHA' ? 78 : undefined;
-
-        return (
-            <div style={{...WRAPPER_STYLE, minHeight}}>
-                {content}
-            </div>
-        );
+        return <div ref={containerRef} style={{...WRAPPER_STYLE, minHeight}}/>;
     },
 );
 
