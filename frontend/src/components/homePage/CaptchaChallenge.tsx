@@ -114,6 +114,21 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
         const containerRef = useRef<HTMLDivElement | null>(null);
         const recaptchaIdRef = useRef<RecaptchaWidgetId>(null);
         const hcaptchaIdRef = useRef<HcaptchaWidgetId>(null);
+        const onChangeRef = useRef(onChange);
+        const onExpiredRef = useRef(onExpired);
+        const onErroredRef = useRef(onErrored);
+
+        useEffect(() => {
+            onChangeRef.current = onChange;
+        }, [onChange]);
+
+        useEffect(() => {
+            onExpiredRef.current = onExpired;
+        }, [onExpired]);
+
+        useEffect(() => {
+            onErroredRef.current = onErrored;
+        }, [onErrored]);
 
         useImperativeHandle(
             ref,
@@ -159,7 +174,7 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                     if (provider === 'RECAPTCHA') {
                         const recaptcha = window.grecaptcha;
                         if (!recaptcha || typeof recaptcha.render !== 'function') {
-                            onErrored('reCAPTCHA is not available.');
+                            onErroredRef.current?.('reCAPTCHA is not available.');
                             return;
                         }
 
@@ -172,26 +187,26 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                                     sitekey: siteKey,
                                     theme,
                                     callback: (token) => {
-                                        onChange(token ?? null);
+                                        onChangeRef.current?.(token ?? null);
                                     },
                                     'error-callback': () => {
-                                        onErrored();
+                                        onErroredRef.current?.();
                                     },
                                     'expired-callback': () => {
-                                        onExpired();
+                                        onExpiredRef.current?.();
                                     },
                                 });
                                 recaptchaIdRef.current = widgetId;
                             } catch (error) {
                                 const message = error instanceof Error ? error.message : undefined;
-                                onErrored(message ?? 'Unable to render the reCAPTCHA widget.');
+                                onErroredRef.current?.(message ?? 'Unable to render the reCAPTCHA widget.');
                             }
                         });
                         return;
                     }
                     const hcaptcha = window.hcaptcha;
                     if (!hcaptcha || typeof hcaptcha.render !== 'function') {
-                        onErrored('hCaptcha is not available.');
+                        onErroredRef.current?.('hCaptcha is not available.');
                         return;
                     }
 
@@ -200,19 +215,19 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                             sitekey: siteKey,
                             theme,
                             callback: (token) => {
-                                onChange(token ?? null);
+                                onChangeRef.current?.(token ?? null);
                             },
                             'error-callback': (error) => {
-                                onErrored(error);
+                                onErroredRef.current?.(error);
                             },
                             'expired-callback': () => {
-                                onExpired();
+                                onExpiredRef.current?.();
                             },
                         });
                         hcaptchaIdRef.current = widgetId;
                     } catch (error) {
                         const message = error instanceof Error ? error.message : undefined;
-                        onErrored(message ?? 'Unable to render the hCaptcha widget.');
+                        onErroredRef.current?.(message ?? 'Unable to render the hCaptcha widget.');
                     }
                 })
                 .catch((error) => {
@@ -233,13 +248,24 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                     }
                 }
             };
-        }, [provider, siteKey, theme, onChange, onErrored, onExpired]);
+        }, [provider, siteKey, theme]);
 
         if (!siteKey || provider === 'NONE') {
             return null;
         }
 
-        return <div ref={containerRef}/>;
+        return (
+            <div
+                ref={containerRef}
+                style={{
+                    minHeight: provider === 'RECAPTCHA' ? 78 : undefined,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: '100%',
+                }}
+            />
+        );
     },
 );
 

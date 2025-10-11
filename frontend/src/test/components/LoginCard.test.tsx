@@ -1,6 +1,6 @@
 import {render, screen} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
-import {forwardRef, type ReactNode} from 'react';
+import {forwardRef, useImperativeHandle, type ReactNode} from 'react';
 import {describe, expect, it, vi} from 'vitest';
 
 import LoginCard from '../../components/homePage/LoginCard';
@@ -28,7 +28,10 @@ vi.mock('../../lib/hooks/useCaptchaConfig', () => ({
 }));
 
 vi.mock('../../components/homePage/CaptchaChallenge', () => ({
-    default: forwardRef((_props, _ref) => <div data-testid="mock-captcha" />),
+    default: forwardRef<Record<string, unknown>, Record<string, unknown>>((_props, ref) => {
+        useImperativeHandle(ref, () => ({reset: vi.fn()}));
+        return <div data-testid="mock-captcha"/>;
+    }),
 }));
 
 function Wrapper({children}: {children: ReactNode}) {
