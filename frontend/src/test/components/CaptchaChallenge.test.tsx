@@ -1,5 +1,5 @@
-import {createRef} from 'react';
-import {render, waitFor} from '@testing-library/react';
+import {StrictMode, createRef} from 'react';
+import {act, render, waitFor} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import CaptchaChallenge, {type CaptchaHandle} from '../../components/homePage/CaptchaChallenge';
@@ -25,19 +25,24 @@ describe('CaptchaChallenge', () => {
     beforeEach(() => {
         delete (window as typeof window & {grecaptcha?: unknown}).grecaptcha;
         delete (window as typeof window & {hcaptcha?: unknown}).hcaptcha;
+        document.head.innerHTML = '';
     });
 
     afterEach(() => {
         delete (window as typeof window & {grecaptcha?: unknown}).grecaptcha;
         delete (window as typeof window & {hcaptcha?: unknown}).hcaptcha;
+        document.head.innerHTML = '';
+        vi.restoreAllMocks();
     });
 
     it('renders reCAPTCHA and forwards events', async () => {
-        const ready = vi.fn((cb: () => void) => cb());
+        const ready = vi.fn<(cb: () => void) => void>((cb) => cb());
         const reset = vi.fn();
         const remove = vi.fn();
         let renderOptions: RecaptchaRenderOptions | null = null;
-        const renderWidget = vi.fn((container: HTMLElement, options: RecaptchaRenderOptions) => {
+        const renderWidget = vi.fn<
+            (container: HTMLElement, options: RecaptchaRenderOptions) => number
+        >((container, options) => {
             renderOptions = options;
             container.dataset.rendered = 'true';
             return 7;
@@ -56,15 +61,17 @@ describe('CaptchaChallenge', () => {
         const ref = createRef<CaptchaHandle>();
 
         render(
-            <CaptchaChallenge
-                ref={ref}
-                provider="RECAPTCHA"
-                siteKey="recaptcha-site"
-                theme="dark"
-                onChange={onChange}
-                onExpired={onExpired}
-                onErrored={onErrored}
-            />,
+            <StrictMode>
+                <CaptchaChallenge
+                    ref={ref}
+                    provider="RECAPTCHA"
+                    siteKey="recaptcha-site"
+                    theme="dark"
+                    onChange={onChange}
+                    onExpired={onExpired}
+                    onErrored={onErrored}
+                />
+            </StrictMode>,
         );
 
         await waitFor(() => {
@@ -74,12 +81,14 @@ describe('CaptchaChallenge', () => {
         expect(ready).toHaveBeenCalledTimes(1);
         expect(renderWidget).toHaveBeenCalledTimes(1);
         expect(renderWidget.mock.calls[0][0]).toBeInstanceOf(HTMLElement);
-        expect(renderOptions?.sitekey).toBe('recaptcha-site');
-        expect(renderOptions?.theme).toBe('dark');
+        expect(renderOptions).not.toBeNull();
+        const recaptchaOptions = renderOptions!;
+        expect(recaptchaOptions.sitekey).toBe('recaptcha-site');
+        expect(recaptchaOptions.theme).toBe('dark');
 
-        renderOptions?.callback?.('recaptcha-token');
-        renderOptions?.['expired-callback']?.();
-        renderOptions?.['error-callback']?.();
+        recaptchaOptions.callback?.('recaptcha-token');
+        recaptchaOptions['expired-callback']?.();
+        recaptchaOptions['error-callback']?.();
         ref.current?.reset();
 
         expect(onChange).toHaveBeenCalledWith('recaptcha-token');
@@ -92,7 +101,9 @@ describe('CaptchaChallenge', () => {
         const reset = vi.fn();
         const remove = vi.fn();
         let renderOptions: HcaptchaRenderOptions | null = null;
-        const renderWidget = vi.fn((container: HTMLElement, options: HcaptchaRenderOptions) => {
+        const renderWidget = vi.fn<
+            (container: HTMLElement, options: HcaptchaRenderOptions) => string
+        >((container, options) => {
             renderOptions = options;
             container.dataset.rendered = 'true';
             return 'widget-id';
@@ -110,15 +121,17 @@ describe('CaptchaChallenge', () => {
         const ref = createRef<CaptchaHandle>();
 
         render(
-            <CaptchaChallenge
-                ref={ref}
-                provider="HCAPTCHA"
-                siteKey="hcaptcha-site"
-                theme="light"
-                onChange={onChange}
-                onExpired={onExpired}
-                onErrored={onErrored}
-            />,
+            <StrictMode>
+                <CaptchaChallenge
+                    ref={ref}
+                    provider="HCAPTCHA"
+                    siteKey="hcaptcha-site"
+                    theme="light"
+                    onChange={onChange}
+                    onExpired={onExpired}
+                    onErrored={onErrored}
+                />
+            </StrictMode>,
         );
 
         await waitFor(() => {
@@ -127,13 +140,15 @@ describe('CaptchaChallenge', () => {
 
         expect(renderWidget).toHaveBeenCalledTimes(1);
         expect(renderWidget.mock.calls[0][0]).toBeInstanceOf(HTMLElement);
-        expect(renderOptions?.sitekey).toBe('hcaptcha-site');
-        expect(renderOptions?.theme).toBe('light');
+        expect(renderOptions).not.toBeNull();
+        const hcaptchaOptions = renderOptions!;
+        expect(hcaptchaOptions.sitekey).toBe('hcaptcha-site');
+        expect(hcaptchaOptions.theme).toBe('light');
 
-        renderOptions?.callback?.('hcaptcha-token');
-        renderOptions?.['expired-callback']?.();
-        renderOptions?.['error-callback']?.('bad-request');
-        renderOptions?.['close-callback']?.();
+        hcaptchaOptions.callback?.('hcaptcha-token');
+        hcaptchaOptions['expired-callback']?.();
+        hcaptchaOptions['error-callback']?.('bad-request');
+        hcaptchaOptions['close-callback']?.();
         ref.current?.reset();
 
         expect(onChange).toHaveBeenCalledWith('hcaptcha-token');
@@ -154,5 +169,71 @@ describe('CaptchaChallenge', () => {
         );
 
         expect(container.firstChild).toBeNull();
+    });
+
+    it('loads the reCAPTCHA script when it is not available yet', async () => {
+        let createdScript: HTMLScriptElement | null = null;
+        const originalCreateElement = document.createElement.bind(document);
+        vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+            const element = originalCreateElement(tagName);
+            if (tagName === 'script') {
+                createdScript = element as HTMLScriptElement;
+            }
+            return element;
+        }) as typeof document.createElement);
+
+        const renderWidget = vi.fn<
+            (container: HTMLElement, options: RecaptchaRenderOptions) => number
+        >((container, options) => {
+            container.dataset.rendered = options.sitekey;
+            return 1;
+        });
+
+        const ready = vi.fn<(cb: () => void) => void>((cb) => cb());
+        const reset = vi.fn();
+        const remove = vi.fn();
+
+        const ref = createRef<CaptchaHandle>();
+        const onChange = vi.fn();
+        const onExpired = vi.fn();
+        const onErrored = vi.fn();
+
+        const view = render(
+            <StrictMode>
+                <CaptchaChallenge
+                    ref={ref}
+                    provider="RECAPTCHA"
+                    siteKey="recaptcha-site"
+                    theme="light"
+                    onChange={onChange}
+                    onExpired={onExpired}
+                    onErrored={onErrored}
+                />
+            </StrictMode>,
+        );
+
+        expect(createdScript).not.toBeNull();
+        const scriptEl = createdScript!;
+        expect(scriptEl.getAttribute('data-captcha-src')).toBe('https://www.google.com/recaptcha/api.js?render=explicit');
+        expect(scriptEl.dataset.captchaLoaded).toBe('false');
+
+        (window as typeof window & {grecaptcha?: unknown}).grecaptcha = {
+            ready,
+            render: renderWidget,
+            reset,
+            remove,
+        };
+
+        await act(async () => {
+            scriptEl.dispatchEvent(new Event('load'));
+            await Promise.resolve();
+        });
+
+        await waitFor(() => {
+            expect(renderWidget).toHaveBeenCalledTimes(1);
+        });
+
+        expect(scriptEl.dataset.captchaLoaded).toBe('true');
+        view.unmount();
     });
 });

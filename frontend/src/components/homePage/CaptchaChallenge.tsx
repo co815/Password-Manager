@@ -34,6 +34,16 @@ const HCAPTCHA_SRC = 'https://hcaptcha.com/1/api.js?render=explicit';
 
 const scriptPromises = new Map<string, Promise<void>>();
 
+function getExistingScript(src: string): HTMLScriptElement | null {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+    return (
+        document.querySelector<HTMLScriptElement>(`script[data-captcha-src="${src}"]`)
+        ?? document.querySelector<HTMLScriptElement>(`script[src="${src}"]`)
+    );
+}
+
 function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promise<void> {
     if (typeof window === 'undefined') {
         return Promise.reject(new Error('Window object is not available.'));
@@ -51,9 +61,12 @@ function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promi
         return scriptPromises.get(src)!;
     }
 
-    const promise = new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+    const existing = getExistingScript(src);
+    if (existing?.dataset.captchaLoaded === 'true') {
+        return Promise.resolve();
+    }
 
+    const promise = new Promise<void>((resolve, reject) => {
         const script = existing ?? document.createElement('script');
         const cleanup = () => {
             script.removeEventListener('load', handleLoad);
@@ -61,11 +74,16 @@ function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promi
         };
         const handleLoad = () => {
             cleanup();
+            script.dataset.captchaLoaded = 'true';
             resolve();
         };
         const handleError = () => {
             cleanup();
+            delete script.dataset.captchaLoaded;
             scriptPromises.delete(src);
+            if (script.parentNode) {
+                script.parentNode.removeChild(script);
+            }
             reject(new Error(`Failed to load script: ${src}`));
         };
 
@@ -76,8 +94,23 @@ function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promi
             script.async = true;
             script.defer = true;
             script.src = src;
+            script.dataset.captchaLoaded = 'false';
+            script.setAttribute('data-captcha-src', src);
             document.head.appendChild(script);
-        }
+        } else {
+            script.async = true;
+            script.defer = true;
+            script.setAttribute('data-captcha-src', src);
+            if (script.dataset.captchaLoaded !== 'true') {
+                script.dataset.captchaLoaded = 'false';
+            }
+            if (script.src !== src) {
+                script.src = src;
+            } else if (script.dataset.captchaLoaded === 'false') {
+                // Retry the download by forcing a new request.
+                script.src = '';
+                script.src = src;
+            }
     });
 
     scriptPromises.set(src, promise);
