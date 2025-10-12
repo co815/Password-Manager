@@ -111,13 +111,15 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         error: captchaConfigError,
         refresh: reloadCaptchaConfig,
     } = useCaptchaConfig();
+    const rawCaptchaProvider = captchaConfig?.provider ?? 'NONE';
+    const hasSiteKey = Boolean(captchaConfig?.siteKey && captchaConfig.siteKey.trim());
     const captchaEnabled = Boolean(
         captchaConfig?.enabled
-        && captchaConfig.provider !== 'NONE'
-        && captchaConfig.siteKey
+        && rawCaptchaProvider !== 'NONE'
+        && (rawCaptchaProvider === 'GENERIC' || hasSiteKey)
     );
     const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
-    const captchaProvider = captchaEnabled ? captchaConfig?.provider ?? 'NONE' : 'NONE';
+    const captchaProvider = captchaEnabled ? rawCaptchaProvider : 'NONE';
 
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
     const disabled = busy

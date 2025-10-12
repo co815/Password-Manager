@@ -10,7 +10,8 @@ public class CaptchaProps {
     public enum Provider {
         NONE,
         RECAPTCHA,
-        HCAPTCHA
+        HCAPTCHA,
+        GENERIC
     }
 
     private Provider provider = Provider.NONE;
@@ -49,7 +50,7 @@ public class CaptchaProps {
         return switch (provider) {
             case RECAPTCHA -> "https://www.google.com/recaptcha/api/siteverify";
             case HCAPTCHA -> "https://hcaptcha.com/siteverify";
-            case NONE -> "";
+            case GENERIC, NONE -> "";
         };
     }
 

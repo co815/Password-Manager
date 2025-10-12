@@ -115,14 +115,15 @@ export default function SignupCard({onSwitchToLogin}: Props) {
         error: captchaConfigError,
         refresh: reloadCaptchaConfig,
     } = useCaptchaConfig();
+    const rawCaptchaProvider = captchaConfig?.provider ?? 'NONE';
+    const hasSiteKey = Boolean(captchaConfig?.siteKey && captchaConfig.siteKey.trim());
     const captchaEnabled = Boolean(
         captchaConfig?.enabled
-        && captchaConfig?.provider
-        && captchaConfig.provider !== 'NONE'
-        && captchaConfig.siteKey
+        && rawCaptchaProvider !== 'NONE'
+        && (rawCaptchaProvider === 'GENERIC' || hasSiteKey)
     );
     const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
-    const captchaProvider = captchaEnabled ? captchaConfig?.provider ?? 'NONE' : 'NONE';
+    const captchaProvider = captchaEnabled ? rawCaptchaProvider : 'NONE';
     const disabled =
         busy
         || captchaLoading

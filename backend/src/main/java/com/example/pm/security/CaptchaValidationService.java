@@ -37,6 +37,15 @@ public class CaptchaValidationService {
             return true;
         }
 
+        if (captchaProps.getProvider() == CaptchaProps.Provider.GENERIC) {
+            String expected = captchaProps.getSecretKey();
+            if (expected == null || expected.isBlank()) {
+                expected = "human";
+            }
+            String trimmedToken = token == null ? "" : token.trim();
+            return !trimmedToken.isEmpty() && expected.equalsIgnoreCase(trimmedToken);
+        }
+
         if (captchaProps.getSecretKey() == null || captchaProps.getSecretKey().isBlank()) {
             log.warn("Captcha provider {} enabled without secret key", captchaProps.getProvider());
             return false;

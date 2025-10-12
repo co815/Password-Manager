@@ -38,4 +38,17 @@ class CaptchaControllerTest {
                 .andExpect(jsonPath("$.provider").value("RECAPTCHA"))
                 .andExpect(jsonPath("$.siteKey").value("site-key-123"));
     }
+
+    @Test
+    void returnsDefaultPromptWhenGenericCaptchaEnabled() throws Exception {
+        CaptchaProps props = new CaptchaProps();
+        props.setProvider(CaptchaProps.Provider.GENERIC);
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new CaptchaController(props)).build();
+
+        mockMvc.perform(get("/api/auth/captcha/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.provider").value("GENERIC"))
+                .andExpect(jsonPath("$.siteKey").value("Type the word HUMAN to verify you are not a bot."));
+    }
 }

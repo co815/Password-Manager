@@ -247,7 +247,7 @@ export interface SaltResponse {
     saltClient: string;
 }
 
-export type CaptchaProvider = 'NONE' | 'RECAPTCHA' | 'HCAPTCHA';
+export type CaptchaProvider = 'NONE' | 'RECAPTCHA' | 'HCAPTCHA' | 'GENERIC';
 
 export interface CaptchaConfigResponse {
     enabled: boolean;

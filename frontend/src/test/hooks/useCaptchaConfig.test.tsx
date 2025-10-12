@@ -71,4 +71,25 @@ describe('useCaptchaConfig', () => {
         expect(final?.config?.siteKey).toBeNull();
         expect(final?.config?.enabled).toBe(false);
     });
+
+    it('enables generic captcha even without a site key', async () => {
+        const getCaptchaConfig = api.getCaptchaConfig as Mock;
+        getCaptchaConfig.mockResolvedValue({
+            enabled: true,
+            provider: 'GENERIC',
+            siteKey: '   ',
+        });
+
+        const updates: CaptchaConfig[] = [];
+        render(<Consumer onUpdate={(value) => updates.push(value)} />);
+
+        await waitFor(() => {
+            expect(updates.at(-1)?.loading).toBe(false);
+        });
+
+        const final = updates.at(-1);
+        expect(final?.config?.provider).toBe('GENERIC');
+        expect(final?.config?.siteKey).toBeNull();
+        expect(final?.config?.enabled).toBe(true);
+    });
 });

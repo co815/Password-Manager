@@ -18,14 +18,30 @@ public class CaptchaController {
 
     @GetMapping("/config")
     public CaptchaConfigResponse config() {
-        boolean enabled = captchaProps.isEnabled()
-                && captchaProps.getSiteKey() != null
-                && !captchaProps.getSiteKey().isBlank();
-        String siteKey = enabled ? captchaProps.getSiteKey() : null;
+        boolean enabled = captchaProps.isEnabled();
+        String siteKey = null;
+
+        if (enabled) {
+            if (captchaProps.getProvider() == CaptchaProps.Provider.GENERIC) {
+                siteKey = sanitizePrompt(captchaProps.getSiteKey());
+            } else {
+                String configuredSiteKey = captchaProps.getSiteKey();
+                enabled = configuredSiteKey != null && !configuredSiteKey.isBlank();
+                siteKey = enabled ? configuredSiteKey : null;
+            }
+        }
+
         return new CaptchaConfigResponse(
                 enabled,
                 captchaProps.getProvider(),
                 siteKey
         );
+    }
+
+    private String sanitizePrompt(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "Type the word HUMAN to verify you are not a bot.";
+        }
+        return raw.trim();
     }
 }

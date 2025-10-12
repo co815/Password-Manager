@@ -1,5 +1,5 @@
 import {StrictMode, createRef} from 'react';
-import {act, render, waitFor} from '@testing-library/react';
+import {act, fireEvent, render, waitFor} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import CaptchaChallenge, {type CaptchaHandle} from '../../components/homePage/CaptchaChallenge';
@@ -155,6 +155,53 @@ describe('CaptchaChallenge', () => {
         expect(onExpired).toHaveBeenCalledTimes(2);
         expect(onErrored).toHaveBeenCalledWith('bad-request');
         expect(reset).toHaveBeenCalledWith('widget-id');
+    });
+
+    it('renders generic captcha prompt and validates input', async () => {
+        const onChange = vi.fn();
+        const onExpired = vi.fn();
+        const onErrored = vi.fn();
+        const ref = createRef<CaptchaHandle>();
+
+        const {getByLabelText, getByText} = render(
+            <StrictMode>
+                <CaptchaChallenge
+                    ref={ref}
+                    provider="GENERIC"
+                    siteKey="Type the word banana to continue."
+                    onChange={onChange}
+                    onExpired={onExpired}
+                    onErrored={onErrored}
+                />
+            </StrictMode>,
+        );
+
+        expect(getByText('Type the word banana to continue.')).toBeInTheDocument();
+
+        const input = getByLabelText('Human verification') as HTMLInputElement;
+        expect(onErrored).toHaveBeenCalledWith(undefined);
+
+        fireEvent.blur(input);
+        expect(onErrored).toHaveBeenLastCalledWith('Please provide the requested answer.');
+
+        fireEvent.change(input, {target: {value: 'banana'}});
+        await waitFor(() => {
+            expect(onChange).toHaveBeenLastCalledWith('banana');
+        });
+        expect(onErrored).toHaveBeenLastCalledWith(undefined);
+
+        fireEvent.change(input, {target: {value: ''}});
+        await waitFor(() => {
+            expect(onChange).toHaveBeenLastCalledWith(null);
+        });
+        expect(onExpired).toHaveBeenCalledTimes(1);
+        expect(onErrored).toHaveBeenLastCalledWith('Please provide the requested answer.');
+
+        ref.current?.reset();
+        await waitFor(() => {
+            expect(input.value).toBe('');
+        });
+        expect(onErrored).toHaveBeenLastCalledWith(undefined);
     });
 
     it('renders nothing when disabled', () => {

@@ -1,4 +1,5 @@
-import {forwardRef, useEffect, useImperativeHandle, useMemo, useRef, type CSSProperties} from 'react';
+import {forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type ChangeEvent} from 'react';
+import {Box, TextField, Typography} from '@mui/material';
 
 import type {CaptchaProvider} from '../../lib/api';
 
@@ -31,6 +32,7 @@ type CaptchaWindow = Window & {
 
 const RECAPTCHA_SRC = 'https://www.google.com/recaptcha/api.js?render=explicit';
 const HCAPTCHA_SRC = 'https://hcaptcha.com/1/api.js?render=explicit';
+const DEFAULT_GENERIC_PROMPT = 'Type the word "human" to verify you are not a bot.';
 
 const scriptPromises = new Map<string, Promise<void>>();
 
@@ -107,7 +109,6 @@ function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promi
             if (script.src !== src) {
                 script.src = src;
             } else if (script.dataset.captchaLoaded === 'false') {
-                // Retry the download by forcing a new request.
                 script.src = '';
                 script.src = src;
             }
@@ -132,8 +133,96 @@ const WRAPPER_STYLE: CSSProperties = {
     width: '100%',
 };
 
+interface GenericCaptchaProps {
+    prompt: string;
+    onChange: (token: string | null) => void;
+    onExpired: () => void;
+    onErrored: (message?: string) => void;
+}
+
+const GenericCaptcha = forwardRef<CaptchaHandle, GenericCaptchaProps>(
+    ({prompt, onChange, onExpired, onErrored}, ref) => {
+        const [value, setValue] = useState('');
+        const [touched, setTouched] = useState(false);
+        const wasFilledRef = useRef(false);
+
+        useImperativeHandle(ref, () => ({
+            reset() {
+                setValue('');
+                setTouched(false);
+                wasFilledRef.current = false;
+                onChange(null);
+                onErrored(undefined);
+            },
+        }), [onChange, onErrored]);
+
+        const trimmed = value.trim();
+        const filled = trimmed.length > 0;
+
+        useEffect(() => {
+            onChange(filled ? trimmed : null);
+            if (!filled && wasFilledRef.current) {
+                onExpired();
+            }
+            wasFilledRef.current = filled;
+        }, [filled, trimmed, onChange, onExpired]);
+
+        useEffect(() => {
+            if (!touched) {
+                onErrored(undefined);
+                return;
+            }
+            if (!filled) {
+                onErrored('Please provide the requested answer.');
+            } else {
+                onErrored(undefined);
+            }
+        }, [filled, touched, onErrored]);
+
+        const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+            setValue(event.target.value);
+        };
+
+        const handleBlur = () => {
+            setTouched(true);
+        };
+
+        const showError = touched && !filled;
+
+        return (
+            <Box sx={{display: 'flex', flexDirection: 'column', gap: 1, width: '100%'}}>
+                <Typography variant="body2" color="text.secondary">
+                    {prompt || DEFAULT_GENERIC_PROMPT}
+                </Typography>
+                <TextField
+                    fullWidth
+                    value={value}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    label="Human verification"
+                    placeholder="Type the answer"
+                    error={showError}
+                    helperText={showError ? 'Please provide the requested answer.' : ' '}
+                    autoComplete="off"
+                />
+            </Box>
+        );
+    }
+);
+
 const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
     ({provider, siteKey, theme, onChange, onExpired, onErrored}, ref) => {
+        if (provider === 'GENERIC') {
+            return (
+                <GenericCaptcha
+                    ref={ref}
+                    prompt={siteKey ?? DEFAULT_GENERIC_PROMPT}
+                    onChange={onChange}
+                    onExpired={onExpired}
+                    onErrored={onErrored}
+                />
+            );
+        }
         const containerRef = useRef<HTMLDivElement | null>(null);
         const widgetIdRef = useRef<number | string | null>(null);
         const activeProviderRef = useRef<CaptchaProvider>('NONE');

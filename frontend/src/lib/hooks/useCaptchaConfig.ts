@@ -11,10 +11,16 @@ function normalizeCaptchaConfig(config: CaptchaConfigResponse | null | undefined
         ? 'HCAPTCHA'
         : upper === 'RECAPTCHA'
             ? 'RECAPTCHA'
-            : 'NONE';
+            : upper === 'GENERIC'
+                ? 'GENERIC'
+                : 'NONE';
     const rawSiteKey = typeof config?.siteKey === 'string' ? config.siteKey.trim() : '';
     const siteKey = rawSiteKey ? rawSiteKey : null;
-    const enabled = Boolean(config?.enabled && provider !== 'NONE' && siteKey);
+    const enabled = Boolean(
+        config?.enabled
+        && provider !== 'NONE'
+        && (provider === 'GENERIC' || siteKey)
+    );
     return {enabled, provider, siteKey};
 }
 
