@@ -111,6 +111,7 @@ function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promi
                 script.src = '';
                 script.src = src;
             }
+        }
     });
 
     scriptPromises.set(src, promise);
