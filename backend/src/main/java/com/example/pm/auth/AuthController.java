@@ -75,6 +75,7 @@ public class AuthController {
         this.rateLimiterService = rateLimiterService;
         this.totpService = totpService;
         this.auditService = auditService;
+        this.captchaValidationService = captchaValidationService;
         this.csrfTokenRepository = csrfTokenRepository;
         this.placeholderSaltService = placeholderSaltService;
         this.emailVerificationService = emailVerificationService;

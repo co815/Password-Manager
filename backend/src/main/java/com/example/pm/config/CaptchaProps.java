@@ -38,7 +38,7 @@ public class CaptchaProps {
     }
 
     public String getSiteKey() {
-        return resolveSiteKey();;
+        return resolveSiteKey();
     }
 
     public void setSiteKey(String siteKey) {
