@@ -68,8 +68,8 @@ The authentication endpoints can require a Google reCAPTCHA challenge. To enable
 
    ```bash
    APP_AUTH_CAPTCHA_PROVIDER=recaptcha
-   APP_AUTH_CAPTCHA_SITE_KEY=6LeLxL0nAAAAA2uRyw0h7iZM1IEQIU_WyjlZkiT
-   APP_AUTH_CAPTCHA_SECRET=6LeLxL0nAAAAAGc-FTTi7hK07W2Nfu9j-1if3t0e
+   APP_AUTH_CAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+   APP_AUTH_CAPTCHA_SECRET=6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe
    ```
 
    The backend loads these settings automatically through `spring.config.import` in
