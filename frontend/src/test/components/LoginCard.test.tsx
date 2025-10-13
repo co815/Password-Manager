@@ -90,13 +90,8 @@ describe('LoginCard captcha', () => {
         expect(await screen.findByTestId('mock-captcha')).toBeInTheDocument();
     });
 
-    it('does not reset captcha while typing password but resets after identifier change', async () => {
+    it('allows completing captcha before entering credentials', async () => {
         render(<LoginCard />, {wrapper: Wrapper});
-
-        const emailField = screen.getByLabelText(/Email or username \*/i);
-        const passwordField = screen.getByLabelText(/Master Password \*/i);
-
-        fireEvent.change(emailField, {target: {value: 'user@example.com'}});
 
         const props = captchaMocks.getProps() as {
             onChange?: (token: string | null) => void;
@@ -108,13 +103,33 @@ describe('LoginCard captcha', () => {
 
         expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
 
+        const emailField = screen.getByLabelText(/Email or username \*/i);
+        fireEvent.change(emailField, {target: {value: 'user@example.com'}});
+
+        expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not reset captcha while editing credentials', async () => {
+        render(<LoginCard />, {wrapper: Wrapper});
+
+        const emailField = screen.getByLabelText(/Email or username \*/i);
+        const passwordField = screen.getByLabelText(/Master Password \*/i);
+
+        const props = captchaMocks.getProps() as {
+            onChange?: (token: string | null) => void;
+        } | null;
+
+        await act(async () => {
+            props?.onChange?.('captcha-token');
+        });
+
+        fireEvent.change(emailField, {target: {value: 'user@example.com'}});
+        expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
+
         fireEvent.change(passwordField, {target: {value: 'super-secret'}});
         expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
 
         fireEvent.change(emailField, {target: {value: 'other@example.com'}});
-        expect(captchaMocks.resetSpy).toHaveBeenCalledTimes(1);
-
-        fireEvent.change(emailField, {target: {value: 'another@example.com'}});
-        expect(captchaMocks.resetSpy).toHaveBeenCalledTimes(1);
+        expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
     });
 }); 

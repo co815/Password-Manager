@@ -8,12 +8,12 @@ type CaptchaStateOptions = {
 };
 
 export function useCaptchaChallengeState(options: CaptchaStateOptions = {}) {
-    const {boundValue = null} = options;
+    const {boundValue: _boundValue = null} = options;
+    void _boundValue;
     const captchaRef = useRef<CaptchaHandle | null>(null);
     const missingKeyLoggedRef = useRef(false);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [captchaError, setCaptchaError] = useState<string | null>(null);
-    const [boundTokenValue, setBoundTokenValue] = useState<string | null>(null);
 
     const {
         config: captchaConfig,
@@ -37,7 +37,6 @@ export function useCaptchaChallengeState(options: CaptchaStateOptions = {}) {
         captchaRef.current?.reset();
         setCaptchaToken(null);
         setCaptchaError(null);
-        setBoundTokenValue(null);
     }, []);
 
     useEffect(() => {
@@ -59,36 +58,12 @@ export function useCaptchaChallengeState(options: CaptchaStateOptions = {}) {
         }
     }, [captchaConfig, captchaLoading, hasSiteKey]);
 
-    useEffect(() => {
-        if (!captchaEnabled) {
-            return;
-        }
-        if (!boundValue) {
-            if (boundTokenValue !== null) {
-                setBoundTokenValue(null);
-            }
-            if (captchaToken) {
-                resetCaptcha();
-            }
-            return;
-        }
-        if (!captchaToken) {
-            return;
-        }
-        if (boundTokenValue && boundTokenValue !== boundValue) {
-            resetCaptcha();
-        }
-    }, [boundTokenValue, boundValue, captchaEnabled, captchaToken, resetCaptcha]);
-
     const setTokenAndClearError = useCallback((token: string | null) => {
         setCaptchaToken(token);
         if (token) {
             setCaptchaError(null);
-            if (boundValue) {
-                setBoundTokenValue(boundValue);
-            }
         }
-    }, [boundValue]);
+    }, []);
 
     return {
         captchaEnabled,
