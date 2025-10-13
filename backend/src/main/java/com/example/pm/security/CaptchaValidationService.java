@@ -1,6 +1,8 @@
 package com.example.pm.security;
 
 import com.example.pm.config.CaptchaProps;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,7 +67,7 @@ public class CaptchaValidationService {
             boolean ok = response != null && response.success();
             if (!ok) {
                 log.info("Captcha validation rejected for provider {}: {}", captchaProps.getProvider(),
-                        response == null ? "null response" : String.join(",", response.errorCodes() == null ? List.of() : response.errorCodes()));
+                        response == null ? "null response" : String.join(",", response.errorCodes()));
             }
             return ok;
         } catch (RestClientException ex) {
@@ -74,6 +76,12 @@ public class CaptchaValidationService {
         }
     }
 
-    record CaptchaResponse(boolean success, List<String> errorCodes) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record CaptchaResponse(@JsonProperty("success") boolean success,
+                           @JsonProperty("error-codes") List<String> errorCodes) {
+
+        CaptchaResponse {
+            errorCodes = errorCodes == null ? List.of() : List.copyOf(errorCodes);
+        }
     }
 }
