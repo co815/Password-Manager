@@ -254,21 +254,15 @@ export default function Dashboard() {
     }, [dek, locked]);
 
     useEffect(() => {
-        console.log("useEffect triggered", {dek, user});
-
         if (!dek) {
-            console.log("No DEK yet → vault still locked");
             return;
         }
         if (!user) {
-            console.log("No authenticated user → not logged in");
             return;
         }
 
         (async () => {
-            console.log("Calling /api/credentials");
             try {
-                console.log("trying to fetch credentials");
                 const {credentials: encCreds}: { credentials: PublicCredential[] } =
                     await api.fetchCredentials();
 

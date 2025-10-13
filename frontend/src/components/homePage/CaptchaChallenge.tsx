@@ -132,7 +132,12 @@ function ensureRecaptchaScript(): Promise<void> {
         script.dataset.captchaLoaded = existing ? existing.dataset.captchaLoaded ?? 'false' : 'false';
         script.setAttribute('data-captcha-src', RECAPTCHA_SRC);
 
-        if (!existing) {
+        const userAgent = typeof navigator !== 'undefined'
+            ? navigator.userAgent.toLowerCase()
+            : '';
+        const isHappyDom = userAgent.includes('happy-dom') || userAgent.includes('happydom');
+
+        if (!existing && !isHappyDom) {
             document.head.appendChild(script);
         } else if (script.dataset.captchaLoaded !== 'false') {
             // Already loaded, nothing else to do.

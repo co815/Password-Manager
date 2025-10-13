@@ -1,11 +1,27 @@
 import {useState, type ReactNode} from 'react';
-import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {configure, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import Dashboard from '../pages/Dashboard';
 import {AuthContext, type AuthContextValue} from '../auth/auth-context';
 import {CryptoContext, type CryptoContextValue} from '../lib/crypto/crypto-context';
 import type {CreateCredentialRequest, PublicCredential, PublicUser} from '../lib/api';
 import {describe, beforeAll, beforeEach, vi, it, expect, type Mock} from 'vitest';
 import {MemoryRouter} from 'react-router-dom';
+import {ThemeProvider, createTheme} from '@mui/material/styles';
+
+const testTheme = createTheme({
+    transitions: {
+        create: () => 'none',
+        duration: {
+            shortest: 0,
+            shorter: 0,
+            short: 0,
+            standard: 0,
+            complex: 0,
+            enteringScreen: 0,
+            leavingScreen: 0,
+        },
+    },
+});
 
 type BufferEncoding = 'utf-8' | 'binary' | 'base64';
 
@@ -28,6 +44,7 @@ const {
     deleteCredentialMock,
     deriveKekMock,
     unwrapDekMock,
+    makeVerifierMock,
 } = vi.hoisted(() => ({
     fetchCredentialsMock: vi.fn(),
     createCredentialMock: vi.fn(),
@@ -35,6 +52,7 @@ const {
     deleteCredentialMock: vi.fn(),
     deriveKekMock: vi.fn(),
     unwrapDekMock: vi.fn(),
+    makeVerifierMock: vi.fn(),
 })) as {
     fetchCredentialsMock: Mock;
     createCredentialMock: Mock;
@@ -42,6 +60,7 @@ const {
     deleteCredentialMock: Mock;
     deriveKekMock: Mock;
     unwrapDekMock: Mock;
+    makeVerifierMock: Mock;
 };
 
 vi.mock('../lib/api', async () => {
@@ -58,19 +77,46 @@ vi.mock('../lib/api', async () => {
     };
 });
 
-vi.mock('../lib/crypto/argon2', async () => {
-    const actual = await vi.importActual<typeof import('../lib/crypto/argon2')>('../lib/crypto/argon2');
-    return {
-        ...actual,
-        deriveKEK: deriveKekMock,
-    };
-});
+vi.mock('../lib/crypto/argon2', () => ({
+    deriveKEK: deriveKekMock,
+    makeVerifier: makeVerifierMock,
+}));
 
-vi.mock('../lib/crypto/unwrap', async () => {
-    const actual = await vi.importActual<typeof import('../lib/crypto/unwrap')>('../lib/crypto/unwrap');
+vi.mock('../lib/crypto/unwrap', () => ({
+    unwrapDEK: unwrapDekMock,
+    unwrapDek: unwrapDekMock,
+}));
+
+vi.mock('@mui/material', async () => {
+    const actual = await vi.importActual<typeof import('@mui/material')>('@mui/material');
+    const Dialog = (props: import('@mui/material').DialogProps) => (
+        <actual.Dialog
+            {...props}
+            TransitionProps={{...(props.TransitionProps ?? {}), timeout: 0}}
+        />
+    );
+
+    const Menu = (props: import('@mui/material').MenuProps) => (
+        <actual.Menu
+            {...props}
+            transitionDuration={0}
+            TransitionProps={{...(props.TransitionProps ?? {}), timeout: 0}}
+        />
+    );
+
+    const Snackbar = (props: import('@mui/material').SnackbarProps) => (
+        <actual.Snackbar
+            {...props}
+            TransitionProps={{...(props.TransitionProps ?? {}), timeout: 0}}
+            autoHideDuration={props.autoHideDuration ?? null}
+        />
+    );
+
     return {
         ...actual,
-        unwrapDEK: unwrapDekMock,
+        Dialog,
+        Menu,
+        Snackbar,
     };
 });
 
@@ -121,9 +167,11 @@ function TestProviders({children, options = {}}: {children: ReactNode; options?:
 
     return (
         <MemoryRouter>
-            <AuthContext.Provider value={authValue}>
-                <CryptoContext.Provider value={cryptoValue}>{children}</CryptoContext.Provider>
-            </AuthContext.Provider>
+            <ThemeProvider theme={testTheme}>
+                <AuthContext.Provider value={authValue}>
+                    <CryptoContext.Provider value={cryptoValue}>{children}</CryptoContext.Provider>
+                </AuthContext.Provider>
+            </ThemeProvider>
         </MemoryRouter>
     );
 }
@@ -145,6 +193,10 @@ function base64Encode(text: string): string {
 
 describe('Dashboard', () => {
     const fakeDek = {} as CryptoKey;
+
+    beforeAll(() => {
+        configure({asyncUtilTimeout: 200});
+    });
 
     beforeAll(() => {
         const cryptoStub = {
@@ -201,6 +253,7 @@ describe('Dashboard', () => {
         deleteCredentialMock.mockReset();
         deriveKekMock.mockReset();
         unwrapDekMock.mockReset();
+        makeVerifierMock.mockReset();
         fetchCredentialsMock.mockResolvedValue({credentials: []});
         createCredentialMock.mockResolvedValue({
             credentialId: 'cred-1',
@@ -223,6 +276,7 @@ describe('Dashboard', () => {
         deleteCredentialMock.mockResolvedValue(undefined);
         deriveKekMock.mockResolvedValue('derived-kek' as unknown as CryptoKey);
         unwrapDekMock.mockResolvedValue(fakeDek);
+        makeVerifierMock.mockResolvedValue('mock-verifier');
     });
 
     it('requests master password when adding a credential without a DEK and unlocks the vault', async () => {

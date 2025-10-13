@@ -103,7 +103,7 @@ describe('LoginCard captcha', () => {
 
         expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
 
-        const emailField = screen.getByLabelText(/Email or username \*/i);
+        const [emailField] = screen.getAllByLabelText(/Email or username \*/i);
         fireEvent.change(emailField, {target: {value: 'user@example.com'}});
 
         expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
@@ -112,8 +112,8 @@ describe('LoginCard captcha', () => {
     it('does not reset captcha while editing credentials', async () => {
         render(<LoginCard />, {wrapper: Wrapper});
 
-        const emailField = screen.getByLabelText(/Email or username \*/i);
-        const passwordField = screen.getByLabelText(/Master Password \*/i);
+        const [emailField] = screen.getAllByLabelText(/Email or username \*/i);
+        const [passwordField] = screen.getAllByLabelText(/Master Password \*/i);
 
         const props = captchaMocks.getProps() as {
             onChange?: (token: string | null) => void;
