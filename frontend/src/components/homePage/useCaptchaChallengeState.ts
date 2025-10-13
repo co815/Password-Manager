@@ -64,18 +64,21 @@ export function useCaptchaChallengeState(options: CaptchaStateOptions = {}) {
             return;
         }
         if (!boundValue) {
-            setBoundTokenValue(null);
+            if (boundTokenValue !== null) {
+                setBoundTokenValue(null);
+            }
+            if (captchaToken) {
+                resetCaptcha();
+            }
             return;
         }
-        if (!boundTokenValue) {
-            setBoundTokenValue(boundValue);
+        if (!captchaToken) {
             return;
         }
-        if (boundTokenValue !== boundValue) {
+        if (boundTokenValue && boundTokenValue !== boundValue) {
             resetCaptcha();
-            setBoundTokenValue(boundValue);
         }
-    }, [boundTokenValue, boundValue, captchaEnabled, resetCaptcha]);
+    }, [boundTokenValue, boundValue, captchaEnabled, captchaToken, resetCaptcha]);
 
     const setTokenAndClearError = useCallback((token: string | null) => {
         setCaptchaToken(token);

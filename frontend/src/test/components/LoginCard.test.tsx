@@ -113,5 +113,8 @@ describe('LoginCard captcha', () => {
 
         fireEvent.change(emailField, {target: {value: 'other@example.com'}});
         expect(captchaMocks.resetSpy).toHaveBeenCalledTimes(1);
+
+        fireEvent.change(emailField, {target: {value: 'another@example.com'}});
+        expect(captchaMocks.resetSpy).toHaveBeenCalledTimes(1);
     });
-});
+}); 

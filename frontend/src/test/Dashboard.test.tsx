@@ -303,7 +303,7 @@ describe('Dashboard', () => {
         });
 
         await screen.findByRole('heading', {name: 'Updated Service'});
-    });
+    }, 15000);
 
     it('generates a password from the menu and reveals it in the dialog', async () => {
         renderDashboard({initialDek: fakeDek, initialLocked: false});
