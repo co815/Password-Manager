@@ -97,6 +97,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
     const [resendBusy, setResendBusy] = useState(false);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [captchaError, setCaptchaError] = useState<string | null>(null);
+    const [captchaBoundIdentifier, setCaptchaBoundIdentifier] = useState<string | null>(null);
 
     const {login} = useAuth();
     const {setDEK, disarm, lockNow} = useCrypto();
@@ -138,12 +139,29 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         setRecoveryCode('');
         setMsg(null);
         setUnverifiedEmail(null);
-        if (captchaEnabled) {
+    }, [trimmedIdentifier]);
+
+    useEffect(() => {
+        if (!captchaEnabled) {
+            setCaptchaBoundIdentifier(null);
+            setCaptchaToken(null);
+            setCaptchaError(null);
+            captchaRef.current?.reset();
+            return;
+        }
+
+        if (
+            captchaBoundIdentifier
+            && trimmedIdentifier
+            && captchaBoundIdentifier !== trimmedIdentifier
+        ) {
+            captchaRef.current?.reset();
+            setCaptchaBoundIdentifier(null);
             captchaRef.current?.reset();
             setCaptchaToken(null);
             setCaptchaError(null);
         }
-    }, [trimmedIdentifier, captchaEnabled]);
+    }, [captchaEnabled, captchaBoundIdentifier, trimmedIdentifier]);
 
     useEffect(() => {
         if (!captchaConfig || captchaLoading) {
@@ -283,6 +301,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         } finally {
             if (captchaEnabled) {
                 captchaRef.current?.reset();
+                setCaptchaBoundIdentifier(null);
                 setCaptchaToken(null);
             }
             setBusy(false);
@@ -333,6 +352,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         if (captchaEnabled) {
             captchaRef.current?.reset();
             setCaptchaToken(null);
+            setCaptchaBoundIdentifier(null);
             setCaptchaError(null);
         }
         onSwitchToSignup?.();
@@ -448,14 +468,22 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                 siteKey={siteKey}
                                 theme={captchaTheme}
                                 onChange={(token) => {
-                                    setCaptchaToken(token ?? null);
-                                    if (token) setCaptchaError(null);
+                                    const normalized = token ?? null;
+                                    setCaptchaToken(normalized);
+                                    if (normalized) {
+                                        setCaptchaBoundIdentifier(trimmedIdentifier);
+                                        setCaptchaError(null);
+                                    } else {
+                                        setCaptchaBoundIdentifier(null);
+                                    }
                                 }}
                                 onExpired={() => {
+                                    setCaptchaBoundIdentifier(null);
                                     setCaptchaToken(null);
                                     setCaptchaError('The CAPTCHA challenge expired. Please try again.');
                                 }}
                                 onErrored={(message) => {
+                                    setCaptchaBoundIdentifier(null);
                                     setCaptchaToken(null);
                                     setCaptchaError(
                                         message

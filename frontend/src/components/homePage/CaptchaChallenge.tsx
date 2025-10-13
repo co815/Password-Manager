@@ -49,6 +49,47 @@ const DEFAULT_GENERIC_PROMPT = 'Type the word "human" to verify you are not a bo
 
 const scriptPromises = new Map<string, Promise<void>>();
 
+function waitForCaptchaApi<T>(
+    getter: () => T | null | undefined,
+    providerLabel: 'reCAPTCHA' | 'hCaptcha' | 'Turnstile',
+    timeoutMs = 5000,
+): Promise<T> {
+    if (typeof window === 'undefined') {
+        return Promise.reject(new Error('Window object is not available.'));
+    }
+
+    const start = Date.now();
+
+    return new Promise<T>((resolve, reject) => {
+        const check = () => {
+            if (typeof window === 'undefined') {
+                reject(new Error('Window object is not available.'));
+                return;
+            }
+
+            try {
+                const value = getter();
+                if (value != null) {
+                    resolve(value);
+                    return;
+                }
+            } catch (error) {
+                reject(error instanceof Error ? error : new Error(String(error)));
+                return;
+            }
+
+            if (Date.now() - start >= timeoutMs) {
+                reject(new Error(`${providerLabel} could not be initialized.`));
+                return;
+            }
+
+            window.setTimeout(check, 50);
+        };
+
+        check();
+    });
+}
+
 function getExistingScript(src: string): HTMLScriptElement | null {
     if (typeof document === 'undefined') {
         return null;
@@ -288,10 +329,15 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                         if (cancelled) return;
 
                         const typedWindow = window as CaptchaWindow;
-                        const api = typedWindow.grecaptcha;
-                        if (!api || typeof api.render !== 'function') {
-                            throw new Error('reCAPTCHA could not be initialized.');
-                        }
+                        const api = await waitForCaptchaApi(
+                            () => {
+                                const candidate = typedWindow.grecaptcha;
+                                return candidate && typeof candidate.render === 'function'
+                                    ? candidate
+                                    : null;
+                            },
+                            'reCAPTCHA',
+                        );
 
                         const renderWidget = () => {
                             if (cancelled || !containerRef.current) return;
@@ -324,10 +370,15 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                         if (cancelled) return;
 
                         const typedWindow = window as CaptchaWindow;
-                        const api = typedWindow.hcaptcha;
-                        if (!api || typeof api.render !== 'function') {
-                            throw new Error('hCaptcha could not be initialized.');
-                        }
+                        const api = await waitForCaptchaApi(
+                            () => {
+                                const candidate = typedWindow.hcaptcha;
+                                return candidate && typeof candidate.render === 'function'
+                                    ? candidate
+                                    : null;
+                            },
+                            'hCaptcha',
+                        );
 
                         if (!containerRef.current) {
                             return;
@@ -359,10 +410,15 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                         if (cancelled) return;
 
                         const typedWindow = window as CaptchaWindow;
-                        const api = typedWindow.turnstile;
-                        if (!api || typeof api.render !== 'function') {
-                            throw new Error('Turnstile could not be initialized.');
-                        }
+                        const api = await waitForCaptchaApi(
+                            () => {
+                                const candidate = typedWindow.turnstile;
+                                return candidate && typeof candidate.render === 'function'
+                                    ? candidate
+                                    : null;
+                            },
+                            'Turnstile',
+                        );
 
                         if (!containerRef.current) {
                             return;

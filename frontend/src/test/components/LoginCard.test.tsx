@@ -1,7 +1,7 @@
-import {render, screen} from '@testing-library/react';
+import {act, fireEvent, render, screen} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
 import {forwardRef, useImperativeHandle, type ReactNode} from 'react';
-import {describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import LoginCard from '../../components/homePage/LoginCard';
 import {AuthContext} from '../../auth/auth-context';
@@ -27,9 +27,24 @@ vi.mock('../../lib/hooks/useCaptchaConfig', () => ({
     }),
 }));
 
+const captchaMocks = vi.hoisted(() => {
+    let latestProps: Record<string, unknown> | null = null;
+    return {
+        setProps: (props: Record<string, unknown>) => {
+            latestProps = props;
+        },
+        getProps: () => latestProps,
+        clearProps: () => {
+            latestProps = null;
+        },
+        resetSpy: vi.fn(),
+    };
+});
+
 vi.mock('../../components/homePage/CaptchaChallenge', () => ({
-    default: forwardRef<Record<string, unknown>, Record<string, unknown>>((_props, ref) => {
-        useImperativeHandle(ref, () => ({reset: vi.fn()}));
+    default: forwardRef<Record<string, unknown>, Record<string, unknown>>((props, ref) => {
+        captchaMocks.setProps(props);
+        useImperativeHandle(ref, () => ({reset: captchaMocks.resetSpy}));
         return <div data-testid="mock-captcha"/>;
     }),
 }));
@@ -64,9 +79,39 @@ function Wrapper({children}: {children: ReactNode}) {
     );
 }
 
+beforeEach(() => {
+    captchaMocks.resetSpy.mockClear();
+    captchaMocks.clearProps();
+});
+
 describe('LoginCard captcha', () => {
     it('renders captcha challenge when enabled', async () => {
         render(<LoginCard />, {wrapper: Wrapper});
         expect(await screen.findByTestId('mock-captcha')).toBeInTheDocument();
+    });
+
+    it('does not reset captcha while typing password but resets after identifier change', async () => {
+        render(<LoginCard />, {wrapper: Wrapper});
+
+        const emailField = screen.getByLabelText(/Email or username \*/i);
+        const passwordField = screen.getByLabelText(/Master Password \*/i);
+
+        fireEvent.change(emailField, {target: {value: 'user@example.com'}});
+
+        const props = captchaMocks.getProps() as {
+            onChange?: (token: string | null) => void;
+        } | null;
+
+        await act(async () => {
+            props?.onChange?.('captcha-token');
+        });
+
+        expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
+
+        fireEvent.change(passwordField, {target: {value: 'super-secret'}});
+        expect(captchaMocks.resetSpy).not.toHaveBeenCalled();
+
+        fireEvent.change(emailField, {target: {value: 'other@example.com'}});
+        expect(captchaMocks.resetSpy).toHaveBeenCalledTimes(1);
     });
 });
