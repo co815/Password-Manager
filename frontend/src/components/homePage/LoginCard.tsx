@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {
     Alert,
     Box,
@@ -13,7 +13,7 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
-import {useTheme, type Theme} from '@mui/material/styles';
+import {useTheme} from '@mui/material/styles';
 import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import PhonelinkLock from '@mui/icons-material/PhonelinkLock';
@@ -27,56 +27,9 @@ import {makeVerifier, deriveKEK} from '../../lib/crypto/argon2';
 import {unwrapDEK} from '../../lib/crypto/unwrap';
 import {useAuth} from '../../auth/auth-context';
 import {useCrypto} from '../../lib/crypto/crypto-context';
-import useCaptchaConfig from '../../lib/hooks/useCaptchaConfig';
-import CaptchaChallenge, {type CaptchaHandle} from './CaptchaChallenge';
-
-const gradientBtn = 'linear-gradient(90deg, #2563eb 0%, #6366f1 50%, #7c3aed 100%)';
-
-const fieldStyles = (theme: Theme) => ({
-    '& .MuiOutlinedInput-root': {
-        backgroundColor:
-            theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.55)' : 'rgba(255,255,255,0.92)',
-        borderRadius: 2.5,
-        color: theme.palette.mode === 'dark' ? '#f8fafc' : theme.palette.text.primary,
-        boxShadow:
-            theme.palette.mode === 'dark'
-                ? '0 10px 30px rgba(15,23,42,0.55)'
-                : '0 18px 38px rgba(79,70,229,0.18)',
-        '& fieldset': {
-            borderColor:
-                theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.45)' : 'rgba(125,140,255,0.4)',
-        },
-        '&:hover fieldset': {
-            borderColor: theme.palette.mode === 'dark' ? 'rgba(129,140,248,0.75)' : 'rgba(99,102,241,0.7)',
-        },
-        '&.Mui-focused': {
-            boxShadow:
-                theme.palette.mode === 'dark'
-                    ? '0 0 0 3px rgba(129,140,248,0.28)'
-                    : '0 0 0 3px rgba(79,70,229,0.22)',
-        },
-        '&.Mui-focused fieldset': {
-            borderColor: theme.palette.mode === 'dark' ? '#a5b4fc' : '#6366f1',
-        },
-        '& .MuiOutlinedInput-input': {
-            color: theme.palette.mode === 'dark' ? '#f8fafc' : theme.palette.text.primary,
-            fontWeight: 500,
-        },
-        '& .MuiSvgIcon-root': {
-            color: theme.palette.mode === 'dark' ? '#c7d2fe' : '#4f46e5',
-        },
-        '& .MuiIconButton-root': {
-            color: theme.palette.mode === 'dark' ? '#c7d2fe' : '#4f46e5',
-        },
-    },
-    '& .MuiInputLabel-root': {
-        color: theme.palette.mode === 'dark' ? 'rgba(226,232,240,0.75)' : 'rgba(30,41,59,0.7)',
-        '&.Mui-focused': {
-            color: theme.palette.mode === 'dark' ? '#c7d2fe' : '#4338ca',
-        },
-        fontWeight: 500,
-    },
-});
+import CaptchaChallenge from './CaptchaChallenge';
+import {authButtonStyles, createFieldStyles} from './authStyles';
+import {useCaptchaChallengeState} from './useCaptchaChallengeState';
 
 type Props = {
     onSuccess?: (user: PublicUser, mp: string) => void;
@@ -95,35 +48,27 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
     const [recoveryCode, setRecoveryCode] = useState('');
     const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
     const [resendBusy, setResendBusy] = useState(false);
-    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-    const [captchaError, setCaptchaError] = useState<string | null>(null);
-    const [captchaBoundIdentifier, setCaptchaBoundIdentifier] = useState<string | null>(null);
 
     const {login} = useAuth();
     const {setDEK, disarm, lockNow} = useCrypto();
     const navigate = useNavigate();
-    const captchaRef = useRef<CaptchaHandle | null>(null);
-    const missingKeyLoggedRef = useRef(false);
     const theme = useTheme();
     const captchaTheme = theme.palette.mode === 'dark' ? 'dark' : 'light';
-
-    const {
-        config: captchaConfig,
-        loading: captchaLoading,
-        error: captchaConfigError,
-        refresh: reloadCaptchaConfig,
-    } = useCaptchaConfig();
-    const rawCaptchaProvider = captchaConfig?.provider ?? 'NONE';
-    const hasSiteKey = Boolean(captchaConfig?.siteKey && captchaConfig.siteKey.trim());
-    const captchaEnabled = Boolean(
-        captchaConfig?.enabled
-        && rawCaptchaProvider === 'RECAPTCHA'
-        && hasSiteKey
-    );
-    const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
-    const captchaProvider = captchaEnabled ? rawCaptchaProvider : 'NONE';
-
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
+    const {
+        captchaEnabled,
+        captchaProvider,
+        siteKey,
+        captchaLoading,
+        captchaConfigError,
+        reloadCaptchaConfig,
+        captchaRef,
+        captchaToken,
+        setCaptchaToken,
+        captchaError,
+        setCaptchaError,
+        resetCaptcha,
+    } = useCaptchaChallengeState({boundValue: trimmedIdentifier || null});
     const disabled = busy
         || captchaLoading
         || Boolean(captchaConfigError)
@@ -140,37 +85,6 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         setMsg(null);
         setUnverifiedEmail(null);
     }, [trimmedIdentifier]);
-
-    useEffect(() => {
-        if (!captchaEnabled) {
-            setCaptchaBoundIdentifier(null);
-            setCaptchaToken(null);
-            setCaptchaError(null);
-            captchaRef.current?.reset();
-            return;
-        }
-
-        if (
-            captchaBoundIdentifier
-            && trimmedIdentifier
-            && captchaBoundIdentifier !== trimmedIdentifier
-        ) {
-            captchaRef.current?.reset();
-            setCaptchaBoundIdentifier(null);
-            setCaptchaToken(null);
-            setCaptchaError(null);
-        }
-    }, [captchaEnabled, captchaBoundIdentifier, trimmedIdentifier]);
-
-    useEffect(() => {
-        if (!captchaConfig || captchaLoading) {
-            return;
-        }
-        if (captchaConfig.provider === 'RECAPTCHA' && !hasSiteKey && !missingKeyLoggedRef.current) {
-            missingKeyLoggedRef.current = true;
-            console.error('[CAPTCHA] Missing site key for provider %s. Check RECAPTCHA_SITE_KEY or backend configuration.', captchaConfig.provider);
-        }
-    }, [captchaConfig, captchaLoading, hasSiteKey]);
 
     async function handleSubmit() {
         if (disabled) {
@@ -299,9 +213,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
             }
         } finally {
             if (captchaEnabled) {
-                captchaRef.current?.reset();
-                setCaptchaBoundIdentifier(null);
-                setCaptchaToken(null);
+                resetCaptcha();
             }
             setBusy(false);
         }
@@ -349,10 +261,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         setRecoveryCode('');
         setMsg(null);
         if (captchaEnabled) {
-            captchaRef.current?.reset();
-            setCaptchaToken(null);
-            setCaptchaBoundIdentifier(null);
-            setCaptchaError(null);
+            resetCaptcha();
         }
         onSwitchToSignup?.();
     };
@@ -391,7 +300,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                 </Stack>
 
                 <Stack spacing={2}>
-                    <FormControl fullWidth variant="outlined" sx={(theme) => fieldStyles(theme)}>
+                    <FormControl fullWidth variant="outlined" sx={(theme) => createFieldStyles(theme)}>
                         <InputLabel htmlFor="login-identifier">Email or Username *</InputLabel>
                         <OutlinedInput
                             id="login-identifier"
@@ -408,7 +317,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                         />
                     </FormControl>
 
-                    <FormControl fullWidth variant="outlined" sx={(theme) => fieldStyles(theme)}>
+                    <FormControl fullWidth variant="outlined" sx={(theme) => createFieldStyles(theme)}>
                         <InputLabel htmlFor="login-password">Master Password *</InputLabel>
                         <OutlinedInput
                             id="login-password"
@@ -467,22 +376,13 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                 siteKey={siteKey}
                                 theme={captchaTheme}
                                 onChange={(token) => {
-                                    const normalized = token ?? null;
-                                    setCaptchaToken(normalized);
-                                    if (normalized) {
-                                        setCaptchaBoundIdentifier(trimmedIdentifier);
-                                        setCaptchaError(null);
-                                    } else {
-                                        setCaptchaBoundIdentifier(null);
-                                    }
+                                    setCaptchaToken(token ?? null);
                                 }}
                                 onExpired={() => {
-                                    setCaptchaBoundIdentifier(null);
                                     setCaptchaToken(null);
                                     setCaptchaError('The CAPTCHA challenge expired. Please try again.');
                                 }}
                                 onErrored={(message) => {
-                                    setCaptchaBoundIdentifier(null);
                                     setCaptchaToken(null);
                                     setCaptchaError(
                                         message
@@ -501,7 +401,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                 Enter a verification code from your authenticator app or a recovery code to finish
                                 signing in.
                             </Typography>
-                            <FormControl fullWidth variant="outlined" sx={(theme) => fieldStyles(theme)}>
+                    <FormControl fullWidth variant="outlined" sx={(theme) => createFieldStyles(theme)}>
                                 <InputLabel htmlFor="login-mfa-code">Authenticator code</InputLabel>
                                 <OutlinedInput
                                     id="login-mfa-code"
@@ -526,7 +426,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                             <Typography variant="caption" sx={{textAlign: 'center', opacity: 0.8}}>
                                 or
                             </Typography>
-                            <FormControl fullWidth variant="outlined" sx={(theme) => fieldStyles(theme)}>
+                    <FormControl fullWidth variant="outlined" sx={(theme) => createFieldStyles(theme)}>
                                 <InputLabel htmlFor="login-recovery-code">Recovery code</InputLabel>
                                 <OutlinedInput
                                     id="login-recovery-code"
@@ -556,17 +456,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                     <Button
                         onClick={handleSubmit}
                         disabled={disabled}
-                        sx={{
-                            py: 1.25,
-                            borderRadius: 3,
-                            fontWeight: 800,
-                            textTransform: 'none',
-                            background: gradientBtn,
-                            color: '#fff',
-                            boxShadow: '0 14px 32px rgba(99,102,241,0.35)',
-                            '&:hover': {background: gradientBtn, opacity: 0.95},
-                            '&.Mui-disabled': {background: gradientBtn, opacity: 0.55},
-                        }}
+                        sx={authButtonStyles}
                         variant="contained"
                     >
                         {busy ? <CircularProgress size={22} sx={{color: '#fff'}}/> : 'Log in'}
