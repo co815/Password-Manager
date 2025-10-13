@@ -59,6 +59,27 @@ The backend defaults to `localhost:1025`, which matches MailHog's SMTP listener.
 
 If the SMTP server cannot be reached, the backend now logs the verification link at `INFO` level so you can still confirm accounts during development or troubleshooting.
 
+## Configuring Google reCAPTCHA
+
+The authentication endpoints can require a Google reCAPTCHA challenge. To enable it:
+
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Keep the following variables (replace the values with your own keys when deploying):
+
+   ```bash
+   APP_AUTH_CAPTCHA_PROVIDER=recaptcha
+   APP_AUTH_CAPTCHA_SITE_KEY=6LeLxL0nAAAAA2uRyw0h7iZM1IEQIU_WyjlZkiT
+   APP_AUTH_CAPTCHA_SECRET=6LeLxL0nAAAAAGc-FTTi7hK07W2Nfu9j-1if3t0e
+   ```
+
+   The backend loads these settings automatically through `spring.config.import` in
+   `application.yml`. When running the backend locally (for example with `mvn spring-boot:run`),
+   the `.env` file in the `backend` directory is read automatically.
+3. Restart the backend.
+
+Once configured, the frontend requests `/api/auth/captcha/config` during login and signup to
+obtain the site key and render the challenge.
+
 ## Backend build proxy configuration
 
 The Maven wrapper reads additional options from `backend/.mvn/maven.config`.  By default the
