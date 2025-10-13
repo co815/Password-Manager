@@ -37,19 +37,6 @@ public class CaptchaValidationService {
             return true;
         }
 
-        if (captchaProps.getProvider() == CaptchaProps.Provider.GENERIC) {
-            String expected = captchaProps.getSecretKey();
-            if (expected == null || expected.isBlank()) {
-                expected = "human";
-            }
-            String trimmedToken = token == null ? "" : token.trim();
-            boolean ok = !trimmedToken.isEmpty() && expected.equalsIgnoreCase(trimmedToken);
-            if (!ok) {
-                log.info("Captcha validation rejected for provider {}: expected generic prompt match", captchaProps.getProvider());
-            }
-            return ok;
-        }
-
         String secret = captchaProps.getSecretKey();
         if (secret == null || secret.isBlank()) {
             log.warn("Captcha provider {} enabled without secret key", captchaProps.getProvider());

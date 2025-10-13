@@ -28,7 +28,7 @@ app:
     captcha:
       provider: ${APP_AUTH_CAPTCHA_PROVIDER:none}
       site-key: ${APP_AUTH_CAPTCHA_SITE_KEY:}
-      secret-key: ${APP_AUTH_CAPTCHA_SECRET:human}
+      secret-key: ${APP_AUTH_CAPTCHA_SECRET:}
       verify-url: ${APP_AUTH_CAPTCHA_VERIFY_URL:}
     rate-limit:
       trusted-proxies: [ ]

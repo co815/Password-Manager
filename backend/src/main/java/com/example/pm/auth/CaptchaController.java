@@ -22,14 +22,9 @@ public class CaptchaController {
         String siteKey = null;
 
         if (enabled) {
-            CaptchaProps.Provider provider = captchaProps.getProvider();
-            if (provider == CaptchaProps.Provider.GENERIC) {
-                siteKey = sanitizePrompt(captchaProps.getSiteKey());
-            } else {
-                String configuredSiteKey = captchaProps.getSiteKey();
-                enabled = configuredSiteKey != null && !configuredSiteKey.isBlank();
-                siteKey = enabled && configuredSiteKey != null ? configuredSiteKey.trim() : null;
-            }
+            String configuredSiteKey = captchaProps.getSiteKey();
+            enabled = configuredSiteKey != null && !configuredSiteKey.isBlank();
+            siteKey = enabled && configuredSiteKey != null ? configuredSiteKey.trim() : null;
         }
 
         return new CaptchaConfigResponse(
@@ -37,12 +32,5 @@ public class CaptchaController {
                 captchaProps.getProvider(),
                 siteKey
         );
-    }
-
-    private String sanitizePrompt(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return "Type the word HUMAN to verify you are not a bot.";
-        }
-        return raw.trim();
     }
 }

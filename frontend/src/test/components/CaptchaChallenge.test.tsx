@@ -1,5 +1,5 @@
 import {StrictMode, createRef} from 'react';
-import {act, fireEvent, render, waitFor} from '@testing-library/react';
+import {act, render, waitFor} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import CaptchaChallenge, {type CaptchaHandle} from '../../components/homePage/CaptchaChallenge';
@@ -12,25 +12,14 @@ type RecaptchaRenderOptions = {
     'error-callback'?: () => void;
 };
 
-type HcaptchaRenderOptions = {
-    sitekey: string;
-    theme?: string;
-    callback?: (token: string | null) => void;
-    'expired-callback'?: () => void;
-    'error-callback'?: (error?: string) => void;
-    'close-callback'?: () => void;
-};
-
 describe('CaptchaChallenge', () => {
     beforeEach(() => {
         delete (window as typeof window & {grecaptcha?: unknown}).grecaptcha;
-        delete (window as typeof window & {hcaptcha?: unknown}).hcaptcha;
         document.head.innerHTML = '';
     });
 
     afterEach(() => {
         delete (window as typeof window & {grecaptcha?: unknown}).grecaptcha;
-        delete (window as typeof window & {hcaptcha?: unknown}).hcaptcha;
         document.head.innerHTML = '';
         vi.restoreAllMocks();
     });
@@ -95,113 +84,6 @@ describe('CaptchaChallenge', () => {
         expect(onExpired).toHaveBeenCalledTimes(1);
         expect(onErrored).toHaveBeenCalledTimes(1);
         expect(reset).toHaveBeenCalledWith(7);
-    });
-
-    it('renders hCaptcha and forwards events', async () => {
-        const reset = vi.fn();
-        const remove = vi.fn();
-        let renderOptions: HcaptchaRenderOptions | null = null;
-        const renderWidget = vi.fn<
-            (container: HTMLElement, options: HcaptchaRenderOptions) => string
-        >((container, options) => {
-            renderOptions = options;
-            container.dataset.rendered = 'true';
-            return 'widget-id';
-        });
-
-        (window as typeof window & {hcaptcha?: unknown}).hcaptcha = {
-            render: renderWidget,
-            reset,
-            remove,
-        };
-
-        const onChange = vi.fn();
-        const onExpired = vi.fn();
-        const onErrored = vi.fn();
-        const ref = createRef<CaptchaHandle>();
-
-        render(
-            <StrictMode>
-                <CaptchaChallenge
-                    ref={ref}
-                    provider="HCAPTCHA"
-                    siteKey="hcaptcha-site"
-                    theme="light"
-                    onChange={onChange}
-                    onExpired={onExpired}
-                    onErrored={onErrored}
-                />
-            </StrictMode>,
-        );
-
-        await waitFor(() => {
-            expect(renderWidget).toHaveBeenCalled();
-        });
-
-        expect(renderWidget).toHaveBeenCalledTimes(1);
-        expect(renderWidget.mock.calls[0][0]).toBeInstanceOf(HTMLElement);
-        expect(renderOptions).not.toBeNull();
-        const hcaptchaOptions = renderOptions!;
-        expect(hcaptchaOptions.sitekey).toBe('hcaptcha-site');
-        expect(hcaptchaOptions.theme).toBe('light');
-
-        hcaptchaOptions.callback?.('hcaptcha-token');
-        hcaptchaOptions['expired-callback']?.();
-        hcaptchaOptions['error-callback']?.('bad-request');
-        hcaptchaOptions['close-callback']?.();
-        ref.current?.reset();
-
-        expect(onChange).toHaveBeenCalledWith('hcaptcha-token');
-        expect(onExpired).toHaveBeenCalledTimes(2);
-        expect(onErrored).toHaveBeenCalledWith('bad-request');
-        expect(reset).toHaveBeenCalledWith('widget-id');
-    });
-
-    it('renders generic captcha prompt and validates input', async () => {
-        const onChange = vi.fn();
-        const onExpired = vi.fn();
-        const onErrored = vi.fn();
-        const ref = createRef<CaptchaHandle>();
-
-        const {getByLabelText, getByText} = render(
-            <StrictMode>
-                <CaptchaChallenge
-                    ref={ref}
-                    provider="GENERIC"
-                    siteKey="Type the word banana to continue."
-                    onChange={onChange}
-                    onExpired={onExpired}
-                    onErrored={onErrored}
-                />
-            </StrictMode>,
-        );
-
-        expect(getByText('Type the word banana to continue.')).toBeInTheDocument();
-
-        const input = getByLabelText('Human verification') as HTMLInputElement;
-        expect(onErrored).toHaveBeenCalledWith(undefined);
-
-        fireEvent.blur(input);
-        expect(onErrored).toHaveBeenLastCalledWith('Please provide the requested answer.');
-
-        fireEvent.change(input, {target: {value: 'banana'}});
-        await waitFor(() => {
-            expect(onChange).toHaveBeenLastCalledWith('banana');
-        });
-        expect(onErrored).toHaveBeenLastCalledWith(undefined);
-
-        fireEvent.change(input, {target: {value: ''}});
-        await waitFor(() => {
-            expect(onChange).toHaveBeenLastCalledWith(null);
-        });
-        expect(onExpired).toHaveBeenCalledTimes(1);
-        expect(onErrored).toHaveBeenLastCalledWith('Please provide the requested answer.');
-
-        ref.current?.reset();
-        await waitFor(() => {
-            expect(input.value).toBe('');
-        });
-        expect(onErrored).toHaveBeenLastCalledWith(undefined);
     });
 
     it('renders nothing when disabled', () => {

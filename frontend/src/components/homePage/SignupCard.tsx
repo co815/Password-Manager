@@ -120,8 +120,8 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const hasSiteKey = Boolean(captchaConfig?.siteKey && captchaConfig.siteKey.trim());
     const captchaEnabled = Boolean(
         captchaConfig?.enabled
-        && rawCaptchaProvider !== 'NONE'
-        && (rawCaptchaProvider === 'GENERIC' || hasSiteKey)
+        && rawCaptchaProvider === 'RECAPTCHA'
+        && hasSiteKey
     );
     const siteKey = captchaEnabled ? captchaConfig?.siteKey ?? '' : '';
     const captchaProvider = captchaEnabled ? rawCaptchaProvider : 'NONE';
@@ -160,9 +160,9 @@ export default function SignupCard({onSwitchToLogin}: Props) {
         if (!captchaConfig || captchaLoading) {
             return;
         }
-        if (captchaConfig.provider !== 'NONE' && !hasSiteKey && !missingKeyLoggedRef.current) {
+        if (captchaConfig.provider === 'RECAPTCHA' && !hasSiteKey && !missingKeyLoggedRef.current) {
             missingKeyLoggedRef.current = true;
-            console.error('[CAPTCHA] Missing site key for provider %s. Check RECAPTCHA_SITE_KEY / TURNSTILE_SITE_KEY or backend configuration.', captchaConfig.provider);
+            console.error('[CAPTCHA] Missing site key for provider %s. Check RECAPTCHA_SITE_KEY or backend configuration.', captchaConfig.provider);
         }
     }, [captchaConfig, captchaLoading, hasSiteKey]);
 

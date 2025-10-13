@@ -7,21 +7,13 @@ const DEFAULT_CONFIG: CaptchaConfigResponse = {enabled: false, provider: 'NONE',
 function normalizeCaptchaConfig(config: CaptchaConfigResponse | null | undefined): CaptchaConfigResponse {
     const rawProvider = typeof config?.provider === 'string' ? config.provider : 'NONE';
     const upper = rawProvider.toUpperCase();
-    const provider: CaptchaProvider = upper === 'HCAPTCHA'
-        ? 'HCAPTCHA'
-        : upper === 'RECAPTCHA'
-            ? 'RECAPTCHA'
-            : upper === 'TURNSTILE'
-                ? 'TURNSTILE'
-                : upper === 'GENERIC'
-                    ? 'GENERIC'
-                    : 'NONE';
+    const provider: CaptchaProvider = upper === 'RECAPTCHA' ? 'RECAPTCHA' : 'NONE';
     const rawSiteKey = typeof config?.siteKey === 'string' ? config.siteKey.trim() : '';
     const siteKey = rawSiteKey ? rawSiteKey : null;
     const enabled = Boolean(
         config?.enabled
-        && provider !== 'NONE'
-        && (provider === 'GENERIC' || siteKey)
+        && provider === 'RECAPTCHA'
+        && siteKey
     );
     return {enabled, provider, siteKey};
 }
