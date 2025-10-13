@@ -11,9 +11,11 @@ function normalizeCaptchaConfig(config: CaptchaConfigResponse | null | undefined
         ? 'HCAPTCHA'
         : upper === 'RECAPTCHA'
             ? 'RECAPTCHA'
-            : upper === 'GENERIC'
-                ? 'GENERIC'
-                : 'NONE';
+            : upper === 'TURNSTILE'
+                ? 'TURNSTILE'
+                : upper === 'GENERIC'
+                    ? 'GENERIC'
+                    : 'NONE';
     const rawSiteKey = typeof config?.siteKey === 'string' ? config.siteKey.trim() : '';
     const siteKey = rawSiteKey ? rawSiteKey : null;
     const enabled = Boolean(

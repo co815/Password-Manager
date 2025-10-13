@@ -12,6 +12,7 @@ import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
 import com.example.pm.security.RateLimiterService;
 import com.example.pm.security.TotpService;
+import com.example.pm.security.CaptchaValidationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -61,7 +62,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -117,7 +118,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -161,7 +162,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -206,7 +207,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -237,7 +238,7 @@ class AuthControllerTest {
 
         AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         ResponseEntity<?> response = controller.verifyEmail("token");
@@ -260,7 +261,7 @@ class AuthControllerTest {
 
         AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         ResponseEntity<?> response = controller.verifyEmail("token");
@@ -283,7 +284,7 @@ class AuthControllerTest {
 
         AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         ResponseEntity<?> response = controller.resendVerification(new ResendVerificationRequest("user@example.com"));
@@ -306,7 +307,7 @@ class AuthControllerTest {
 
         AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         ResponseEntity<?> response = controller.resendVerification(new ResendVerificationRequest("user@example.com"));
@@ -347,7 +348,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -402,7 +403,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -441,7 +442,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit,
                 csrfTokenRepository, placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -483,7 +484,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -516,7 +517,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -548,7 +549,7 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = new AuthController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
+        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
                 placeholderSaltService, emailVerificationService, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -566,5 +567,21 @@ class AuthControllerTest {
         assertThat(first.saltClient()).isNotBlank();
         assertThat(second.saltClient()).isNotBlank();
         assertThat(first.saltClient()).isEqualTo(second.saltClient());
+    }
+
+    private AuthController createController(UserRepository users,
+                                            JwtService jwt,
+                                            AuthCookieProps props,
+                                            RateLimiterService rateLimiter,
+                                            TotpService totp,
+                                            SecurityAuditService audit,
+                                            CsrfTokenRepository csrfTokenRepository,
+                                            PlaceholderSaltService placeholderSaltService,
+                                            EmailVerificationService emailVerificationService,
+                                            boolean sslEnabled) {
+        CaptchaValidationService captchaValidationService = mock(CaptchaValidationService.class);
+        when(captchaValidationService.validateCaptcha(any(), any())).thenReturn(true);
+        return new AuthController(users, jwt, props, rateLimiter, totp, audit, captchaValidationService,
+                csrfTokenRepository, placeholderSaltService, emailVerificationService, sslEnabled);
     }
 }

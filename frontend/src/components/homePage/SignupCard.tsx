@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 import {
     Alert,
@@ -22,7 +22,7 @@ import LockOutlined from '@mui/icons-material/LockOutlined';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
-import {api, primeCsrfToken} from '../../lib/api';
+import {ApiError, api, primeCsrfToken} from '../../lib/api';
 import {createAccountMaterial} from '../../lib/crypto/keys';
 import {makeVerifier} from '../../lib/crypto/argon2';
 import useCaptchaConfig from '../../lib/hooks/useCaptchaConfig';
@@ -101,6 +101,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const [captchaError, setCaptchaError] = useState<string | null>(null);
     const captchaRef = useRef<CaptchaHandle | null>(null);
+    const missingKeyLoggedRef = useRef(false);
     const them = useTheme();
     const captchaTheme = them.palette.mode === 'dark' ? 'dark' : 'light';
 
@@ -135,15 +136,35 @@ export default function SignupCard({onSwitchToLogin}: Props) {
         || mp !== mp2
         || (captchaEnabled && !captchaToken);
 
+    const handleSwitchToLogin = useCallback(() => {
+        setMsg(null);
+        if (captchaEnabled) {
+            captchaRef.current?.reset();
+            setCaptchaToken(null);
+            setCaptchaError(null);
+        }
+        onSwitchToLogin?.();
+    }, [captchaEnabled, onSwitchToLogin]);
+
     useEffect(() => {
         if (msg?.type === 'success') {
             const timer = setTimeout(() => {
-                onSwitchToLogin?.();
+                handleSwitchToLogin();
             }, 1800);
             return () => clearTimeout(timer);
         }
         return undefined;
-    }, [msg, onSwitchToLogin]);
+    }, [handleSwitchToLogin, msg]);
+
+    useEffect(() => {
+        if (!captchaConfig || captchaLoading) {
+            return;
+        }
+        if (captchaConfig.provider !== 'NONE' && !hasSiteKey && !missingKeyLoggedRef.current) {
+            missingKeyLoggedRef.current = true;
+            console.error('[CAPTCHA] Missing site key for provider %s. Check RECAPTCHA_SITE_KEY / TURNSTILE_SITE_KEY or backend configuration.', captchaConfig.provider);
+        }
+    }, [captchaConfig, captchaLoading, hasSiteKey]);
 
     async function handleSubmit() {
         if (disabled) {
@@ -178,8 +199,26 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                 setCaptchaError(null);
             }
         } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : 'Something went wrong';
-            setMsg({type: 'error', text: message || 'Something went wrong'});
+            if (e instanceof ApiError) {
+                const message = typeof e.message === 'string' ? e.message : '';
+                const details = typeof e.data === 'object' && e.data && 'message' in e.data
+                    ? String((e.data as { message?: unknown }).message ?? '')
+                    : '';
+                const errorCode = typeof e.data === 'object' && e.data && 'error' in e.data
+                    ? String((e.data as { error?: unknown }).error ?? '')
+                    : '';
+                const normalized = (message || details || '').trim();
+                if (e.status === 400 && errorCode === 'INVALID_CAPTCHA') {
+                    console.warn('[CAPTCHA] Signup rejected due to invalid token.');
+                    setCaptchaError('CAPTCHA verification failed. Please try again.');
+                    setMsg({type: 'error', text: 'CAPTCHA verification failed. Please try again.'});
+                } else {
+                    setMsg({type: 'error', text: normalized || 'Something went wrong'});
+                }
+            } else {
+                const message = e instanceof Error ? e.message : 'Something went wrong';
+                setMsg({type: 'error', text: message || 'Something went wrong'});
+            }
         } finally {
             if (captchaEnabled) {
                 captchaRef.current?.reset();
@@ -414,7 +453,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                             Already have an account?
                         </Typography>
                         <Button
-                            onClick={onSwitchToLogin}
+                            onClick={handleSwitchToLogin}
                             color="inherit"
                             size="small"
                             sx={{textTransform: 'none', fontWeight: 700, px: 0, minWidth: 0}}

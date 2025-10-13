@@ -102,6 +102,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
     const {setDEK, disarm, lockNow} = useCrypto();
     const navigate = useNavigate();
     const captchaRef = useRef<CaptchaHandle | null>(null);
+    const missingKeyLoggedRef = useRef(false);
     const theme = useTheme();
     const captchaTheme = theme.palette.mode === 'dark' ? 'dark' : 'light';
 
@@ -143,6 +144,16 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
             setCaptchaError(null);
         }
     }, [trimmedIdentifier, captchaEnabled]);
+
+    useEffect(() => {
+        if (!captchaConfig || captchaLoading) {
+            return;
+        }
+        if (captchaConfig.provider !== 'NONE' && !hasSiteKey && !missingKeyLoggedRef.current) {
+            missingKeyLoggedRef.current = true;
+            console.error('[CAPTCHA] Missing site key for provider %s. Check RECAPTCHA_SITE_KEY / TURNSTILE_SITE_KEY or backend configuration.', captchaConfig.provider);
+        }
+    }, [captchaConfig, captchaLoading, hasSiteKey]);
 
     async function handleSubmit() {
         if (disabled) {
@@ -216,7 +227,16 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                     ? String((e.data as { error?: unknown }).error ?? '')
                     : '';
                 const normalized = (message || details || '').trim();
-                if (e.status === 401 && normalized === 'Invalid MFA challenge') {
+                if (e.status === 400 && errorCode === 'INVALID_CAPTCHA') {
+                    console.warn('[CAPTCHA] Login rejected due to invalid token.');
+                    setCaptchaError('CAPTCHA verification failed. Please try again.');
+                    setMsg({type: 'error', text: 'CAPTCHA verification failed. Please try again.'});
+                    setPendingLogin(null);
+                    setMfaRequired(false);
+                    setMfaCode('');
+                    setRecoveryCode('');
+                    setUnverifiedEmail(null);
+                } else if (e.status === 401 && normalized === 'Invalid MFA challenge') {
                     const alreadyPrompted = mfaRequired;
                     setMfaRequired(true);
                     setUnverifiedEmail(null);

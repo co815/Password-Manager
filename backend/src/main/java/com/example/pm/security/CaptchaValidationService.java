@@ -43,20 +43,26 @@ public class CaptchaValidationService {
                 expected = "human";
             }
             String trimmedToken = token == null ? "" : token.trim();
-            return !trimmedToken.isEmpty() && expected.equalsIgnoreCase(trimmedToken);
+            boolean ok = !trimmedToken.isEmpty() && expected.equalsIgnoreCase(trimmedToken);
+            if (!ok) {
+                log.info("Captcha validation rejected for provider {}: expected generic prompt match", captchaProps.getProvider());
+            }
+            return ok;
         }
 
-        if (captchaProps.getSecretKey() == null || captchaProps.getSecretKey().isBlank()) {
+        String secret = captchaProps.getSecretKey();
+        if (secret == null || secret.isBlank()) {
             log.warn("Captcha provider {} enabled without secret key", captchaProps.getProvider());
             return false;
         }
 
         if (token == null || token.isBlank()) {
+            log.info("Captcha validation rejected for provider {}: empty token", captchaProps.getProvider());
             return false;
         }
 
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("secret", captchaProps.getSecretKey());
+        body.add("secret", secret);
         body.add("response", token);
         if (remoteIp != null && !remoteIp.isBlank()) {
             body.add("remoteip", remoteIp);
@@ -69,7 +75,12 @@ public class CaptchaValidationService {
                     .body(body)
                     .retrieve()
                     .body(CaptchaResponse.class);
-            return response != null && response.success();
+            boolean ok = response != null && response.success();
+            if (!ok) {
+                log.info("Captcha validation rejected for provider {}: {}", captchaProps.getProvider(),
+                        response == null ? "null response" : String.join(",", response.errorCodes() == null ? List.of() : response.errorCodes()));
+            }
+            return ok;
         } catch (RestClientException ex) {
             log.warn("Captcha validation failed: {}", ex.getMessage());
             return false;

@@ -3,6 +3,13 @@ import {Box, TextField, Typography} from '@mui/material';
 
 import type {CaptchaProvider} from '../../lib/api';
 
+/**
+ * CAPTCHA integration checklist:
+ *  - Register every domain that will host the app (include localhost/127.0.0.1) in the provider console.
+ *  - Issue separate site/secret keys for development and production to avoid accidental abuse.
+ *  - Update your Content-Security-Policy (script-src/connect-src) to allow the provider domains when enabling CAPTCHA.
+ */
+
 export interface CaptchaHandle {
     reset(): void;
 }
@@ -28,10 +35,16 @@ type CaptchaWindow = Window & {
         reset(id?: string | number): void;
         remove?(id?: string | number): void;
     };
+    turnstile?: {
+        render(container: HTMLElement, parameters: Record<string, unknown>): string;
+        reset(id?: string): void;
+        remove?(id?: string): void;
+    };
 };
 
 const RECAPTCHA_SRC = 'https://www.google.com/recaptcha/api.js?render=explicit';
 const HCAPTCHA_SRC = 'https://hcaptcha.com/1/api.js?render=explicit';
+const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const DEFAULT_GENERIC_PROMPT = 'Type the word "human" to verify you are not a bot.';
 
 const scriptPromises = new Map<string, Promise<void>>();
@@ -46,7 +59,7 @@ function getExistingScript(src: string): HTMLScriptElement | null {
     );
 }
 
-function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promise<void> {
+function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha' | 'turnstile'): Promise<void> {
     if (typeof window === 'undefined') {
         return Promise.reject(new Error('Window object is not available.'));
     }
@@ -56,6 +69,9 @@ function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promi
         return Promise.resolve();
     }
     if (globalName === 'hcaptcha' && typedWindow.hcaptcha) {
+        return Promise.resolve();
+    }
+    if (globalName === 'turnstile' && typedWindow.turnstile) {
         return Promise.resolve();
     }
 
@@ -86,6 +102,7 @@ function ensureScript(src: string, globalName: 'grecaptcha' | 'hcaptcha'): Promi
             if (script.parentNode) {
                 script.parentNode.removeChild(script);
             }
+            console.error('[CAPTCHA] Script failed to load:', src);
             reject(new Error(`Failed to load script: ${src}`));
         };
 
@@ -241,6 +258,8 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                     typedWindow.grecaptcha?.reset(widgetIdRef.current as number);
                 } else if (activeProviderRef.current === 'HCAPTCHA' && widgetIdRef.current != null) {
                     typedWindow.hcaptcha?.reset(widgetIdRef.current);
+                } else if (activeProviderRef.current === 'TURNSTILE' && widgetIdRef.current != null) {
+                    typedWindow.turnstile?.reset(widgetIdRef.current as string);
                 }
             },
         }), []);
@@ -335,7 +354,45 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                             },
                         });
                         activeProviderRef.current = 'HCAPTCHA';
-                    }
+                    } else if (provider === 'TURNSTILE') {
+                        await ensureScript(TURNSTILE_SRC, 'turnstile');
+                        if (cancelled) return;
+
+                        const typedWindow = window as CaptchaWindow;
+                        const api = typedWindow.turnstile;
+                        if (!api || typeof api.render !== 'function') {
+                            throw new Error('Turnstile could not be initialized.');
+                        }
+
+                        if (!containerRef.current) {
+                            return;
+                        }
+
+                        containerRef.current.innerHTML = '';
+                        widgetIdRef.current = api.render(containerRef.current, {
+                            sitekey: siteKey,
+                            theme,
+                            callback: (token: string | null) => {
+                                onChangeRef.current(token ?? null);
+                            },
+                            'expired-callback': () => {
+                                onExpiredRef.current();
+                                onChangeRef.current(null);
+                            },
+                            'error-callback': () => {
+                                onErroredRef.current();
+                                onChangeRef.current(null);
+                            },
+                            'timeout-callback': () => {
+                                onExpiredRef.current();
+                                onChangeRef.current(null);
+                            },
+                            'unsupported-callback': () => {
+                                onErroredRef.current('CAPTCHA is not supported in this browser.');
+                                onChangeRef.current(null);
+                            },
+                        });
+                        activeProviderRef.current = 'TURNSTILE';
                 } catch (error) {
                     if (cancelled) {
                         return;
@@ -350,6 +407,11 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                     return;
                 }
                 const message = error instanceof Error ? error.message : undefined;
+                if (message) {
+                    console.error('[CAPTCHA] Unable to render widget:', message);
+                } else {
+                    console.error('[CAPTCHA] Unable to render widget due to an unknown error.');
+                }
                 onErroredRef.current(message);
             });
 
@@ -365,6 +427,9 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                 } else if (activeProviderRef.current === 'HCAPTCHA' && widgetIdRef.current != null) {
                     typedWindow.hcaptcha?.reset(widgetIdRef.current);
                     typedWindow.hcaptcha?.remove?.(widgetIdRef.current);
+                } else if (activeProviderRef.current === 'TURNSTILE' && widgetIdRef.current != null) {
+                    typedWindow.turnstile?.reset(widgetIdRef.current as string);
+                    typedWindow.turnstile?.remove?.(widgetIdRef.current as string);
                 }
                 widgetIdRef.current = null;
                 activeProviderRef.current = 'NONE';
@@ -380,6 +445,9 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
             }
             if (provider === 'HCAPTCHA') {
                 return 82;
+            }
+            if (provider === 'TURNSTILE') {
+                return 65;
             }
             return undefined;
         }, [provider]);

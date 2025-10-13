@@ -22,12 +22,13 @@ public class CaptchaController {
         String siteKey = null;
 
         if (enabled) {
-            if (captchaProps.getProvider() == CaptchaProps.Provider.GENERIC) {
+            CaptchaProps.Provider provider = captchaProps.getProvider();
+            if (provider == CaptchaProps.Provider.GENERIC) {
                 siteKey = sanitizePrompt(captchaProps.getSiteKey());
             } else {
                 String configuredSiteKey = captchaProps.getSiteKey();
                 enabled = configuredSiteKey != null && !configuredSiteKey.isBlank();
-                siteKey = enabled ? configuredSiteKey : null;
+                siteKey = enabled && configuredSiteKey != null ? configuredSiteKey.trim() : null;
             }
         }
 

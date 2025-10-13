@@ -9,6 +9,7 @@ import com.example.pm.repo.UserRepository;
 import com.example.pm.security.JwtService;
 import com.example.pm.security.RateLimiterService;
 import com.example.pm.security.TotpService;
+import com.example.pm.security.CaptchaValidationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -45,6 +46,7 @@ public class AuthController {
     private final RateLimiterService rateLimiterService;
     private final TotpService totpService;
     private final SecurityAuditService auditService;
+    private final CaptchaValidationService captchaValidationService;
     private final boolean sslEnabled;
     private final CsrfTokenRepository csrfTokenRepository;
     private final PlaceholderSaltService placeholderSaltService;
@@ -62,6 +64,7 @@ public class AuthController {
     public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
                           RateLimiterService rateLimiterService, TotpService totpService,
                           SecurityAuditService auditService,
+                          CaptchaValidationService captchaValidationService,
                           CsrfTokenRepository csrfTokenRepository,
                           PlaceholderSaltService placeholderSaltService,
                           EmailVerificationService emailVerificationService,
@@ -79,7 +82,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest,
+                                      HttpServletRequest request) {
+        if (!captchaValidationService.validateCaptcha(registerRequest.captchaToken(), resolveClientIp(request))) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse(400, "INVALID_CAPTCHA", "CAPTCHA verification failed. Please try again."));
+        }
         String normalizedAvatar;
         try {
             normalizedAvatar = normalizeAvatarData(registerRequest.avatarData());
@@ -135,6 +143,12 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest,
                                    HttpServletRequest request,
                                    HttpServletResponse response) {
+
+        if (!captchaValidationService.validateCaptcha(loginRequest.captchaToken(), resolveClientIp(request))) {
+            auditService.recordLoginFailure(loginRequest.email());
+            return ResponseEntity.status(400)
+                    .body(new ErrorResponse(400, "INVALID_CAPTCHA", "CAPTCHA verification failed. Please try again."));
+        }
 
         String normalizedEmail = loginRequest.email() == null ? null : loginRequest.email().trim().toLowerCase(Locale.ROOT);
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
@@ -198,6 +212,22 @@ public class AuthController {
                 .header(csrfToken.getHeaderName(), csrfToken.getToken())
                 .body(new LoginResponse(publicUser));
 
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        String remote = request.getRemoteAddr();
+        return remote == null ? null : remote.trim();
     }
 
     @GetMapping("/verify-email")
