@@ -43,7 +43,9 @@ public class TestSupportConfig {
     @Bean
     @Primary
     public CaptchaProps captchaProps() {
-        return new CaptchaProps();
+        CaptchaProps props = new CaptchaProps();
+        props.setProvider(CaptchaProps.Provider.NONE);
+        return props;
     }
 
     @Bean
@@ -62,7 +64,12 @@ public class TestSupportConfig {
     @Bean
     @Primary
     public CaptchaValidationService captchaValidationService(CaptchaProps captchaProps) {
-        return new CaptchaValidationService(captchaProps);
+        return new CaptchaValidationService(captchaProps) {
+            @Override
+            public boolean validateCaptcha(String token, String remoteIp) {
+                return true;
+            }
+        };
     }
 
     private static class InMemoryLoginThrottleRepository implements LoginThrottleRepository {

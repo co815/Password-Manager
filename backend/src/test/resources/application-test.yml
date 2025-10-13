@@ -16,6 +16,8 @@ app:
   jwt:
     secret: test-secret-value-test-secret-value
   auth:
+    captcha:
+      provider: none
     cookie:
       same-site: Strict
     placeholder-salt-secret: test-placeholder-secret
