@@ -1,4 +1,5 @@
 import {useState, type ReactNode} from 'react';
+import {Buffer} from 'node:buffer';
 import {configure, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import Dashboard from '../pages/Dashboard';
 import {AuthContext, type AuthContextValue} from '../auth/auth-context';
@@ -22,20 +23,6 @@ const testTheme = createTheme({
         },
     },
 });
-
-type BufferEncoding = 'utf-8' | 'binary' | 'base64';
-
-type MinimalBuffer = {
-    from: (input: string, encoding?: BufferEncoding) => { toString: (encoding: BufferEncoding) => string };
-};
-
-function getBuffer(): MinimalBuffer {
-    const buffer = (globalThis as {Buffer?: MinimalBuffer}).Buffer;
-    if (!buffer) {
-        throw new Error('Buffer is not available in this environment.');
-    }
-    return buffer;
-}
 
 const {
     fetchCredentialsMock,
@@ -188,7 +175,7 @@ function base64Encode(text: string): string {
     if (typeof globalThis.btoa === 'function') {
         return globalThis.btoa(text);
     }
-    return getBuffer().from(text, 'utf-8').toString('base64');
+    return Buffer.from(text, 'utf-8').toString('base64');
 }
 
 describe('Dashboard', () => {
@@ -237,10 +224,10 @@ describe('Dashboard', () => {
         });
 
         if (typeof globalThis.atob !== 'function') {
-            globalThis.atob = (value: string) => getBuffer().from(value, 'base64').toString('binary');
+            globalThis.atob = (value: string) => Buffer.from(value, 'base64').toString('binary');
         }
         if (typeof globalThis.btoa !== 'function') {
-            globalThis.btoa = (value: string) => getBuffer().from(value, 'binary').toString('base64');
+            globalThis.btoa = (value: string) => Buffer.from(value, 'binary').toString('base64');
         }
     });
 

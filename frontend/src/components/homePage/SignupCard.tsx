@@ -28,6 +28,7 @@ import {makeVerifier} from '../../lib/crypto/argon2';
 import CaptchaChallenge from './CaptchaChallenge';
 import {authButtonStyles, createFieldStyles} from './authStyles';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
+import {extractApiErrorDetails} from '../../lib/api-error';
 
 type Props = {
     onSwitchToLogin?: () => void;
@@ -135,20 +136,13 @@ export default function SignupCard({onSwitchToLogin}: Props) {
             }
         } catch (e: unknown) {
             if (e instanceof ApiError) {
-                const message = typeof e.message === 'string' ? e.message : '';
-                const details = typeof e.data === 'object' && e.data && 'message' in e.data
-                    ? String((e.data as { message?: unknown }).message ?? '')
-                    : '';
-                const errorCode = typeof e.data === 'object' && e.data && 'error' in e.data
-                    ? String((e.data as { error?: unknown }).error ?? '')
-                    : '';
-                const normalized = (message || details || '').trim();
+                const {message: normalizedMessage, errorCode} = extractApiErrorDetails(e);
                 if (e.status === 400 && errorCode === 'INVALID_CAPTCHA') {
                     console.warn('[CAPTCHA] Signup rejected due to invalid token.');
                     setCaptchaError('CAPTCHA verification failed. Please try again.');
                     setMsg({type: 'error', text: 'CAPTCHA verification failed. Please try again.'});
                 } else {
-                    setMsg({type: 'error', text: normalized || 'Something went wrong'});
+                    setMsg({type: 'error', text: normalizedMessage || 'Something went wrong'});
                 }
             } else {
                 const message = e instanceof Error ? e.message : 'Something went wrong';

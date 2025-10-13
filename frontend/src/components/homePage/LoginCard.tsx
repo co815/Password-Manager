@@ -30,6 +30,7 @@ import {useCrypto} from '../../lib/crypto/crypto-context';
 import CaptchaChallenge from './CaptchaChallenge';
 import {authButtonStyles, createFieldStyles} from './authStyles';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
+import {extractApiErrorDetails} from '../../lib/api-error';
 
 type Props = {
     onSuccess?: (user: PublicUser, mp: string) => void;
@@ -150,14 +151,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
             navigate('/dashboard', {replace: true});
         } catch (e: unknown) {
             if (e instanceof ApiError) {
-                const message = typeof e.message === 'string' ? e.message : '';
-                const details = typeof e.data === 'object' && e.data && 'message' in e.data
-                    ? String((e.data as { message?: unknown }).message ?? '')
-                    : '';
-                const errorCode = typeof e.data === 'object' && e.data && 'error' in e.data
-                    ? String((e.data as { error?: unknown }).error ?? '')
-                    : '';
-                const normalized = (message || details || '').trim();
+                const {message: normalizedMessage, errorCode} = extractApiErrorDetails(e);
                 if (e.status === 400 && errorCode === 'INVALID_CAPTCHA') {
                     console.warn('[CAPTCHA] Login rejected due to invalid token.');
                     setCaptchaError('CAPTCHA verification failed. Please try again.');
@@ -167,7 +161,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                     setMfaCode('');
                     setRecoveryCode('');
                     setUnverifiedEmail(null);
-                } else if (e.status === 401 && normalized === 'Invalid MFA challenge') {
+                } else if (e.status === 401 && normalizedMessage === 'Invalid MFA challenge') {
                     const alreadyPrompted = mfaRequired;
                     setMfaRequired(true);
                     setUnverifiedEmail(null);
@@ -188,7 +182,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                     setRecoveryCode('');
                     setMsg({
                         type: 'error',
-                        text: normalized
+                        text: normalizedMessage
                             || 'You need to verify your email address before logging in. Use the link we sent you or request a new one below.',
                     });
                 } else {
@@ -199,7 +193,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                     setUnverifiedEmail(null);
                     setMsg({
                         type: 'error',
-                        text: normalized || 'Something went wrong',
+                        text: normalizedMessage || 'Something went wrong',
                     });
                 }
             } else {
@@ -229,14 +223,10 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
             setMsg({type: 'success', text: message});
         } catch (error) {
             if (error instanceof ApiError) {
-                const message = typeof error.message === 'string' ? error.message : '';
-                const details = typeof error.data === 'object' && error.data && 'message' in error.data
-                    ? String((error.data as { message?: unknown }).message ?? '')
-                    : '';
-                const normalized = (message || details || '').trim();
+                const {message} = extractApiErrorDetails(error);
                 setMsg({
                     type: 'error',
-                    text: normalized || 'Unable to resend verification email right now.',
+                    text: message || 'Unable to resend verification email right now.',
                 });
             } else {
                 const message = error instanceof Error ? error.message : 'Unable to resend verification email right now.';

@@ -253,6 +253,8 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                 // error already handled in loadAndRender
             });
 
+            const containerEl = containerRef.current;
+
             return () => {
                 cancelled = true;
                 if (typeof window === 'undefined') {
@@ -265,8 +267,8 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                 }
                 widgetIdRef.current = null;
                 activeProviderRef.current = 'NONE';
-                if (containerRef.current) {
-                    containerRef.current.innerHTML = '';
+                if (containerEl) {
+                    containerEl.innerHTML = '';
                 }
             };
         }, [provider, siteKey, theme, onChangeRef, onExpiredRef, onErroredRef]);
