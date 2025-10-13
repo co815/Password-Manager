@@ -393,6 +393,7 @@ const CaptchaChallenge = forwardRef<CaptchaHandle, CaptchaChallengeProps>(
                             },
                         });
                         activeProviderRef.current = 'TURNSTILE';
+                    }
                 } catch (error) {
                     if (cancelled) {
                         return;
