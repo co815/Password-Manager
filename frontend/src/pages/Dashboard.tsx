@@ -1108,28 +1108,16 @@ export default function Dashboard() {
 
     const handleCopyPassword = async () => {
         if (!selected?.password) return;
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            setToast({
+                type: 'error',
+                msg: 'Copying passwords is not supported in this browser.',
+            });
+            return;
+        }
+
         try {
-            let copySucceeded = false;
-            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                await navigator.clipboard.writeText(selected.password);
-                copySucceeded = true;
-            } else {
-                const textArea = document.createElement('textarea');
-                textArea.value = selected.password;
-                textArea.style.position = 'fixed';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                copySucceeded = document.execCommand('copy');
-                document.body.removeChild(textArea);
-            }
-
-            if (!copySucceeded) {
-                setToast({type: 'error', msg: 'Failed to copy password.'});
-                return;
-            }
-
+            await navigator.clipboard.writeText(selected.password);
             setToast({type: 'success', msg: 'Password copied to clipboard.'});
         } catch (error) {
             console.error('Failed to copy password.', error);
