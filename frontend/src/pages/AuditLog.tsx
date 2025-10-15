@@ -78,8 +78,15 @@ export default function AuditLog() {
     const hasLogs = useMemo(() => logs.length > 0, [logs]);
 
     return (
-        <Box py={4}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2} mb={3}>
+        <Box sx={{paddingTop: (theme) => theme.spacing(4), paddingBottom: (theme) => theme.spacing(4)}}>
+            <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                flexWrap="wrap"
+                gap={2}
+                sx={{marginBottom: (theme) => theme.spacing(3)}}
+            >
                 <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
                     <Button
                         variant="outlined"
@@ -105,7 +112,10 @@ export default function AuditLog() {
             </Stack>
 
             {error && (
-                <Alert severity="error" sx={{mb: 3}}>
+                <Alert
+                    severity="error"
+                    sx={{marginBottom: (theme) => theme.spacing(3)}}
+                >
                     {error}
                 </Alert>
             )}

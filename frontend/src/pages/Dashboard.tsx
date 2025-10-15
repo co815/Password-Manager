@@ -705,7 +705,7 @@ export default function Dashboard() {
         <Stack
             component="ul"
             spacing={0.5}
-            sx={{listStyle: 'none', pl: 0, mb: 0}}
+            sx={{listStyle: 'none', paddingLeft: 0, marginBottom: 0}}
         >
             {codes.map((code) => (
                 <Typography
@@ -937,7 +937,8 @@ export default function Dashboard() {
             const filename = `vault-${timestamp}.pmvault`;
 
             if (typeof window === 'undefined') {
-                throw new Error('Export is not available in this environment.');
+                setToast({type: 'error', msg: 'Export is not available in this environment.'});
+                return;
             }
 
             const urlObject = window.URL.createObjectURL(blob);
@@ -1108,8 +1109,10 @@ export default function Dashboard() {
     const handleCopyPassword = async () => {
         if (!selected?.password) return;
         try {
+            let copySucceeded = false;
             if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
                 await navigator.clipboard.writeText(selected.password);
+                copySucceeded = true;
             } else {
                 const textArea = document.createElement('textarea');
                 textArea.value = selected.password;
@@ -1118,14 +1121,18 @@ export default function Dashboard() {
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
-                const successful = document.execCommand('copy');
+                copySucceeded = document.execCommand('copy');
                 document.body.removeChild(textArea);
-                if (!successful) {
-                    throw new Error('Copy command was unsuccessful');
-                }
             }
+
+            if (!copySucceeded) {
+                setToast({type: 'error', msg: 'Failed to copy password.'});
+                return;
+            }
+
             setToast({type: 'success', msg: 'Password copied to clipboard.'});
-        } catch {
+        } catch (error) {
+            console.error('Failed to copy password.', error);
             setToast({type: 'error', msg: 'Failed to copy password.'});
         }
     };
@@ -1192,8 +1199,14 @@ export default function Dashboard() {
                 </List>
             </Drawer>
 
-            <Box flex={1} p={3} ml={{xs: 0, md: '260px'}}>
-                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} gap={2}>
+            <Box
+                flex={1}
+                p={3}
+                sx={{
+                    marginLeft: {xs: 0, md: '260px'},
+                }}
+            >
+                <Box display="flex" alignItems="center" justifyContent="space-between" marginBottom={2} gap={2}>
                     <TextField
                         placeholder="Search"
                         value={searchQuery}
@@ -1305,7 +1318,7 @@ export default function Dashboard() {
                                 </Box>
                             ) : (
                                 <>
-                                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                                    <Box display="flex" justifyContent="space-between" alignItems="center" marginBottom={1.5}>
                                         <Typography variant="h6" fontWeight={700}>
                                             {selected?.name || 'Select a credential'}
                                         </Typography>
@@ -1362,15 +1375,15 @@ export default function Dashboard() {
                                     </Box>
 
                                     <Typography variant="caption" color="text.secondary">username</Typography>
-                                    <Typography sx={{mb: 1}}>{selected?.username || '—'}</Typography>
+                                    <Typography sx={{marginBottom: 1}}>{selected?.username || '—'}</Typography>
 
                                     <Typography variant="caption" color="text.secondary">password</Typography>
-                                    <Box display="flex" alignItems="center" gap={0.5} sx={{mb: 1}}>
+                                    <Box display="flex" alignItems="center" gap={0.5} sx={{marginBottom: 1}}>
                                         <Typography
                                             sx={{
                                                 fontFamily: 'monospace',
                                                 wordBreak: 'break-all',
-                                                mb: 0,
+                                                marginBottom: 0,
                                             }}
                                             title={showSelectedPassword ? selected?.password : undefined}
                                         >
@@ -1407,8 +1420,8 @@ export default function Dashboard() {
                                         width: 140,
                                         backgroundColor: 'action.hover',
                                         borderRadius: 4,
-                                        mt: 0.5,
-                                        mb: 2
+                                        marginTop: 0.5,
+                                        marginBottom: 2,
                                     }}>
                                         <Box sx={{
                                             height: '100%',
@@ -1815,7 +1828,7 @@ export default function Dashboard() {
                     {dialogMode === 'edit' ? 'Edit credential' : 'Add credential'}
                 </DialogTitle>
                 <DialogContent>
-                    <Stack spacing={1.5} mt={0.5}>
+                    <Stack spacing={1.5} marginTop={0.5}>
                         <TextField
                             label="Title (service)"
                             value={title}
@@ -1875,7 +1888,7 @@ export default function Dashboard() {
                                 variant="determinate"
                                 value={(pwdScore / 5) * 100}
                                 sx={{
-                                    mt: 1,
+                                    marginTop: 1,
                                     height: 6,
                                     borderRadius: 3,
                                     '& .MuiLinearProgress-bar': {
@@ -1940,7 +1953,7 @@ export default function Dashboard() {
             >
                 <DialogTitle sx={{fontWeight: 800}}>Unlock Vault to Add Credential</DialogTitle>
                 <DialogContent>
-                    <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
+                    <Typography variant="body2" color="text.secondary" sx={{marginBottom: 2}}>
                         Your vault is currently locked. Please enter your master password to unlock it and add new
                         credentials.
                     </Typography>

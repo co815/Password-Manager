@@ -52,7 +52,7 @@ const AddCredentialDialog: React.FC<AddCredentialDialogProps> = ({
         >
             <DialogTitle>Add New Credential</DialogTitle>
             <DialogContent>
-                <Box display="flex" flexDirection="column" gap={2} mt={1}>
+                <Box display="flex" flexDirection="column" gap={2} marginTop={1}>
                     <TextField
                         label="Name"
                         value={name}
