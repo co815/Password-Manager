@@ -18,7 +18,8 @@ public class CredentialDtos {
             String usernameNonce,
 
             String passwordEncrypted,
-            String passwordNonce
+            String passwordNonce,
+            boolean favorite
     ) {
         public static PublicCredential fromCredential(Credential credential){
             return new PublicCredential(
@@ -28,7 +29,8 @@ public class CredentialDtos {
                     credential.getUsernameEncrypted(),
                     credential.getUsernameNonce(),
                     credential.getPasswordEncrypted(),
-                    credential.getPasswordNonce()
+                    credential.getPasswordNonce(),
+                    credential.isFavorite()
             );
         }
     }
@@ -63,7 +65,10 @@ public class CredentialDtos {
 
             @JsonProperty("passwordNonce")
             @NotBlank
-            String passwordNonce
+            String passwordNonce,
+
+            @JsonProperty("favorite")
+            Boolean favorite
     ) {}
 
     public record UpdateCredentialRequest(
@@ -72,7 +77,12 @@ public class CredentialDtos {
             String usernameEncrypted,
             String usernameNonce,
             String passwordEncrypted,
-            String passwordNonce
+            String passwordNonce,
+            Boolean favorite
+    ) {}
+
+    public record UpdateFavoriteRequest(
+            Boolean favorite
     ) {}
 
 }

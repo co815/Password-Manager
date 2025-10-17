@@ -56,11 +56,11 @@ export type Credential = {
     url?: string;
     username: string;
     password: string;
-}
+    favorite: boolean;
+};
 
 const ALL_CATEGORY_ID = '__all__';
 const UNCATEGORIZED_LABEL = 'Uncategorized';
-const FAVORITES_STORAGE_KEY = 'pm:favorites';
 
 type CategoryItem = {
     id: string;
@@ -122,20 +122,7 @@ export default function Dashboard() {
 
     const [credentials, setCredentials] = useState<Credential[]>([]);
     const [selected, setSelected] = useState<Credential | null>(null);
-    const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
-        if (typeof window === 'undefined') return [];
-        try {
-            const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
-            if (!raw) return [];
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-                return parsed.filter((id): id is string => typeof id === 'string');
-            }
-        } catch {
-            // Ignore malformed stored data and fall back to an empty list.
-        }
-        return [];
-    });
+    const [favoriteBusy, setFavoriteBusy] = useState(false);
 
     const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
     const [editingTarget, setEditingTarget] = useState<Credential | null>(null);
@@ -251,6 +238,7 @@ export default function Dashboard() {
         setRotateConfirmPassword('');
         setRotateInvalidateSessions(false);
         setRotateMessage(null);
+        setFavoriteBusy(false);
     }, [dek, locked]);
 
     useEffect(() => {
@@ -276,6 +264,7 @@ export default function Dashboard() {
                         usernameNonce,
                         passwordEncrypted,
                         passwordNonce,
+                        favorite,
                     } = enc;
                     const username = await decryptField(dek, usernameEncrypted, usernameNonce);
                     const password = await decryptField(dek, passwordEncrypted, passwordNonce);
@@ -285,6 +274,7 @@ export default function Dashboard() {
                         url: websiteLink || undefined,
                         username,
                         password,
+                        favorite,
                     });
                 }
 
@@ -296,15 +286,6 @@ export default function Dashboard() {
             }
         })();
     }, [dek, user]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
-        } catch {
-            // Ignore write errors (e.g. storage disabled).
-        }
-    }, [favoriteIds]);
 
     useEffect(() => {
         setAvatarLoadError(false);
@@ -849,13 +830,14 @@ export default function Dashboard() {
                     url: trimmedUrl || undefined,
                     username: trimmedUsername,
                     password: password,
+                    favorite: created.favorite,
                 };
 
                 setCredentials((prev) => [newCredential, ...prev]);
                 setSelected(newCredential);
                 setToast({type: 'success', msg: 'Saved to /api/credentials (encrypted).'});
             } else if (dialogMode === 'edit' && editingTarget) {
-                await api.updateCredential(editingTarget.id, {
+                const updatedEnc = await api.updateCredential(editingTarget.id, {
                     service: title,
                     websiteLink: trimmedUrl || undefined,
                     usernameEncrypted: usernameCipher,
@@ -870,6 +852,7 @@ export default function Dashboard() {
                     url: trimmedUrl || undefined,
                     username: trimmedUsername,
                     password: password,
+                    favorite: updatedEnc.favorite,
                 };
 
                 setCredentials((prev) =>
@@ -906,7 +889,6 @@ export default function Dashboard() {
                 }
                 return next;
             });
-            setFavoriteIds((prev) => prev.filter((id) => id !== deleteTarget.id));
             setToast({type: 'success', msg: 'Credential deleted.'});
             setDeleteTarget(null);
         } catch (e: unknown) {
@@ -1011,7 +993,7 @@ export default function Dashboard() {
 
                 const existingIndex = nextCredentials.findIndex((c) => c.id === cred.id);
                 if (existingIndex >= 0) {
-                    await api.updateCredential(cred.id, {
+                    const updatedEnc = await api.updateCredential(cred.id, {
                         service: sanitizedTitle,
                         websiteLink: sanitizedUrl,
                         usernameEncrypted: usernameCipher,
@@ -1026,6 +1008,7 @@ export default function Dashboard() {
                         url: sanitizedUrl,
                         username: sanitizedUsername,
                         password: cred.password,
+                        favorite: updatedEnc.favorite,
                     };
 
                     nextCredentials[existingIndex] = updatedCredential;
@@ -1049,6 +1032,7 @@ export default function Dashboard() {
                         url: sanitizedUrl,
                         username: sanitizedUsername,
                         password: cred.password,
+                        favorite: created.favorite,
                     };
 
                     nextCredentials = [...nextCredentials, newCredential];
@@ -1091,19 +1075,37 @@ export default function Dashboard() {
         }
     };
 
-    const selectedIsFavorite = selected ? favoriteIds.includes(selected.id) : false;
+    const selectedIsFavorite = selected?.favorite ?? false;
 
-    const handleToggleFavorite = () => {
-        if (!selected) return;
-        setFavoriteIds((prev) => {
-            const nextSet = new Set(prev);
-            if (nextSet.has(selected.id)) {
-                nextSet.delete(selected.id);
-            } else {
-                nextSet.add(selected.id);
-            }
-            return Array.from(nextSet);
-        });
+    const handleToggleFavorite = async () => {
+        if (!selected || favoriteBusy) return;
+
+        const targetId = selected.id;
+        const nextFavorite = !selected.favorite;
+        setFavoriteBusy(true);
+        try {
+            const updated = await api.updateCredentialFavorite(targetId, nextFavorite);
+            setCredentials((prev) =>
+                prev.map((cred) =>
+                    cred.id === targetId
+                        ? {
+                            ...cred,
+                            favorite: updated.favorite,
+                        }
+                        : cred,
+                ),
+            );
+            setSelected((prevSelected) =>
+                prevSelected && prevSelected.id === targetId
+                    ? {...prevSelected, favorite: updated.favorite}
+                    : prevSelected,
+            );
+        } catch (error) {
+            const message = messageFromError(error, 'Failed to update favorite');
+            setToast({type: 'error', msg: message});
+        } finally {
+            setFavoriteBusy(false);
+        }
     };
 
     const handleCopyPassword = async () => {
@@ -1281,7 +1283,7 @@ export default function Dashboard() {
                                         >
                                             <ListItemText
                                                 primary={
-                                                    favoriteIds.includes(credential.id)
+                                                    credential.favorite
                                                         ? `${credential.name} ★`
                                                         : credential.name
                                                 }
@@ -1337,7 +1339,7 @@ export default function Dashboard() {
                                             <IconButton
                                                 size="small"
                                                 onClick={handleToggleFavorite}
-                                                disabled={!selected}
+                                                disabled={!selected || favoriteBusy}
                                                 title={selectedIsFavorite ? 'Remove from favorites' : 'Add to favorites'}
                                             >
                                                 {selectedIsFavorite ? <Star color="warning"/> : <StarBorder/>}

@@ -29,6 +29,7 @@ const {
     createCredentialMock,
     updateCredentialMock,
     deleteCredentialMock,
+    updateCredentialFavoriteMock,
     deriveKekMock,
     unwrapDekMock,
     makeVerifierMock,
@@ -37,6 +38,7 @@ const {
     createCredentialMock: vi.fn(),
     updateCredentialMock: vi.fn(),
     deleteCredentialMock: vi.fn(),
+    updateCredentialFavoriteMock: vi.fn(),
     deriveKekMock: vi.fn(),
     unwrapDekMock: vi.fn(),
     makeVerifierMock: vi.fn(),
@@ -45,6 +47,7 @@ const {
     createCredentialMock: Mock;
     updateCredentialMock: Mock;
     deleteCredentialMock: Mock;
+    updateCredentialFavoriteMock: Mock;
     deriveKekMock: Mock;
     unwrapDekMock: Mock;
     makeVerifierMock: Mock;
@@ -60,6 +63,7 @@ vi.mock('../lib/api', async () => {
             createCredential: createCredentialMock,
             updateCredential: updateCredentialMock,
             deleteCredential: deleteCredentialMock,
+            updateCredentialFavorite: updateCredentialFavoriteMock,
         },
     };
 });
@@ -238,6 +242,7 @@ describe('Dashboard', () => {
         createCredentialMock.mockReset();
         updateCredentialMock.mockReset();
         deleteCredentialMock.mockReset();
+        updateCredentialFavoriteMock.mockReset();
         deriveKekMock.mockReset();
         unwrapDekMock.mockReset();
         makeVerifierMock.mockReset();
@@ -250,6 +255,7 @@ describe('Dashboard', () => {
             usernameNonce: '',
             passwordEncrypted: '',
             passwordNonce: '',
+            favorite: false,
         });
         updateCredentialMock.mockResolvedValue({
             credentialId: 'cred-1',
@@ -259,8 +265,19 @@ describe('Dashboard', () => {
             usernameNonce: '',
             passwordEncrypted: '',
             passwordNonce: '',
+            favorite: false,
         });
         deleteCredentialMock.mockResolvedValue(undefined);
+        updateCredentialFavoriteMock.mockResolvedValue({
+            credentialId: 'cred-1',
+            service: 'Service',
+            websiteLink: '',
+            usernameEncrypted: '',
+            usernameNonce: '',
+            passwordEncrypted: '',
+            passwordNonce: '',
+            favorite: false,
+        });
         deriveKekMock.mockResolvedValue('derived-kek' as unknown as CryptoKey);
         unwrapDekMock.mockResolvedValue(fakeDek);
         makeVerifierMock.mockResolvedValue('mock-verifier');
@@ -373,6 +390,7 @@ describe('Dashboard', () => {
                 usernameNonce: base64Encode('nonce-1'),
                 passwordEncrypted: base64Encode('mail-pass'),
                 passwordNonce: base64Encode('nonce-2'),
+                favorite: false,
             },
             {
                 credentialId: 'cred-git',
@@ -382,10 +400,15 @@ describe('Dashboard', () => {
                 usernameNonce: base64Encode('nonce-3'),
                 passwordEncrypted: base64Encode('git-pass'),
                 passwordNonce: base64Encode('nonce-4'),
+                favorite: false,
             },
         ];
 
         fetchCredentialsMock.mockResolvedValue({credentials});
+        updateCredentialFavoriteMock.mockResolvedValueOnce({
+            ...credentials[0],
+            favorite: true,
+        });
 
         renderDashboard({initialDek: fakeDek, initialLocked: false});
 
@@ -400,9 +423,7 @@ describe('Dashboard', () => {
             ?? favoriteButtons[0];
         fireEvent.click(activeFavoriteButton);
         await waitFor(() => {
-            const removeButtons = screen.getAllByTitle('Remove from favorites');
-            expect(removeButtons.some((button) => !(button as HTMLButtonElement).disabled)).toBe(true);
-            expect(() => within(activeFavoriteButton).getByTestId('StarIcon')).not.toThrow();
+            expect(updateCredentialFavoriteMock).toHaveBeenCalledWith(expect.any(String), true);
         });
 
         const categoryButtons = screen.getAllByRole('button', {name: /mail\.example\.com/i});

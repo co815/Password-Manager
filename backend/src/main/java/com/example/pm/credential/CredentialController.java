@@ -117,6 +117,9 @@ public class CredentialController {
                     if (StringUtils.hasText(updateRequest.passwordNonce())) {
                         existing.setPasswordNonce(updateRequest.passwordNonce());
                     }
+                    if (updateRequest.favorite() != null) {
+                        existing.setFavorite(updateRequest.favorite());
+                    }
 
                     credentials.save(existing);
                     return ResponseEntity.ok(PublicCredential.fromCredential(existing));
@@ -137,6 +140,28 @@ public class CredentialController {
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(new ErrorResponse(404, "NOT_FOUND",
                                 "The Credentials you want to DELETE were not found!"))));
+    }
+
+    @PutMapping("/{id}/favorite")
+    public ResponseEntity<?> updateFavorite(
+            Authentication authentication,
+            @PathVariable String id,
+            @RequestBody CredentialDtos.UpdateFavoriteRequest updateFavoriteRequest
+    ) {
+        if (updateFavoriteRequest == null || updateFavoriteRequest.favorite() == null) {
+            return badRequest("Favorite value is required");
+        }
+
+        return requireUser(authentication, userId -> credentials.findById(id)
+                .filter(credential -> userId.equals(credential.getUserId()))
+                .<ResponseEntity<?>>map(existing -> {
+                    existing.setFavorite(updateFavoriteRequest.favorite());
+                    credentials.save(existing);
+                    return ResponseEntity.ok(PublicCredential.fromCredential(existing));
+                })
+                .orElseGet(() -> ResponseEntity.status(404)
+                        .body(new ErrorResponse(404, "NOT_FOUND",
+                                "The Credentials you want to UPDATE were not found!"))));
     }
 
     private Optional<String> resolveUserId(Authentication authentication) {

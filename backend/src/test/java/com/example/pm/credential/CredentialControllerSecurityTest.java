@@ -96,7 +96,7 @@ class CredentialControllerSecurityTest {
     @Test
     void createCredentialWithoutTokenReturns401() throws Exception {
         var req = new CredentialDtos.AddCredentialRequest(
-                "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce"
+                "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce", false
         );
 
         mockMvc.perform(post("/api/credentials")
@@ -113,7 +113,7 @@ class CredentialControllerSecurityTest {
         String token = jwtService.generate("user-123", 0);
 
         var req = new CredentialDtos.AddCredentialRequest(
-                "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce"
+                "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce", false
         );
 
         mockMvc.perform(post("/api/credentials")
@@ -132,7 +132,7 @@ class CredentialControllerSecurityTest {
                 .thenReturn(Optional.of(new Credential()));
 
         var req = new CredentialDtos.AddCredentialRequest(
-                "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce"
+                "Email", "https://mail.example", "uEnc", "uNonce", "pEnc", "pNonce", false
         );
 
         mockMvc.perform(post("/api/credentials")

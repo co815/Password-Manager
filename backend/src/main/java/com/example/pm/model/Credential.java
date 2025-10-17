@@ -27,6 +27,7 @@ public class Credential {
 
     private String passwordEncrypted;   // password Encrypted
     private String passwordNonce;       //
+    private boolean favorite;
 
     @CreatedDate private Instant createdAt;
 
@@ -38,6 +39,7 @@ public class Credential {
                 .usernameNonce(addRequest.usernameNonce())
                 .passwordEncrypted(addRequest.passwordEncrypted())
                 .passwordNonce(addRequest.passwordNonce())
+                .favorite(Boolean.TRUE.equals(addRequest.favorite()))
                 .build();
     }
 

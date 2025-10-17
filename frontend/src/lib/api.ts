@@ -328,6 +328,7 @@ export type CreateCredentialRequest = {
     passwordNonce: string;
     url?: string;
     notes?: string;
+    favorite?: boolean;
 };
 
 export type UpdateCredentialRequest = {
@@ -337,6 +338,7 @@ export type UpdateCredentialRequest = {
     usernameNonce?: string;
     passwordEncrypted?: string;
     passwordNonce?: string;
+    favorite?: boolean;
 };
 
 export type PublicCredential = {
@@ -347,10 +349,15 @@ export type PublicCredential = {
     usernameNonce: string;
     passwordEncrypted: string;
     passwordNonce: string;
+    favorite: boolean;
 };
 
 export type GetAllCredentialResponse = {
     credentials: PublicCredential[];
+};
+
+export type UpdateCredentialFavoriteRequest = {
+    favorite: boolean;
 };
 
 export interface AuditLogActor {
@@ -441,6 +448,12 @@ export const api = {
         req<PublicCredential>(`/credential/${id}`, {method: 'PUT', body: JSON.stringify(body)}),
     deleteCredential: (id: string) =>
         req<void>(`/credential/${id}`, {method: 'DELETE'}),
+
+    updateCredentialFavorite: (id: string, favorite: boolean) =>
+        req<PublicCredential>(`/credential/${id}/favorite`, {
+            method: 'PUT',
+            body: JSON.stringify({favorite}),
+        }),
 
     fetchCredentials: () => req<GetAllCredentialResponse>(`/credentials`),
 
