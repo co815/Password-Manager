@@ -34,10 +34,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ActiveProfiles("test")
@@ -120,6 +124,62 @@ class VaultControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateMetadataWithoutTokenReturns401() throws Exception {
+        String payload = """
+                {
+                  "favorite": true
+                }
+                """;
+
+        mockMvc.perform(put("/api/vault/item-1/metadata")
+                        .secure(true)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateMetadataWithTokenSanitizesCollections() throws Exception {
+        VaultItem existing = new VaultItem();
+        existing.setId("item-1");
+        existing.setUserId("user-123");
+        existing.setTitleCipher("titleCipher");
+        existing.setTitleNonce("titleNonce");
+        existing.setUsernameCipher("usernameCipher");
+        existing.setUsernameNonce("usernameNonce");
+        existing.setPasswordCipher("passwordCipher");
+        existing.setPasswordNonce("passwordNonce");
+        existing.setUrl("https://example.com");
+
+        when(vaultItemRepository.findByIdAndUserId("item-1", "user-123"))
+                .thenReturn(Optional.of(existing));
+        when(vaultItemRepository.save(any(VaultItem.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        stubUser("user-123");
+        String token = jwtService.generate("user-123", 0);
+
+        String payload = """
+                {
+                  "favorite": true,
+                  "collections": [" Work ", "Personal", "Work", ""]
+                }
+                """;
+
+        mockMvc.perform(put("/api/vault/item-1/metadata")
+                        .secure(true)
+                        .with(csrf())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favorite").value(true))
+                .andExpect(jsonPath("$.collections", hasSize(2)))
+                .andExpect(jsonPath("$.collections", containsInAnyOrder("Work", "Personal")));
     }
 
     private void stubUser(String userId) {

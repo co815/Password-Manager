@@ -2,6 +2,7 @@ package com.example.pm.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Builder.Default;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -11,6 +12,8 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Data
 @Builder
@@ -37,6 +40,12 @@ public class VaultItem {
 
     private String notesCipher;
     private String notesNonce;
+
+    @Default
+    private boolean favorite = false;
+
+    @Default
+    private Set<String> collections = new LinkedHashSet<>();
 
     @CreatedDate
     private Instant createdAt;

@@ -318,6 +318,13 @@ export interface VaultItem {
     notesNonce?: string;
     createdAt?: string;
     updatedAt?: string;
+    favorite?: boolean;
+    collections?: string[];
+}
+
+export interface VaultMetadataUpdateRequest {
+    favorite?: boolean;
+    collections?: string[];
 }
 
 export type CreateCredentialRequest = {
@@ -507,6 +514,8 @@ export const api = {
         req<VaultItem>(`/vault`, {method: 'POST', body: JSON.stringify(body)}),
     updateVault: (id: string, body: Partial<VaultItem>) =>
         req<VaultItem>(`/vault/${id}`, {method: 'PUT', body: JSON.stringify(body)}),
+    updateVaultMetadata: (id: string, body: VaultMetadataUpdateRequest) =>
+        req<VaultItem>(`/vault/${id}/metadata`, {method: 'PUT', body: JSON.stringify(body)}),
     deleteVault: (id: string) =>
         req<{ ok: boolean }>(`/vault/${id}`, {method: 'DELETE'}),
 
