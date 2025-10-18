@@ -30,6 +30,7 @@ import {authButtonStyles, createFieldStyles} from './authStyles';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
 import {extractApiErrorDetails} from '../../lib/api-error';
 import {
+    MIN_ACCEPTABLE_PASSWORD_SCORE,
     assessPasswordStrength,
     getPasswordStrengthColor,
     getPasswordStrengthLabel,
@@ -74,10 +75,22 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const pwdScore = pwdStrength.score;
     const pwdProgress = (pwdScore / 4) * 100;
     const strengthLabel = mp ? getPasswordStrengthLabel(pwdScore) : 'No password entered';
-    const strengthMessage = mp
-        ? pwdStrength.suggestions[0]
-        : 'Use a long, unique passphrase to protect your vault.';
+    const strengthSuggestions = mp
+        ? pwdStrength.suggestions
+        : [
+              'Use a long, unique passphrase to protect your vault.',
+              'Avoid personal information or common phrases that can be guessed.',
+          ];
     const strengthColor = getPasswordStrengthColor(pwdScore);
+    const passwordTooWeak =
+        Boolean(mp) && (pwdStrength.compromised || pwdStrength.score < MIN_ACCEPTABLE_PASSWORD_SCORE);
+    const passwordWarning = !mp
+        ? null
+        : pwdStrength.compromised
+            ? 'This password was found in known breaches. Please choose a different one.'
+            : pwdStrength.score < MIN_ACCEPTABLE_PASSWORD_SCORE
+                ? 'Your master password is too weak. Make it longer and mix words, numbers, and symbols.'
+                : null;
     const usernameError = !!trimmedUsername && trimmedUsername.length < 4;
     const confirmError = !!mp2 && mp2 !== mp;
     const disabled =
@@ -89,6 +102,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
         || trimmedUsername.length < 4
         || !mp
         || mp !== mp2
+        || passwordTooWeak
         || (captchaEnabled && !captchaToken);
 
     const handleSwitchToLogin = useCallback(() => {
@@ -282,13 +296,41 @@ export default function SignupCard({onSwitchToLogin}: Props) {
                         >
                             {strengthLabel}
                         </Typography>
-                        <Typography
-                            variant="caption"
-                            color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
-                            sx={{display: 'block'}}
+                        {mp ? (
+                            <Typography
+                                variant="caption"
+                                color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
+                                sx={{display: 'block'}}
+                            >
+                                Estimated crack time: {pwdStrength.crackTime}
+                            </Typography>
+                        ) : null}
+                        <Stack
+                            component="ul"
+                            spacing={0.25}
+                            sx={{
+                                listStyleType: 'disc',
+                                pl: 2,
+                                mt: 0.5,
+                                mb: 0,
+                                color: pwdStrength.compromised ? 'error.main' : 'text.secondary',
+                            }}
                         >
-                            {strengthMessage}
-                        </Typography>
+                            {strengthSuggestions.map((suggestion, index) => (
+                                <Typography key={`${suggestion}-${index}`} component="li" variant="caption">
+                                    {suggestion}
+                                </Typography>
+                            ))}
+                        </Stack>
+                        {passwordWarning ? (
+                            <Typography
+                                variant="caption"
+                                color="error.main"
+                                sx={{display: 'block', fontWeight: 600, mt: 0.75}}
+                            >
+                                {passwordWarning}
+                            </Typography>
+                        ) : null}
                     </Box>
 
                     <FormControl fullWidth variant="outlined" error={confirmError} sx={(theme) => createFieldStyles(theme)}>

@@ -41,6 +41,7 @@ import {
 } from '@mui/icons-material';
 import {passwordTemplates} from '../lib/passwordTemplates';
 import {
+    MIN_ACCEPTABLE_PASSWORD_SCORE,
     assessPasswordStrength,
     getPasswordStrengthColor,
     getPasswordStrengthLabel,
@@ -202,11 +203,23 @@ export default function Dashboard() {
     const pwdScore = pwdStrength.score;
     const pwdProgress = (pwdScore / 4) * 100;
     const strengthLabel = password ? getPasswordStrengthLabel(pwdScore) : 'No password entered';
-    const strengthMessage = password
-        ? pwdStrength.suggestions[0]
-        : 'Use a long, unique password to improve security.';
+    const strengthSuggestions = password
+        ? pwdStrength.suggestions
+        : [
+            'Use a long, unique password to improve security.',
+            'Avoid reusing passwords between different websites.',
+        ];
     const strengthColor = getPasswordStrengthColor(pwdScore);
-    const saveDisabled = busy || !title.trim() || !username.trim() || !password;
+    const passwordTooWeak =
+        Boolean(password) && (pwdStrength.compromised || pwdStrength.score < MIN_ACCEPTABLE_PASSWORD_SCORE);
+    const passwordWarning = !password
+        ? null
+        : pwdStrength.compromised
+            ? 'This password was found in known breaches. Choose a different one before saving.'
+            : pwdStrength.score < MIN_ACCEPTABLE_PASSWORD_SCORE
+                ? 'This password is too weak. Increase its length and complexity before saving.'
+                : null;
+    const saveDisabled = busy || !title.trim() || !username.trim() || !password || passwordTooWeak;
     const rotateDisabled =
         rotateBusy
         || locked
@@ -1849,6 +1862,7 @@ export default function Dashboard() {
                                 placeholder="••••••••"
                                 fullWidth
                                 size="small"
+                                error={passwordTooWeak}
                                 type={showPwd ? 'text' : 'password'}
                                 slotProps={{
                                     input: {
@@ -1900,13 +1914,41 @@ export default function Dashboard() {
                                 >
                                     {strengthLabel}
                                 </Typography>
-                                <Typography
-                                    variant="caption"
-                                    color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
-                                    sx={{display: 'block'}}
+                                {password ? (
+                                    <Typography
+                                        variant="caption"
+                                        color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
+                                        sx={{display: 'block'}}
+                                    >
+                                        Estimated crack time: {pwdStrength.crackTime}
+                                    </Typography>
+                                ) : null}
+                                <Stack
+                                    component="ul"
+                                    spacing={0.25}
+                                    sx={{
+                                        listStyleType: 'disc',
+                                        pl: 2,
+                                        mt: 0.5,
+                                        mb: 0,
+                                        color: pwdStrength.compromised ? 'error.main' : 'text.secondary',
+                                    }}
                                 >
-                                    {strengthMessage}
-                                </Typography>
+                                    {strengthSuggestions.map((suggestion, index) => (
+                                        <Typography key={`${suggestion}-${index}`} component="li" variant="caption">
+                                            {suggestion}
+                                        </Typography>
+                                    ))}
+                                </Stack>
+                                {passwordWarning ? (
+                                    <Typography
+                                        variant="caption"
+                                        color="error.main"
+                                        sx={{display: 'block', fontWeight: 600, mt: 0.75}}
+                                    >
+                                        {passwordWarning}
+                                    </Typography>
+                                ) : null}
                             </Box>
                         </Box>
                         <TextField

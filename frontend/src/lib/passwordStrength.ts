@@ -31,6 +31,7 @@ const BREACHED_PASSWORDS = new Set(
 );
 
 const STRENGTH_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'] as const;
+export const MIN_ACCEPTABLE_PASSWORD_SCORE = 2;
 
 export type PasswordStrengthAssessment = {
     score: number;
@@ -72,8 +73,15 @@ export function assessPasswordStrength(
         suggestions.push(evaluation.feedback.warning);
     }
     suggestions.push(...evaluation.feedback.suggestions);
-    if (!suggestions.length) {
-        suggestions.push('Great! This password looks strong. Consider storing it securely in your vault.');
+
+    const normalizedSuggestions = suggestions
+        .map((suggestion) => suggestion.trim())
+        .filter((suggestion) => suggestion.length > 0);
+
+    const uniqueSuggestions = Array.from(new Set(normalizedSuggestions));
+
+    if (!uniqueSuggestions.length) {
+        uniqueSuggestions.push('Great! This password looks strong. Consider storing it securely in your vault.');
     }
 
     const crackTimeValue = evaluation.crack_times_display.offline_fast_hashing_1e10_per_second;
@@ -81,7 +89,7 @@ export function assessPasswordStrength(
     return {
         score,
         compromised,
-        suggestions,
+        suggestions: uniqueSuggestions,
         crackTime: typeof crackTimeValue === 'number' ? crackTimeValue.toString() : crackTimeValue,
     };
 }
