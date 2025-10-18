@@ -219,7 +219,7 @@ export default function Dashboard() {
             : pwdStrength.score < MIN_ACCEPTABLE_PASSWORD_SCORE
                 ? 'This password is too weak. Increase its length and complexity before saving.'
                 : null;
-    const saveDisabled = busy || !title.trim() || !username.trim() || !password || passwordTooWeak;
+    const saveDisabled = busy || !title.trim() || !username.trim() || !password;
     const rotateDisabled =
         rotateBusy
         || locked

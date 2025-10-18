@@ -95,6 +95,21 @@ export default function AuditLog() {
     const [filters, setFilters] = useState<FilterState>({...DEFAULT_FILTERS});
     const [draftFilters, setDraftFilters] = useState<FilterState>({...DEFAULT_FILTERS});
     const firstLoad = useRef(true);
+    const pageRef = useRef(page);
+    const pageSizeRef = useRef(pageSize);
+    const totalElementsRef = useRef(totalElements);
+
+    useEffect(() => {
+        pageRef.current = page;
+    }, [page]);
+
+    useEffect(() => {
+        pageSizeRef.current = pageSize;
+    }, [pageSize]);
+
+    useEffect(() => {
+        totalElementsRef.current = totalElements;
+    }, [totalElements]);
 
     const buildParams = useCallback((options?: {includePagination?: boolean; limit?: number}): AuditLogListParams => {
         const includePagination = options?.includePagination ?? true;
@@ -141,26 +156,28 @@ export default function AuditLog() {
         try {
             const response = await api.listAuditLogs(buildParams());
             setLogs(response.logs ?? []);
-            const nextPageSize = typeof response.pageSize === 'number' ? response.pageSize : pageSize;
-            if (nextPageSize !== pageSize) {
-                setPageSize(nextPageSize);
-            }
-            const nextTotalElements = typeof response.totalElements === 'number' ? response.totalElements : totalElements;
-            if (nextTotalElements !== totalElements) {
-                setTotalElements(nextTotalElements);
-            }
+
+            const responsePageSize = typeof response.pageSize === 'number' ? response.pageSize : undefined;
+            const responseTotalElements = typeof response.totalElements === 'number' ? response.totalElements : undefined;
+            const responsePage = typeof response.page === 'number' ? response.page : undefined;
+
+            const nextPageSize = responsePageSize ?? pageSizeRef.current;
+            setPageSize((prevPageSize) => (nextPageSize !== prevPageSize ? nextPageSize : prevPageSize));
+
+            const nextTotalElements = responseTotalElements ?? totalElementsRef.current;
+            setTotalElements((prevTotalElements) => (nextTotalElements !== prevTotalElements ? nextTotalElements : prevTotalElements));
+
             const totalPagesFromResponse = typeof response.totalPages === 'number'
                 ? response.totalPages
                 : nextPageSize > 0
                     ? Math.ceil(nextTotalElements / nextPageSize)
                     : 0;
-            if (typeof response.page === 'number') {
+
+            if (typeof responsePage === 'number') {
                 const clampedPage = totalPagesFromResponse > 0
-                    ? Math.min(response.page, totalPagesFromResponse - 1)
+                    ? Math.min(responsePage, totalPagesFromResponse - 1)
                     : 0;
-                if (clampedPage !== page) {
-                    setPage(clampedPage);
-                }
+                setPage((prevPage) => (prevPage !== clampedPage ? clampedPage : prevPage));
             }
             setError(null);
         } catch (err: unknown) {
