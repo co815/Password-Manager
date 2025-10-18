@@ -5,6 +5,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface AuditLogRepository extends MongoRepository<AuditLog,String> {
+public interface AuditLogRepository extends MongoRepository<AuditLog,String>, AuditLogRepositoryCustom {
     Page<AuditLog> findAllByOrderByCreatedDateDesc(Pageable pageable);
 }
