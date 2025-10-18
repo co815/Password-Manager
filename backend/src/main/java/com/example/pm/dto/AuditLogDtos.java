@@ -47,7 +47,13 @@ public class AuditLogDtos {
     }
 
     public record ListResponse(
-            List<AuditLogEntry> logs
+            List<AuditLogEntry> logs,
+            int page,
+            int pageSize,
+            long totalElements,
+            int totalPages,
+            boolean hasNext,
+            boolean hasPrevious
     ) {
     }
 }

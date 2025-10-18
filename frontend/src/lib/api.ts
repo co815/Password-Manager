@@ -378,6 +378,75 @@ export interface AuditLogEntry {
 
 export interface AuditLogListResponse {
     logs: AuditLogEntry[];
+    page: number;
+    pageSize: number;
+    totalElements: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+}
+
+export interface AuditLogListParams {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    actions?: string[];
+    targetTypes?: string[];
+    targetId?: string;
+    actor?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+}
+
+function buildAuditLogQuery(
+    params: AuditLogListParams = {},
+    options: {includePagination?: boolean; includeLimit?: boolean} = {},
+): string {
+    const searchParams = new URLSearchParams();
+    const includePagination = options.includePagination ?? true;
+
+    if (includePagination) {
+        if (typeof params.page === 'number') {
+            searchParams.set('page', String(params.page));
+        }
+        if (typeof params.pageSize === 'number') {
+            searchParams.set('pageSize', String(params.pageSize));
+        }
+    }
+
+    if (options.includeLimit && typeof params.limit === 'number') {
+        searchParams.set('limit', String(params.limit));
+    }
+
+    if (params.search) {
+        searchParams.set('search', params.search);
+    }
+    if (params.targetId) {
+        searchParams.set('targetId', params.targetId);
+    }
+    if (params.actor) {
+        searchParams.set('actor', params.actor);
+    }
+    if (params.from) {
+        searchParams.set('from', params.from);
+    }
+    if (params.to) {
+        searchParams.set('to', params.to);
+    }
+
+    const appendAll = (key: string, values?: string[]) => {
+        values?.forEach((value) => {
+            if (value) {
+                searchParams.append(key, value);
+            }
+        });
+    };
+
+    appendAll('action', params.actions);
+    appendAll('targetType', params.targetTypes);
+
+    return searchParams.toString();
 }
 
 export const api = {
@@ -457,6 +526,22 @@ export const api = {
 
     fetchCredentials: () => req<GetAllCredentialResponse>(`/credentials`),
 
-    listAuditLogs: (limit = 100) =>
-        req<AuditLogListResponse>(`/audit-logs?limit=${encodeURIComponent(limit)}`),
+    listAuditLogs: (params: AuditLogListParams = {}) => {
+        const query = buildAuditLogQuery(params);
+        const suffix = query ? `?${query}` : '';
+        return req<AuditLogListResponse>(`/audit-logs${suffix}`);
+    },
+
+    exportAuditLogs: async (params: AuditLogListParams = {}) => {
+        const query = buildAuditLogQuery(params, {includePagination: false, includeLimit: true});
+        const suffix = query ? `?${query}` : '';
+        const res = await fetch(`${API_BASE}/audit-logs/export${suffix}`, {
+            credentials: 'include',
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new ApiError(text || 'Failed to export audit logs', res.status, text);
+        }
+        return res.blob();
+    },
 };
