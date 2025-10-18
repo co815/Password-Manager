@@ -63,12 +63,47 @@ export function assessPasswordStrength(
     );
 
     const compromised = BREACHED_PASSWORDS.has(normalizedPassword.toLowerCase());
-    const score = compromised ? 0 : evaluation.score;
+    const rawScore = compromised ? 0 : evaluation.score;
+
+    const characterSetsUsed = [
+        /[a-z]/.test(normalizedPassword),
+        /[A-Z]/.test(normalizedPassword),
+        /[0-9]/.test(normalizedPassword),
+        /[^A-Za-z0-9]/.test(normalizedPassword),
+    ].filter(Boolean).length;
+
+    const heuristicsWarnings: string[] = [];
+    let score = rawScore;
+
+    if (characterSetsUsed <= 1) {
+        score = Math.min(score, 1);
+        heuristicsWarnings.push(
+            'Mix in uppercase letters, numbers, or symbols so your password is not made from just one type of character.'
+        );
+    } else if (characterSetsUsed === 2) {
+        score = Math.min(score, 2);
+        heuristicsWarnings.push('Using three or more types of characters makes passwords much harder to guess.');
+    }
+
+    if (normalizedPassword.length < 12) {
+        score = Math.min(score, 2);
+        heuristicsWarnings.push('Add a few more characters—longer passwords are significantly stronger.');
+    }
+
+    const guessesLog10 = evaluation.guesses_log10 ?? Math.log10(Math.max(1, evaluation.guesses));
+    if (guessesLog10 < 6) {
+        score = Math.min(score, 1);
+        heuristicsWarnings.push('This password would be cracked almost instantly. Use a longer and more complex password.');
+    } else if (guessesLog10 < 8) {
+        score = Math.min(score, 2);
+        heuristicsWarnings.push('Increase the complexity so it takes far longer to crack.');
+    }
 
     const suggestions: string[] = [];
     if (compromised) {
         suggestions.push('This password appears in known data breaches. Choose a different one.');
     }
+    suggestions.push(...heuristicsWarnings);
     if (evaluation.feedback.warning) {
         suggestions.push(evaluation.feedback.warning);
     }
