@@ -40,6 +40,11 @@ import {
     AutoFixHigh,
 } from '@mui/icons-material';
 import {passwordTemplates} from '../lib/passwordTemplates';
+import {
+    assessPasswordStrength,
+    getPasswordStrengthColor,
+    getPasswordStrengthLabel,
+} from '../lib/passwordStrength';
 
 const td = new TextDecoder();
 
@@ -103,16 +108,6 @@ async function encryptField(dek: CryptoKey, text: string) {
     const iv = randIv();
     const ct = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, dek, te.encode(text ?? ''));
     return {cipher: toB64(ct), nonce: toB64(iv)} as { cipher: string; nonce: string };
-}
-
-function scorePassword(p: string) {
-    let s = 0;
-    if (p.length >= 8) s++;
-    if (/[A-Z]/.test(p)) s++;
-    if (/[a-z]/.test(p)) s++;
-    if (/\d/.test(p)) s++;
-    if (/[^A-Za-z0-9]/.test(p)) s++;
-    return Math.min(s, 5);
 }
 
 export default function Dashboard() {
@@ -199,7 +194,18 @@ export default function Dashboard() {
     const avatarSrc = user?.avatarData ?? null;
     const avatarChanged = avatarPreview !== avatarSrc;
 
-    const pwdScore = useMemo(() => scorePassword(password), [password]);
+    const pwdStrength = useMemo(
+        () =>
+            assessPasswordStrength(password, [username, title, user?.email ?? '', user?.username ?? '']),
+        [password, title, user?.email, user?.username, username]
+    );
+    const pwdScore = pwdStrength.score;
+    const pwdProgress = (pwdScore / 4) * 100;
+    const strengthLabel = password ? getPasswordStrengthLabel(pwdScore) : 'No password entered';
+    const strengthMessage = password
+        ? pwdStrength.suggestions[0]
+        : 'Use a long, unique password to improve security.';
+    const strengthColor = getPasswordStrengthColor(pwdScore);
     const saveDisabled = busy || !title.trim() || !username.trim() || !password;
     const rotateDisabled =
         rotateBusy
@@ -1876,16 +1882,32 @@ export default function Dashboard() {
                             />
                             <LinearProgress
                                 variant="determinate"
-                                value={(pwdScore / 5) * 100}
+                                value={pwdProgress}
                                 sx={{
                                     marginTop: 1,
                                     height: 6,
                                     borderRadius: 3,
                                     '& .MuiLinearProgress-bar': {
-                                        background: ['#ef4444', '#f59e0b', '#10b981', '#22c55e', '#16a34a'][Math.max(0, pwdScore - 1)],
+                                        background: strengthColor,
                                     },
                                 }}
                             />
+                            <Box sx={{mt: 0.5}}>
+                                <Typography
+                                    variant="caption"
+                                    sx={{fontWeight: 600, display: 'block'}}
+                                    color={pwdStrength.compromised ? 'error.main' : 'inherit'}
+                                >
+                                    {strengthLabel}
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
+                                    sx={{display: 'block'}}
+                                >
+                                    {strengthMessage}
+                                </Typography>
+                            </Box>
                         </Box>
                         <TextField
                             label="Website (optional)"

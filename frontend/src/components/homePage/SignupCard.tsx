@@ -29,20 +29,15 @@ import CaptchaChallenge from './CaptchaChallenge';
 import {authButtonStyles, createFieldStyles} from './authStyles';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
 import {extractApiErrorDetails} from '../../lib/api-error';
+import {
+    assessPasswordStrength,
+    getPasswordStrengthColor,
+    getPasswordStrengthLabel,
+} from '../../lib/passwordStrength';
 
 type Props = {
     onSwitchToLogin?: () => void;
 };
-
-function scorePassword(p: string) {
-    let score = 0;
-    if (p.length >= 8) score++;
-    if (/[A-Z]/.test(p)) score++;
-    if (/[a-z]/.test(p)) score++;
-    if (/\d/.test(p)) score++;
-    if (/[^A-Za-z0-9]/.test(p)) score++;
-    return Math.min(score, 5);
-}
 
 export default function SignupCard({onSwitchToLogin}: Props) {
     const [email, setEmail] = useState('');
@@ -72,7 +67,17 @@ export default function SignupCard({onSwitchToLogin}: Props) {
 
     const trimmedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
     const trimmedUsername = useMemo(() => username.trim(), [username]);
-    const pwdScore = useMemo(() => scorePassword(mp), [mp]);
+    const pwdStrength = useMemo(
+        () => assessPasswordStrength(mp, [trimmedEmail, trimmedUsername]),
+        [mp, trimmedEmail, trimmedUsername]
+    );
+    const pwdScore = pwdStrength.score;
+    const pwdProgress = (pwdScore / 4) * 100;
+    const strengthLabel = mp ? getPasswordStrengthLabel(pwdScore) : 'No password entered';
+    const strengthMessage = mp
+        ? pwdStrength.suggestions[0]
+        : 'Use a long, unique passphrase to protect your vault.';
+    const strengthColor = getPasswordStrengthColor(pwdScore);
     const usernameError = !!trimmedUsername && trimmedUsername.length < 4;
     const confirmError = !!mp2 && mp2 !== mp;
     const disabled =
@@ -258,17 +263,33 @@ export default function SignupCard({onSwitchToLogin}: Props) {
 
                     <LinearProgress
                         variant="determinate"
-                        value={(pwdScore / 5) * 100}
+                        value={pwdProgress}
                         sx={{
                             height: 6,
                             borderRadius: 3,
                             mx: 0.5,
                             '& .MuiLinearProgress-bar': {
-                                background: ['#ef4444', '#f97316', '#facc15', '#22c55e', '#16a34a'][Math.max(0, pwdScore - 1)],
+                                background: strengthColor,
                             },
                             backgroundColor: 'rgba(148,163,184,0.35)',
                         }}
                     />
+                    <Box sx={{px: 0.5, mt: 0.5}}>
+                        <Typography
+                            variant="caption"
+                            sx={{fontWeight: 600, display: 'block'}}
+                            color={pwdStrength.compromised ? 'error.main' : 'inherit'}
+                        >
+                            {strengthLabel}
+                        </Typography>
+                        <Typography
+                            variant="caption"
+                            color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
+                            sx={{display: 'block'}}
+                        >
+                            {strengthMessage}
+                        </Typography>
+                    </Box>
 
                     <FormControl fullWidth variant="outlined" error={confirmError} sx={(theme) => createFieldStyles(theme)}>
                         <InputLabel htmlFor="signup-confirm">Confirm Password *</InputLabel>
