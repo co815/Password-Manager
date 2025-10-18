@@ -76,11 +76,13 @@ export function assessPasswordStrength(
         suggestions.push('Great! This password looks strong. Consider storing it securely in your vault.');
     }
 
+    const crackTimeValue = evaluation.crack_times_display.offline_fast_hashing_1e10_per_second;
+
     return {
         score,
         compromised,
         suggestions,
-        crackTime: evaluation.crack_times_display.offline_fast_hashing_1e10_per_second,
+        crackTime: typeof crackTimeValue === 'number' ? crackTimeValue.toString() : crackTimeValue,
     };
 }
 
