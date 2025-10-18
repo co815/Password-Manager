@@ -84,7 +84,9 @@ export function assessPasswordStrength(
         uniqueSuggestions.push('Great! This password looks strong. Consider storing it securely in your vault.');
     }
 
-    const crackTimeValue = evaluation.crack_times_display.offline_fast_hashing_1e10_per_second;
+    const crackTimeValue =
+        evaluation.crack_times_display.offline_slow_hashing_1e4_per_second ??
+        evaluation.crack_times_display.offline_fast_hashing_1e10_per_second;
 
     return {
         score,
