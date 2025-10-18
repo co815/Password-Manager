@@ -6,11 +6,13 @@ import com.yubico.webauthn.RelyingParty;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Configuration
+@Profile("!test")
 public class WebAuthnConfig {
 
     @Bean

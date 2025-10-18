@@ -5,11 +5,17 @@ import com.example.pm.security.CaptchaValidationService;
 import com.example.pm.security.LoginThrottleEntry;
 import com.example.pm.security.LoginThrottleRepository;
 import com.example.pm.security.LoginThrottleService;
+import com.example.pm.webauthn.MongoWebAuthnCredentialRepository;
+import com.example.pm.webauthn.WebAuthnCredentialRepository;
+import com.example.pm.webauthn.WebAuthnService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 
+import org.mockito.Mockito;
+
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -70,6 +76,30 @@ public class TestSupportConfig {
                 return true;
             }
         };
+    }
+
+    @Bean
+    @Primary
+    public WebAuthnCredentialRepository webAuthnCredentialRepository() {
+        return Mockito.mock(WebAuthnCredentialRepository.class);
+    }
+
+    @Bean
+    @Primary
+    public MongoWebAuthnCredentialRepository mongoWebAuthnCredentialRepository() {
+        MongoWebAuthnCredentialRepository repository = Mockito.mock(MongoWebAuthnCredentialRepository.class);
+        Mockito.when(repository.getCredentialIdsForUsername(Mockito.anyString())).thenReturn(Collections.emptySet());
+        Mockito.when(repository.getUserHandleForUsername(Mockito.anyString())).thenReturn(Optional.empty());
+        Mockito.when(repository.getUsernameForUserHandle(Mockito.any())).thenReturn(Optional.empty());
+        Mockito.when(repository.lookup(Mockito.any(), Mockito.any())).thenReturn(Optional.empty());
+        Mockito.when(repository.lookupAll(Mockito.any())).thenReturn(Collections.emptySet());
+        return repository;
+    }
+
+    @Bean
+    @Primary
+    public WebAuthnService webAuthnService() {
+        return Mockito.mock(WebAuthnService.class);
     }
 
     private static class InMemoryLoginThrottleRepository implements LoginThrottleRepository {

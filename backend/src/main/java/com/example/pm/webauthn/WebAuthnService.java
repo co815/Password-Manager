@@ -22,6 +22,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialRequestOptions;
 import com.yubico.webauthn.data.UserIdentity;
 import com.yubico.webauthn.exception.AssertionFailedException;
 import com.yubico.webauthn.exception.RegistrationFailedException;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -31,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 
 @Service
+@Profile("!test")
 public class WebAuthnService {
 
     private final RelyingParty relyingParty;

@@ -9,6 +9,8 @@ import com.yubico.webauthn.data.AuthenticatorTransport;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.PublicKeyCredentialDescriptor;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -19,21 +21,26 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
+@Profile("!test")
 public class MongoWebAuthnCredentialRepository implements CredentialRepository {
 
-    private final WebAuthnCredentialRepository credentials;
-    private final UserRepository userRepository;
+    private final ObjectProvider<WebAuthnCredentialRepository> credentialsProvider;
+    private final ObjectProvider<UserRepository> userRepositoryProvider;
 
-    public MongoWebAuthnCredentialRepository(WebAuthnCredentialRepository credentials,
-                                             UserRepository userRepository) {
-        this.credentials = credentials;
-        this.userRepository = userRepository;
+    public MongoWebAuthnCredentialRepository(ObjectProvider<WebAuthnCredentialRepository> credentials,
+                                             ObjectProvider<UserRepository> userRepository) {
+        this.credentialsProvider = credentials;
+        this.userRepositoryProvider = userRepository;
     }
 
     @Override
     public Set<PublicKeyCredentialDescriptor> getCredentialIdsForUsername(String username) {
+        WebAuthnCredentialRepository credentialRepository = credentialsProvider.getIfAvailable();
+        if (credentialRepository == null) {
+            return Collections.emptySet();
+        }
         return findUserByEmail(username)
-                .map(user -> credentials.findByUserId(user.getId()).stream()
+                .map(user -> credentialRepository.findByUserId(user.getId()).stream()
                         .map(this::toDescriptor)
                         .collect(Collectors.toSet()))
                 .orElseGet(Collections::emptySet);
@@ -55,6 +62,10 @@ public class MongoWebAuthnCredentialRepository implements CredentialRepository {
             return Optional.empty();
         }
         String userId = userIdFromHandle(userHandle);
+        UserRepository userRepository = userRepositoryProvider.getIfAvailable();
+        if (userRepository == null) {
+            return Optional.empty();
+        }
         return userRepository.findById(userId).map(User::getEmail);
     }
 
@@ -63,7 +74,11 @@ public class MongoWebAuthnCredentialRepository implements CredentialRepository {
         if (credentialId == null) {
             return Optional.empty();
         }
-        Optional<WebAuthnCredential> credential = credentials.findByCredentialId(credentialId.getBase64());
+        WebAuthnCredentialRepository credentialRepository = credentialsProvider.getIfAvailable();
+        if (credentialRepository == null) {
+            return Optional.empty();
+        }
+        Optional<WebAuthnCredential> credential = credentialRepository.findByCredentialId(credentialId.getBase64());
         if (credential.isEmpty()) {
             return Optional.empty();
         }
@@ -81,13 +96,21 @@ public class MongoWebAuthnCredentialRepository implements CredentialRepository {
         if (credentialId == null) {
             return Collections.emptySet();
         }
-        return credentials.findByCredentialId(credentialId.getBase64())
+        WebAuthnCredentialRepository credentialRepository = credentialsProvider.getIfAvailable();
+        if (credentialRepository == null) {
+            return Collections.emptySet();
+        }
+        return credentialRepository.findByCredentialId(credentialId.getBase64())
                 .map(this::toRegisteredCredential)
                 .map(Set::of)
                 .orElseGet(Collections::emptySet);
     }
 
     private Optional<User> findUserByEmail(String email) {
+        UserRepository userRepository = userRepositoryProvider.getIfAvailable();
+        if (userRepository == null) {
+            return Optional.empty();
+        }
         if (email == null) {
             return Optional.empty();
         }
