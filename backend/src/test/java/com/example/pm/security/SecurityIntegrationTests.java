@@ -1,6 +1,8 @@
 package com.example.pm.security;
 
 import com.example.pm.TestSupportConfig;
+import com.example.pm.auth.EmailVerificationService;
+import com.example.pm.auth.PlaceholderSaltService;
 import com.example.pm.model.AuditLog;
 import com.example.pm.model.User;
 import com.example.pm.model.VaultItem;
@@ -8,8 +10,12 @@ import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.repo.VaultItemRepository;
+import com.example.pm.security.AuthSessionService;
 import com.example.pm.security.RateLimiterService;
+import com.example.pm.webauthn.MongoWebAuthnCredentialRepository;
+import com.example.pm.webauthn.WebAuthnCredentialRepository;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,12 +24,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Instant;
 import java.util.List;
@@ -82,6 +90,21 @@ class SecurityIntegrationTests {
     @MockBean
     private RateLimiterService rateLimiterService;
 
+    @MockBean
+    private PlaceholderSaltService placeholderSaltService;
+
+    @MockBean
+    private EmailVerificationService emailVerificationService;
+
+    @MockBean
+    private AuthSessionService authSessionService;
+
+    @MockBean
+    private MongoWebAuthnCredentialRepository mongoWebAuthnCredentialRepository;
+
+    @MockBean
+    private WebAuthnCredentialRepository webAuthnCredentialRepository;
+
     @BeforeEach
     void setUpMocks() {
         reset(vaultItemRepository, auditLogRepository, userRepository, credentialRepository, rateLimiterService);
@@ -102,6 +125,11 @@ class SecurityIntegrationTests {
         lenient().when(auditLogRepository.save(any(AuditLog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(rateLimiterService.isAllowed(anyString())).thenReturn(true);
+        lenient().when(authSessionService.startSession(any(User.class), any(), any())).thenAnswer(invocation -> {
+            ResponseCookie cookie = ResponseCookie.from("accessToken", "token-value").build();
+            CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
+            return new AuthSessionService.Session("token-value", cookie, csrfToken);
+        });
     }
 
     @Test

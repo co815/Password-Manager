@@ -44,6 +44,24 @@ public class SecurityAuditService {
                 viaRecoveryCode ? "MFA disabled using recovery code" : "MFA disabled using OTP code");
     }
 
+    public void recordPasskeyRegistrationStarted(String userId) {
+        save(userId, "PASSKEY_REGISTRATION_STARTED", "User initiated passkey registration");
+    }
+
+    public void recordPasskeyRegistered(String userId, String credentialId) {
+        save(userId, "PASSKEY_REGISTERED",
+                "New passkey registered (credential=" + abbreviate(credentialId) + ")");
+    }
+
+    public void recordPasskeyAuthenticationSuccess(String userId) {
+        save(userId, "PASSKEY_AUTHENTICATION_SUCCESS", "User authenticated using passkey");
+    }
+
+    public void recordPasskeyAuthenticationFailure(String identifier) {
+        save(null, "PASSKEY_AUTHENTICATION_FAILURE",
+                "Failed passkey authentication for identifier=" + sanitize(identifier));
+    }
+
     public void recordSessionsRevoked(String userId, int tokenVersion) {
         save(userId, "SESSIONS_REVOKED", "Token version bumped to " + tokenVersion);
     }
@@ -64,5 +82,16 @@ public class SecurityAuditService {
             return "unknown";
         }
         return identifier.replaceAll("[^a-zA-Z0-9@._-]", "?");
+    }
+
+    private String abbreviate(String credentialId) {
+        if (credentialId == null) {
+            return "unknown";
+        }
+        String trimmed = credentialId.trim();
+        if (trimmed.length() <= 8) {
+            return trimmed;
+        }
+        return trimmed.substring(0, 4) + "…" + trimmed.substring(trimmed.length() - 4);
     }
 }

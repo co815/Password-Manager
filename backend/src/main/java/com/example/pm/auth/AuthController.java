@@ -1,19 +1,17 @@
 package com.example.pm.auth;
 
 import com.example.pm.auditlog.SecurityAuditService;
-import com.example.pm.config.AuthCookieProps;
 import com.example.pm.dto.AuthDtos.*;
 import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
-import com.example.pm.security.JwtService;
+import com.example.pm.security.AuthSessionService;
 import com.example.pm.security.RateLimiterService;
 import com.example.pm.security.TotpService;
 import com.example.pm.security.CaptchaValidationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -41,13 +38,11 @@ import java.util.regex.Pattern;
 public class AuthController {
 
     private final UserRepository users;
-    private final JwtService jwt;
-    private final AuthCookieProps authCookieProps;
+    private final AuthSessionService authSessionService;
     private final RateLimiterService rateLimiterService;
     private final TotpService totpService;
     private final SecurityAuditService auditService;
     private final CaptchaValidationService captchaValidationService;
-    private final boolean sslEnabled;
     private final CsrfTokenRepository csrfTokenRepository;
     private final PlaceholderSaltService placeholderSaltService;
     private final EmailVerificationService emailVerificationService;
@@ -61,25 +56,23 @@ public class AuthController {
     private static final SecureRandom RECOVERY_RANDOM = new SecureRandom();
     private static final char[] RECOVERY_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public AuthController(UserRepository users, JwtService jwt, AuthCookieProps authCookieProps,
+    public AuthController(UserRepository users,
                           RateLimiterService rateLimiterService, TotpService totpService,
                           SecurityAuditService auditService,
                           CaptchaValidationService captchaValidationService,
-                          CsrfTokenRepository csrfTokenRepository,
                           PlaceholderSaltService placeholderSaltService,
                           EmailVerificationService emailVerificationService,
-                          @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
+                          AuthSessionService authSessionService,
+                          CsrfTokenRepository csrfTokenRepository) {
         this.users = users;
-        this.jwt = jwt;
-        this.authCookieProps = authCookieProps;
+        this.authSessionService = authSessionService;
         this.rateLimiterService = rateLimiterService;
         this.totpService = totpService;
         this.auditService = auditService;
         this.captchaValidationService = captchaValidationService;
-        this.csrfTokenRepository = csrfTokenRepository;
         this.placeholderSaltService = placeholderSaltService;
         this.emailVerificationService = emailVerificationService;
-        this.sslEnabled = sslEnabled;
+        this.csrfTokenRepository = csrfTokenRepository;
     }
 
     @PostMapping("/register")
@@ -199,18 +192,12 @@ public class AuthController {
             }
         }
 
-        String token = jwt.generate(user.getId(), user.getTokenVersion());
         var publicUser = PublicUser.fromUser(user);
-        ResponseCookie cookie = buildAccessTokenCookie(token, jwt.getExpiry(),
-                shouldUseSecureCookie(request));
-        CsrfToken csrfToken = csrfTokenRepository.generateToken(request);
-        request.setAttribute(CsrfToken.class.getName(), csrfToken);
-        request.setAttribute(csrfToken.getParameterName(), csrfToken);
-        csrfTokenRepository.saveToken(csrfToken, request, response);
+        AuthSessionService.Session session = authSessionService.startSession(user, request, response);
         auditService.recordLoginSuccess(user.getId());
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .header(csrfToken.getHeaderName(), csrfToken.getToken())
+                .header(HttpHeaders.SET_COOKIE, session.cookie().toString())
+                .header(session.csrfToken().getHeaderName(), session.csrfToken().getToken())
                 .body(new LoginResponse(publicUser));
 
     }
@@ -272,8 +259,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
-        ResponseCookie cleared = buildAccessTokenCookie("", Duration.ZERO,
-                shouldUseSecureCookie(request));
+        ResponseCookie cleared = authSessionService.buildClearingCookie(request);
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cleared.toString())
                 .build();
@@ -483,73 +469,6 @@ public class AuthController {
                                 user.getMfaRecoveryCodes() != null ? user.getMfaRecoveryCodes().size() : 0)))
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
-    }
-
-    private ResponseCookie buildAccessTokenCookie(String value, Duration maxAge, boolean secure) {
-        String sameSite = authCookieProps.getSameSiteAttribute();
-        boolean requiresCrossSite = sameSite != null && sameSite.equalsIgnoreCase("None");
-
-        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("accessToken", value != null ? value : "")
-                .path("/")
-                .httpOnly(true)
-                .secure(secure || requiresCrossSite);
-
-        if (maxAge != null) {
-            if (maxAge.isZero() || maxAge.isNegative()) {
-                builder.maxAge(Duration.ZERO);
-            } else {
-                builder.maxAge(maxAge);
-            }
-        }
-
-        if (sameSite != null && !sameSite.isBlank()) {
-            builder.sameSite(sameSite);
-        }
-        return builder.build();
-    }
-
-    private boolean shouldUseSecureCookie(HttpServletRequest request) {
-        if (!sslEnabled) {
-            return false;
-        }
-
-        if (request == null) {
-            return true;
-        }
-
-        if (forwardedProtoIsHttp(request)) {
-            return false;
-        }
-
-        return request.isSecure();
-    }
-
-    private boolean forwardedProtoIsHttp(HttpServletRequest request) {
-        String forwardedProto = request.getHeader("X-Forwarded-Proto");
-        if (forwardedProto != null) {
-            for (String proto : forwardedProto.split(",")) {
-                if ("http".equalsIgnoreCase(proto.trim())) {
-                    return true;
-                }
-            }
-        }
-
-        String forwarded = request.getHeader("Forwarded");
-        if (forwarded != null) {
-            for (String segment : forwarded.split(",")) {
-                for (String part : segment.split(";")) {
-                    String trimmed = part.trim();
-                    if (trimmed.regionMatches(true, 0, "proto=", 0, 6)) {
-                        String value = trimmed.substring(6).trim();
-                        if ("http".equalsIgnoreCase(value)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-
-        return false;
     }
 
     private List<String> generateRecoveryCodes() {

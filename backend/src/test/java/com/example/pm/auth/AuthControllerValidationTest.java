@@ -1,9 +1,12 @@
 package com.example.pm.auth;
 
 import com.example.pm.TestSupportConfig;
-import com.example.pm.config.AuthCookieProps;
 import com.example.pm.auditlog.SecurityAuditService;
+import com.example.pm.auth.EmailVerificationService;
+import com.example.pm.auth.PlaceholderSaltService;
+import com.example.pm.config.AuthCookieProps;
 import com.example.pm.repo.UserRepository;
+import com.example.pm.security.AuthSessionService;
 import com.example.pm.security.JwtService;
 import com.example.pm.security.TotpService;
 import org.junit.jupiter.api.Test;
@@ -29,6 +32,7 @@ class AuthControllerValidationTest {
     @Autowired MockMvc mockMvc;
 
     @MockBean UserRepository userRepository;
+    @MockBean AuthSessionService authSessionService;
     @MockBean JwtService jwtService;
     @MockBean TotpService totpService;
     @MockBean SecurityAuditService auditService;

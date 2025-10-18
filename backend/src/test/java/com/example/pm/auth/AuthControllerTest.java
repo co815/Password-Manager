@@ -1,7 +1,8 @@
 package com.example.pm.auth;
 
 import com.example.pm.auditlog.SecurityAuditService;
-import com.example.pm.config.AuthCookieProps;
+import com.example.pm.auth.EmailVerificationService;
+import com.example.pm.auth.PlaceholderSaltService;
 import com.example.pm.dto.AuthDtos.LoginRequest;
 import com.example.pm.dto.AuthDtos.ResendVerificationRequest;
 import com.example.pm.dto.AuthDtos.SaltResponse;
@@ -9,12 +10,13 @@ import com.example.pm.dto.AuthDtos.SimpleMessageResponse;
 import com.example.pm.exceptions.ErrorResponse;
 import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
-import com.example.pm.security.JwtService;
+import com.example.pm.security.AuthSessionService;
+import com.example.pm.security.CaptchaValidationService;
 import com.example.pm.security.RateLimiterService;
 import com.example.pm.security.TotpService;
-import com.example.pm.security.CaptchaValidationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -33,13 +35,11 @@ class AuthControllerTest {
     @Test
     void loginSetsSecureHttpOnlyCookieWithSameSite() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
-        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -52,18 +52,23 @@ class AuthControllerTest {
         user.setEmailVerified(true);
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-123", 0)).thenReturn("token-value");
-        when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
-
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite("None");
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
+        ResponseCookie cookie = ResponseCookie.from("accessToken", "token-value")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .maxAge(Duration.ofMinutes(15))
+                .build();
+        when(authSessionService.startSession(eq(user), any(), any()))
+                .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
+
+        AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, emailVerificationService, authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -83,19 +88,17 @@ class AuthControllerTest {
                 .contains("HttpOnly");
         assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN"))
                 .isEqualTo("csrf-token-value");
-        verify(csrfTokenRepository).saveToken(csrfToken, request, responseServlet);
+        verify(authSessionService).startSession(user, request, responseServlet);
     }
 
     @Test
     void loginSucceedsWhenVerifierMatchesAfterTrimmingWhitespace() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
-        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -108,18 +111,23 @@ class AuthControllerTest {
         user.setEmailVerified(true);
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-123", 0)).thenReturn("token-value");
-        when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
-
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite("Lax");
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
+        ResponseCookie cookie = ResponseCookie.from("accessToken", "token-value")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("Lax")
+                .maxAge(Duration.ofMinutes(15))
+                .build();
+        when(authSessionService.startSession(eq(user), any(), any()))
+                .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
+
+        AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, emailVerificationService, authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -137,11 +145,11 @@ class AuthControllerTest {
     @Test
     void loginFailsWhenVerifierDoesNotMatchAfterTrimmingWhitespace() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -155,15 +163,12 @@ class AuthControllerTest {
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
 
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite("Lax");
-
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, emailVerificationService, authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -177,16 +182,17 @@ class AuthControllerTest {
         ErrorResponse error = (ErrorResponse) response.getBody();
         assertThat(error.error()).isEqualTo("UNAUTHORIZED");
         verify(audit).recordLoginFailure("user@example.com");
+        verify(authSessionService, never()).startSession(any(), any(), any());
     }
 
     @Test
     void loginFailsWhenEmailNotVerified() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -200,15 +206,12 @@ class AuthControllerTest {
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
 
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite("Lax");
-
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, emailVerificationService, authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -222,24 +225,32 @@ class AuthControllerTest {
         ErrorResponse error = (ErrorResponse) response.getBody();
         assertThat(error.error()).isEqualTo("EMAIL_NOT_VERIFIED");
         verify(audit).recordLoginFailure("user@example.com");
+        verify(authSessionService, never()).startSession(any(), any(), any());
     }
 
     @Test
     void verifyEmailReturnsOkWhenTokenValid() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
+
         when(emailVerificationService.verifyToken("token"))
                 .thenReturn(EmailVerificationService.VerificationResult.VERIFIED);
 
-        AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         ResponseEntity<?> response = controller.verifyEmail("token");
 
@@ -250,19 +261,26 @@ class AuthControllerTest {
     @Test
     void verifyEmailReturnsGoneWhenExpired() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
+
         when(emailVerificationService.verifyToken("token"))
                 .thenReturn(EmailVerificationService.VerificationResult.EXPIRED);
 
-        AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         ResponseEntity<?> response = controller.verifyEmail("token");
 
@@ -273,19 +291,26 @@ class AuthControllerTest {
     @Test
     void resendVerificationReturnsAccepted() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
+
         when(emailVerificationService.resendVerification("user@example.com"))
                 .thenReturn(EmailVerificationService.ResendResult.SENT);
 
-        AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         ResponseEntity<?> response = controller.resendVerification(new ResendVerificationRequest("user@example.com"));
 
@@ -296,19 +321,26 @@ class AuthControllerTest {
     @Test
     void resendVerificationReturnsConflictWhenAlreadyVerified() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
+
         when(emailVerificationService.resendVerification("user@example.com"))
                 .thenReturn(EmailVerificationService.ResendResult.ALREADY_VERIFIED);
 
-        AuthCookieProps props = new AuthCookieProps();
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         ResponseEntity<?> response = controller.resendVerification(new ResendVerificationRequest("user@example.com"));
 
@@ -319,13 +351,11 @@ class AuthControllerTest {
     @Test
     void loginKeepsSecureCookieEvenWhenOriginIsHttp() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
-        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -338,18 +368,22 @@ class AuthControllerTest {
         user.setEmailVerified(true);
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-123", 0)).thenReturn("token-value");
-        when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
-
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite("None");
-
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
+        ResponseCookie cookie = ResponseCookie.from("accessToken", "token-value")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .maxAge(Duration.ofMinutes(15))
+                .build();
+        when(authSessionService.startSession(eq(user), any(), any()))
+                .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
+
+        AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, emailVerificationService, authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -367,20 +401,17 @@ class AuthControllerTest {
                 .contains("SameSite=None")
                 .contains("Secure")
                 .contains("HttpOnly");
-        assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN"))
-                .isEqualTo("csrf-token-value");
+        assertThat(response.getHeaders().getFirst("X-XSRF-TOKEN")).isEqualTo("csrf-token-value");
     }
 
     @Test
     void loginKeepsSecureCookieWithSameSiteNoneWhenForwardedProtoIsHttp() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
-        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
-        when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
 
         User user = new User();
         user.setId("user-123");
@@ -393,18 +424,22 @@ class AuthControllerTest {
         user.setEmailVerified(true);
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwt.generate("user-123", 0)).thenReturn("token-value");
-        when(jwt.getExpiry()).thenReturn(Duration.ofMinutes(15));
-
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite("None");
-
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
+        ResponseCookie cookie = ResponseCookie.from("accessToken", "token-value")
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .maxAge(Duration.ofMinutes(15))
+                .build();
+        when(authSessionService.startSession(eq(user), any(), any()))
+                .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
+
+        AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
+                placeholderSaltService, emailVerificationService, authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -429,21 +464,24 @@ class AuthControllerTest {
     @Test
     void loginReturnsTooManyRequestsWhenRateLimitExceeded() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
 
         when(rateLimiter.isAllowed(anyString())).thenReturn(false);
-
-        AuthCookieProps props = new AuthCookieProps();
-        props.setSameSite("Strict");
-
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit,
-                csrfTokenRepository, placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -465,11 +503,11 @@ class AuthControllerTest {
     @Test
     void saltReturnsStoredSaltForKnownEmail() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
         CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
@@ -478,14 +516,19 @@ class AuthControllerTest {
         user.setSaltClient("stored-salt");
 
         when(users.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-
-        AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -501,24 +544,29 @@ class AuthControllerTest {
     @Test
     void saltHidesWhetherUsernameExists() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
         CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         when(users.findByUsername("unknown_user"))
                 .thenReturn(Optional.empty());
-
-        AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -534,23 +582,28 @@ class AuthControllerTest {
     @Test
     void saltReturnsStableFakeValueForUnknownEmail() {
         UserRepository users = mock(UserRepository.class);
-        JwtService jwt = mock(JwtService.class);
         RateLimiterService rateLimiter = mock(RateLimiterService.class);
         TotpService totp = mock(TotpService.class);
         SecurityAuditService audit = mock(SecurityAuditService.class);
         CsrfTokenRepository csrfTokenRepository = mock(CsrfTokenRepository.class);
+        AuthSessionService authSessionService = mock(AuthSessionService.class);
         CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
         when(csrfTokenRepository.generateToken(any())).thenReturn(csrfToken);
 
         when(users.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
-
-        AuthCookieProps props = new AuthCookieProps();
         when(rateLimiter.isAllowed(anyString())).thenReturn(true);
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
-        AuthController controller = createController(users, jwt, props, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, true);
+        AuthController controller = createController(
+                users,
+                rateLimiter,
+                totp,
+                audit,
+                csrfTokenRepository,
+                placeholderSaltService,
+                emailVerificationService,
+                authSessionService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -570,18 +623,16 @@ class AuthControllerTest {
     }
 
     private AuthController createController(UserRepository users,
-                                            JwtService jwt,
-                                            AuthCookieProps props,
                                             RateLimiterService rateLimiter,
                                             TotpService totp,
                                             SecurityAuditService audit,
                                             CsrfTokenRepository csrfTokenRepository,
                                             PlaceholderSaltService placeholderSaltService,
                                             EmailVerificationService emailVerificationService,
-                                            boolean sslEnabled) {
+                                            AuthSessionService authSessionService) {
         CaptchaValidationService captchaValidationService = mock(CaptchaValidationService.class);
         when(captchaValidationService.validateCaptcha(any(), any())).thenReturn(true);
-        return new AuthController(users, jwt, props, rateLimiter, totp, audit, captchaValidationService,
-                csrfTokenRepository, placeholderSaltService, emailVerificationService, sslEnabled);
+        return new AuthController(users, rateLimiter, totp, audit, captchaValidationService,
+                placeholderSaltService, emailVerificationService, authSessionService, csrfTokenRepository);
     }
 }

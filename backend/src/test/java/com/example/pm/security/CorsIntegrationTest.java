@@ -3,11 +3,16 @@ package com.example.pm.security;
 import com.example.pm.TestSupportConfig;
 import com.example.pm.auditlog.AuditLogAspect;
 import com.example.pm.auditlog.AuditLogController;
+import com.example.pm.auth.EmailVerificationService;
+import com.example.pm.auth.PlaceholderSaltService;
 import com.example.pm.config.TestMongoConfig;
 import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.repo.VaultItemRepository;
+import com.example.pm.security.AuthSessionService;
+import com.example.pm.webauthn.MongoWebAuthnCredentialRepository;
+import com.example.pm.webauthn.WebAuthnCredentialRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -47,6 +52,11 @@ class CorsIntegrationTest {
     @MockBean AuditLogRepository auditLogRepository;
     @MockBean AuditLogController auditLogController;
     @MockBean AuditLogAspect auditLogAspect;
+    @MockBean PlaceholderSaltService placeholderSaltService;
+    @MockBean EmailVerificationService emailVerificationService;
+    @MockBean AuthSessionService authSessionService;
+    @MockBean MongoWebAuthnCredentialRepository mongoWebAuthnCredentialRepository;
+    @MockBean WebAuthnCredentialRepository webAuthnCredentialRepository;
 
     @Test
     void preflightFromDisallowedOriginIsForbidden() throws Exception {
