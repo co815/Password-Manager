@@ -12,6 +12,7 @@ import {encryptDekWithKek} from '../lib/crypto/keys';
 import {deserializeVaultCredentials, serializeVaultCredentials} from '../lib/vault/pack';
 import {extractApiErrorDetails} from '../lib/api-error';
 import {attestationToJSON, decodeCreationOptions, isWebAuthnSupported} from '../lib/webauthn';
+import {rememberDek, restoreDek} from '../lib/crypto/dek-storage';
 
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
@@ -132,6 +133,7 @@ export default function Dashboard() {
 
     const [showUnlockDialog, setShowUnlockDialog] = useState(false);
     const [autoPromptedUnlock, setAutoPromptedUnlock] = useState(false);
+    const restoreAttemptedRef = useRef<string | null>(null);
     const [unlockPassword, setUnlockPassword] = useState('');
     const [showUnlockPwd, setShowUnlockPwd] = useState(false);
     const [unlockBusy, setUnlockBusy] = useState(false);
@@ -240,6 +242,23 @@ export default function Dashboard() {
         setShowUnlockPwd(false);
         setShowUnlockDialog(true);
     }, []);
+
+    useEffect(() => {
+        if (!user?.id) {
+            restoreAttemptedRef.current = null;
+            return;
+        }
+        if (!locked || dek || restoreAttemptedRef.current === user.id) {
+            return;
+        }
+        restoreAttemptedRef.current = user.id;
+        void (async () => {
+            const remembered = await restoreDek(user.id);
+            if (remembered) {
+                setDEK(remembered);
+            }
+        })();
+    }, [user?.id, locked, dek, setDEK]);
 
     useEffect(() => {
         if (locked && !hadDek && !autoPromptedUnlock) {
@@ -914,6 +933,7 @@ export default function Dashboard() {
         try {
             const kek = await deriveKEK(unlockPassword, userProfile.saltClient);
             const dekKey = await unwrapDEK(kek, userProfile.dekEncrypted, userProfile.dekNonce);
+            await rememberDek(userProfile.id, dekKey);
             setDEK(dekKey);
             const nextMode = pendingDialogMode;
             const nextEditTarget = pendingEditTarget;

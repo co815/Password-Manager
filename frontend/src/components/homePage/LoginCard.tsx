@@ -33,6 +33,7 @@ import {authButtonStyles, createFieldStyles} from './authStyles';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
 import {extractApiErrorDetails} from '../../lib/api-error';
 import {assertionToJSON, decodeRequestOptions, isWebAuthnSupported} from '../../lib/webauthn';
+import {rememberDek, restoreDek} from '../../lib/crypto/dek-storage';
 
 type Props = {
     onSuccess?: (user: PublicUser, mp: string) => void;
@@ -147,17 +148,29 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
 
             login(data.user);
 
+            let unlocked = false;
+
             if (mp) {
                 try {
                     const kek = await deriveKEK(mp, data.user.saltClient);
                     const dek = await unwrapDEK(kek, data.user.dekEncrypted, data.user.dekNonce);
+                    await rememberDek(data.user.id, dek);
                     setDEK(dek);
+                    unlocked = true;
                 } catch (error) {
                     console.warn('Failed to unlock vault with provided master password.', error);
                     setDEK(null);
                 }
-            } else {
-                setDEK(null);
+            }
+
+            if (!unlocked) {
+                const remembered = await restoreDek(data.user.id);
+                if (remembered) {
+                    setDEK(remembered);
+                    unlocked = true;
+                } else if (!mp) {
+                    setDEK(null);
+                }
             }
 
             await primeCsrfToken();
@@ -277,6 +290,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
 
             const kek = await deriveKEK(mp, data.user.saltClient);
             const dek = await unwrapDEK(kek, data.user.dekEncrypted, data.user.dekNonce);
+            await rememberDek(data.user.id, dek);
             setDEK(dek);
 
             await primeCsrfToken();

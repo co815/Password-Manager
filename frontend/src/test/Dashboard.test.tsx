@@ -33,6 +33,8 @@ const {
     deriveKekMock,
     unwrapDekMock,
     makeVerifierMock,
+    rememberDekMock,
+    restoreDekMock,
 } = vi.hoisted(() => ({
     fetchCredentialsMock: vi.fn(),
     createCredentialMock: vi.fn(),
@@ -42,6 +44,8 @@ const {
     deriveKekMock: vi.fn(),
     unwrapDekMock: vi.fn(),
     makeVerifierMock: vi.fn(),
+    rememberDekMock: vi.fn(),
+    restoreDekMock: vi.fn(),
 })) as {
     fetchCredentialsMock: Mock;
     createCredentialMock: Mock;
@@ -51,6 +55,8 @@ const {
     deriveKekMock: Mock;
     unwrapDekMock: Mock;
     makeVerifierMock: Mock;
+    rememberDekMock: Mock;
+    restoreDekMock: Mock;
 };
 
 vi.mock('../lib/api', async () => {
@@ -76,6 +82,13 @@ vi.mock('../lib/crypto/argon2', () => ({
 vi.mock('../lib/crypto/unwrap', () => ({
     unwrapDEK: unwrapDekMock,
     unwrapDek: unwrapDekMock,
+}));
+
+vi.mock('../lib/crypto/dek-storage', () => ({
+    rememberDek: rememberDekMock,
+    restoreDek: restoreDekMock,
+    forgetDek: vi.fn(),
+    forgetAllDek: vi.fn(),
 }));
 
 vi.mock('@mui/material', async () => {
@@ -281,6 +294,10 @@ describe('Dashboard', () => {
         deriveKekMock.mockResolvedValue('derived-kek' as unknown as CryptoKey);
         unwrapDekMock.mockResolvedValue(fakeDek);
         makeVerifierMock.mockResolvedValue('mock-verifier');
+        rememberDekMock.mockReset();
+        restoreDekMock.mockReset();
+        rememberDekMock.mockResolvedValue(undefined);
+        restoreDekMock.mockResolvedValue(null);
     });
 
     it('requests master password when adding a credential without a DEK and unlocks the vault', async () => {
@@ -297,6 +314,7 @@ describe('Dashboard', () => {
         await waitFor(() => {
             expect(deriveKekMock).toHaveBeenCalledWith('super-secret', baseUser.saltClient);
             expect(unwrapDekMock).toHaveBeenCalled();
+            expect(rememberDekMock).toHaveBeenCalledWith(baseUser.id, fakeDek);
         });
 
         await waitFor(() => {

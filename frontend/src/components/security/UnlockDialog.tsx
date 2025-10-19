@@ -18,6 +18,7 @@ import { deriveKEK } from '../../lib/crypto/argon2';
 import { unwrapDEK } from '../../lib/crypto/unwrap';
 import { useCrypto } from '../../lib/crypto/crypto-context';
 import { useAuth } from '../../auth/auth-context';
+import { rememberDek } from '../../lib/crypto/dek-storage';
 
 export default function UnlockDialog({ open }: { open: boolean }) {
     const { setDEK } = useCrypto();
@@ -42,6 +43,7 @@ export default function UnlockDialog({ open }: { open: boolean }) {
         try {
             const kek = await deriveKEK(mp, profile.saltClient);
             const dek = await unwrapDEK(kek, profile.dekEncrypted, profile.dekNonce);
+            await rememberDek(profile.id, dek);
             setDEK(dek);
             setMp('');
         } catch {

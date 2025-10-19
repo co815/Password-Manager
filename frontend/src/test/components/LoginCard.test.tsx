@@ -7,6 +7,18 @@ import LoginCard from '../../components/homePage/LoginCard';
 import {AuthContext} from '../../auth/auth-context';
 import {CryptoContext} from '../../lib/crypto/crypto-context';
 
+const {rememberDekMock, restoreDekMock} = vi.hoisted(() => ({
+    rememberDekMock: vi.fn(),
+    restoreDekMock: vi.fn(),
+}));
+
+vi.mock('../../lib/crypto/dek-storage', () => ({
+    rememberDek: rememberDekMock,
+    restoreDek: restoreDekMock,
+    forgetDek: vi.fn(),
+    forgetAllDek: vi.fn(),
+}));
+
 type CaptchaConfig = {
     config: {enabled: boolean; provider: 'RECAPTCHA'; siteKey: string};
     loading: boolean;
@@ -82,6 +94,10 @@ function Wrapper({children}: {children: ReactNode}) {
 beforeEach(() => {
     captchaMocks.resetSpy.mockClear();
     captchaMocks.clearProps();
+    rememberDekMock.mockReset();
+    restoreDekMock.mockReset();
+    rememberDekMock.mockResolvedValue(undefined);
+    restoreDekMock.mockResolvedValue(null);
 });
 
 describe('LoginCard captcha', () => {

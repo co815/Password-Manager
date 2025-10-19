@@ -15,7 +15,7 @@ export async function unwrapDEK(
         'raw',
         dekRaw,
         { name: 'AES-GCM' },
-        false,
+        true,
         ['encrypt', 'decrypt']
     );
 }
