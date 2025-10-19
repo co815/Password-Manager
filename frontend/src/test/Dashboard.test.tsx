@@ -152,6 +152,7 @@ function TestProviders({children, options = {}}: {children: ReactNode; options?:
         user,
         loading: false,
         loggingOut: false,
+        sessionRestored: false,
         login: vi.fn(),
         logout: vi.fn(),
         refresh: vi.fn(),

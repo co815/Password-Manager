@@ -8,6 +8,7 @@ export default function AuthProvider({children}: PropsWithChildren) {
     const [user, setUser] = useState<AuthUser>(null);
     const [loading, setLoading] = useState(true);
     const [loggingOut, setLoggingOut] = useState(false);
+    const [sessionRestored, setSessionRestored] = useState(false);
     const refreshEpochRef = useRef(0);
     const dispatchAuthClearedEvent = useCallback(() => {
         if (typeof window !== 'undefined') {
@@ -19,6 +20,7 @@ export default function AuthProvider({children}: PropsWithChildren) {
         refreshEpochRef.current += 1;
         setUser(null);
         setLoading(false);
+        setSessionRestored(false);
         sessionStorage.removeItem('pm-had-dek');
     }, []);
 
@@ -34,10 +36,13 @@ export default function AuthProvider({children}: PropsWithChildren) {
             await primeCsrfToken();
             if (isLatest()) {
                 setUser(profile);
+                setSessionRestored(true);
             }
         } catch {
             if (isLatest()) {
                 setUser(null);
+                setSessionRestored(false);
+                sessionStorage.removeItem('pm-had-dek');
             }
         } finally {
             if (isLatest()) {
@@ -67,12 +72,14 @@ export default function AuthProvider({children}: PropsWithChildren) {
         setLoggingOut(false);
         setUser(u);
         setLoading(false);
+        setSessionRestored(false);
     }, []);
 
     const logout = useCallback(async () => {
         setLoggingOut(true);
         dispatchAuthClearedEvent();
         applyAuthCleared();
+        setSessionRestored(false);
         try {
             await api.logout();
         } catch (error) {
@@ -86,8 +93,8 @@ export default function AuthProvider({children}: PropsWithChildren) {
     }, [applyAuthCleared, dispatchAuthClearedEvent]);
 
     const value = useMemo<AuthContextValue>(
-        () => ({user, loading, loggingOut, login, logout, refresh}),
-        [user, loading, loggingOut, login, logout, refresh],
+        () => ({user, loading, loggingOut, sessionRestored, login, logout, refresh}),
+        [user, loading, loggingOut, sessionRestored, login, logout, refresh],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

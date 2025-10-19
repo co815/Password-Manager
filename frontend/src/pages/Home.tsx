@@ -10,14 +10,14 @@ type Mode = 'login' | 'signup';
 
 export default function Home() {
     const [mode, setMode] = useState<Mode>('login');
-    const { user, loading } = useAuth();
+    const { user, loading, sessionRestored } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (!loading && user) {
+        if (!loading && user && !sessionRestored) {
             navigate('/dashboard', { replace: true });
         }
-    }, [loading, navigate, user]);
+    }, [loading, navigate, sessionRestored, user]);
 
     return (
         <Box

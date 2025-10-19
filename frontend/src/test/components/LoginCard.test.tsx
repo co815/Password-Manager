@@ -69,6 +69,7 @@ function Wrapper({children}: {children: ReactNode}) {
                     user: null,
                     loading: false,
                     loggingOut: false,
+                    sessionRestored: false,
                     login: vi.fn(),
                     logout: vi.fn(),
                     refresh: vi.fn(),
