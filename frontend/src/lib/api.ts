@@ -1,3 +1,10 @@
+import type {
+    PublicKeyCredentialCreationOptionsJSON,
+    PublicKeyCredentialRequestOptionsJSON,
+    WebAuthnAssertionCredentialJSON,
+    WebAuthnAttestationCredentialJSON,
+} from './webauthn';
+
 const RAW_API_ORIGIN = import.meta.env.VITE_API_ORIGIN;
 const API_BASE = RAW_API_ORIGIN
     ? `${RAW_API_ORIGIN.replace(/\/$/, '')}/api`
@@ -247,6 +254,31 @@ export interface SaltResponse {
     saltClient: string;
 }
 
+export interface WebAuthnRegistrationOptionsResponse {
+    requestId: string;
+    publicKey: PublicKeyCredentialCreationOptionsJSON;
+}
+
+export interface WebAuthnRegistrationFinishRequest {
+    requestId: string;
+    credential: WebAuthnAttestationCredentialJSON;
+}
+
+export interface WebAuthnLoginOptionsRequest {
+    email: string;
+    captchaToken?: string | null;
+}
+
+export interface WebAuthnLoginOptionsResponse {
+    requestId: string;
+    publicKey: PublicKeyCredentialRequestOptionsJSON;
+}
+
+export interface WebAuthnLoginFinishRequest {
+    requestId: string;
+    credential: WebAuthnAssertionCredentialJSON;
+}
+
 export type CaptchaProvider = 'NONE' | 'RECAPTCHA';
 
 export interface CaptchaConfigResponse {
@@ -465,6 +497,26 @@ export const api = {
         req<{ id: string }>(`/auth/register`, {method: 'POST', body: JSON.stringify(body)}),
     login: (body: LoginRequest) =>
         req<LoginResponse>(`/auth/login`, {method: 'POST', body: JSON.stringify(body)}),
+    startPasskeyRegistration: () =>
+        req<WebAuthnRegistrationOptionsResponse>(`/auth/webauthn/register/options`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+        }),
+    finishPasskeyRegistration: (body: WebAuthnRegistrationFinishRequest) =>
+        req<SimpleMessageResponse>(`/auth/webauthn/register/finish`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        }),
+    startPasskeyLogin: (body: WebAuthnLoginOptionsRequest) =>
+        req<WebAuthnLoginOptionsResponse>(`/auth/webauthn/login/options`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        }),
+    finishPasskeyLogin: (body: WebAuthnLoginFinishRequest) =>
+        req<LoginResponse>(`/auth/webauthn/login/finish`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        }),
     getCaptchaConfig: () => req<CaptchaConfigResponse>(
         `/auth/captcha/config`,
         {},

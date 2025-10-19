@@ -18,6 +18,7 @@ import EmailOutlined from '@mui/icons-material/EmailOutlined';
 import LockOutlined from '@mui/icons-material/LockOutlined';
 import PhonelinkLock from '@mui/icons-material/PhonelinkLock';
 import Security from '@mui/icons-material/Security';
+import VpnKey from '@mui/icons-material/VpnKey';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {useNavigate} from 'react-router-dom';
@@ -31,6 +32,7 @@ import CaptchaChallenge from './CaptchaChallenge';
 import {authButtonStyles, createFieldStyles} from './authStyles';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
 import {extractApiErrorDetails} from '../../lib/api-error';
+import {assertionToJSON, decodeRequestOptions, isWebAuthnSupported} from '../../lib/webauthn';
 
 type Props = {
     onSuccess?: (user: PublicUser, mp: string) => void;
@@ -49,12 +51,14 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
     const [recoveryCode, setRecoveryCode] = useState('');
     const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
     const [resendBusy, setResendBusy] = useState(false);
+    const [passkeyBusy, setPasskeyBusy] = useState(false);
 
     const {login} = useAuth();
     const {setDEK, disarm, lockNow} = useCrypto();
     const navigate = useNavigate();
     const theme = useTheme();
     const captchaTheme = theme.palette.mode === 'dark' ? 'dark' : 'light';
+    const [passkeySupported] = useState(() => isWebAuthnSupported());
     const trimmedIdentifier = useMemo(() => identifier.trim(), [identifier]);
     const {
         captchaEnabled,
@@ -77,6 +81,11 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         || !mp
         || (mfaRequired && !mfaCode.trim() && !recoveryCode.trim())
         || (captchaEnabled && !captchaToken);
+    const passkeyDisabled = busy
+        || captchaLoading
+        || Boolean(captchaConfigError)
+        || !trimmedIdentifier
+        || (captchaEnabled && !captchaToken);
 
     useEffect(() => {
         setPendingLogin(null);
@@ -86,6 +95,136 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
         setMsg(null);
         setUnverifiedEmail(null);
     }, [trimmedIdentifier]);
+
+    async function handlePasskeyLogin() {
+        if (!passkeySupported) {
+            setMsg({type: 'error', text: 'Passkeys are not supported in this browser.'});
+            return;
+        }
+        if (!trimmedIdentifier) {
+            setMsg({type: 'error', text: 'Enter your email address to use a passkey.'});
+            return;
+        }
+        if (captchaEnabled && !captchaToken) {
+            setCaptchaError('Please complete the CAPTCHA challenge.');
+            setMsg({type: 'error', text: 'Complete the CAPTCHA challenge to continue.'});
+            return;
+        }
+
+        setMsg(null);
+        setBusy(true);
+        setPasskeyBusy(true);
+        let attemptedEmail: string | null = null;
+        try {
+            lockNow();
+            disarm();
+
+            const {saltClient, email: canonicalEmail} = await api.getSalt(trimmedIdentifier);
+            attemptedEmail = canonicalEmail;
+            setPendingLogin({email: canonicalEmail, saltClient});
+
+            await primeCsrfToken();
+            const optionsResponse = await api.startPasskeyLogin({
+                email: canonicalEmail,
+                ...(captchaEnabled ? {captchaToken} : {}),
+            });
+            const publicKey = decodeRequestOptions(optionsResponse.publicKey);
+            const credential = await navigator.credentials.get({publicKey});
+            if (!credential) {
+                setMsg({type: 'error', text: 'Passkey authentication was cancelled.'});
+                return;
+            }
+            if (!(credential instanceof PublicKeyCredential)) {
+                throw new Error('Unexpected credential type returned by the browser.');
+            }
+            const assertion = assertionToJSON(credential);
+
+            await primeCsrfToken();
+            const data = await api.finishPasskeyLogin({
+                requestId: optionsResponse.requestId,
+                credential: assertion,
+            });
+
+            login(data.user);
+
+            if (mp) {
+                try {
+                    const kek = await deriveKEK(mp, data.user.saltClient);
+                    const dek = await unwrapDEK(kek, data.user.dekEncrypted, data.user.dekNonce);
+                    setDEK(dek);
+                } catch (error) {
+                    console.warn('Failed to unlock vault with provided master password.', error);
+                    setDEK(null);
+                }
+            } else {
+                setDEK(null);
+            }
+
+            await primeCsrfToken();
+            setPendingLogin(null);
+            setMfaRequired(false);
+            setMfaCode('');
+            setRecoveryCode('');
+            setUnverifiedEmail(null);
+            onSuccess?.(data.user, mp);
+            await Promise.resolve();
+            navigate('/dashboard', {replace: true});
+        } catch (error) {
+            if (error instanceof ApiError) {
+                const {message: normalizedMessage, errorCode} = extractApiErrorDetails(error);
+                if (error.status === 400 && errorCode === 'INVALID_CAPTCHA') {
+                    console.warn('[CAPTCHA] Passkey login rejected due to invalid token.');
+                    setCaptchaError('CAPTCHA verification failed. Please try again.');
+                    setMsg({type: 'error', text: 'CAPTCHA verification failed. Please try again.'});
+                } else if (error.status === 400 && errorCode === 'NO_PASSKEY') {
+                    setMsg({
+                        type: 'error',
+                        text: normalizedMessage || 'No passkeys are registered for this account.',
+                    });
+                } else if (error.status === 403 && errorCode === 'EMAIL_NOT_VERIFIED') {
+                    if (attemptedEmail) {
+                        setUnverifiedEmail(attemptedEmail);
+                    }
+                    setMsg({
+                        type: 'error',
+                        text: normalizedMessage
+                            || 'You need to verify your email address before logging in.',
+                    });
+                } else {
+                    setMsg({
+                        type: 'error',
+                        text: normalizedMessage || 'Unable to sign in with your passkey right now.',
+                    });
+                }
+            } else if (error instanceof DOMException) {
+                if (error.name === 'NotAllowedError') {
+                    setMsg({
+                        type: 'error',
+                        text: 'Passkey authentication timed out or was dismissed.',
+                    });
+                } else {
+                    setMsg({
+                        type: 'error',
+                        text: error.message || 'Passkey authentication failed.',
+                    });
+                }
+            } else {
+                const message = error instanceof Error ? error.message : 'Unable to sign in with your passkey right now.';
+                setMsg({type: 'error', text: message || 'Unable to sign in with your passkey right now.'});
+            }
+            setPendingLogin(null);
+            setMfaRequired(false);
+            setMfaCode('');
+            setRecoveryCode('');
+            setUnverifiedEmail(null);
+        } finally {
+            if (captchaEnabled) {
+                resetCaptcha();
+            }
+            setBusy(false);
+            setPasskeyBusy(false);
+        }
+    }
 
     async function handleSubmit() {
         if (disabled) {
@@ -443,6 +582,32 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                 </Stack>
 
                 <Stack spacing={2}>
+                    {passkeySupported ? (
+                        <Button
+                            onClick={() => {
+                                void handlePasskeyLogin();
+                            }}
+                            disabled={passkeyDisabled}
+                            variant="outlined"
+                            startIcon={passkeyBusy ? <CircularProgress size={18} color="inherit"/> : <VpnKey/>}
+                            sx={{
+                                py: 1.15,
+                                borderRadius: 3,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                color: '#e0f2fe',
+                                borderColor: 'rgba(191,219,254,0.75)',
+                                backgroundColor: 'rgba(15,23,42,0.28)',
+                                '&:hover': {
+                                    borderColor: 'rgba(191,219,254,1)',
+                                    backgroundColor: 'rgba(30,64,175,0.35)',
+                                },
+                                '&.Mui-disabled': {opacity: 0.6},
+                            }}
+                        >
+                            {passkeyBusy ? 'Waiting for passkey…' : 'Use passkey'}
+                        </Button>
+                    ) : null}
                     <Button
                         onClick={handleSubmit}
                         disabled={disabled}

@@ -3,13 +3,15 @@ import {useNavigate} from 'react-router-dom';
 import type {ChangeEvent, FormEvent, MouseEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
 import {useCrypto} from '../lib/crypto/crypto-context';
-import {api, type MfaEnrollmentResponse, type MfaStatusResponse, type PublicCredential} from '../lib/api';
+import {api, ApiError, type MfaEnrollmentResponse, type MfaStatusResponse, type PublicCredential} from '../lib/api';
 import {isAuditAdminEmail} from '../lib/accessControl';
 import Alert from '@mui/material/Alert';
 import {deriveKEK, makeVerifier} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
 import {encryptDekWithKek} from '../lib/crypto/keys';
 import {deserializeVaultCredentials, serializeVaultCredentials} from '../lib/vault/pack';
+import {extractApiErrorDetails} from '../lib/api-error';
+import {attestationToJSON, decodeCreationOptions, isWebAuthnSupported} from '../lib/webauthn';
 
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
@@ -159,6 +161,9 @@ export default function Dashboard() {
     const [mfaDisableCode, setMfaDisableCode] = useState('');
     const [mfaDisableRecoveryCode, setMfaDisableRecoveryCode] = useState('');
     const [mfaMessage, setMfaMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [passkeySupported, setPasskeySupported] = useState(() => isWebAuthnSupported());
+    const [passkeyBusy, setPasskeyBusy] = useState(false);
+    const [passkeyMessage, setPasskeyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY_ID);
 
@@ -200,6 +205,9 @@ export default function Dashboard() {
             assessPasswordStrength(password, [username, title, user?.email ?? '', user?.username ?? '']),
         [password, title, user?.email, user?.username, username]
     );
+    useEffect(() => {
+        setPasskeySupported(isWebAuthnSupported());
+    }, []);
     const pwdScore = pwdStrength.score;
     const pwdProgress = (pwdScore / 4) * 100;
     const strengthLabel = password ? getPasswordStrengthLabel(pwdScore) : 'No password entered';
@@ -461,6 +469,8 @@ export default function Dashboard() {
         setMfaMessage(null);
         setMfaLoading(false);
         setMfaActionBusy(false);
+        setPasskeyMessage(null);
+        setPasskeyBusy(false);
     };
 
     const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -698,6 +708,74 @@ export default function Dashboard() {
             setMfaMessage({type: 'error', text: message});
         } finally {
             setMfaActionBusy(false);
+        }
+    };
+
+    const handleRegisterPasskey = async () => {
+        const supported = isWebAuthnSupported();
+        setPasskeySupported(supported);
+        if (!supported) {
+            setPasskeyMessage({
+                type: 'error',
+                text: 'Passkeys are not supported in this browser. Try a different browser or device.',
+            });
+            return;
+        }
+
+        setPasskeyMessage(null);
+        setPasskeyBusy(true);
+        try {
+            const options = await api.startPasskeyRegistration();
+            const publicKey = decodeCreationOptions(options.publicKey);
+            const credential = await navigator.credentials.create({publicKey});
+            if (!credential) {
+                setPasskeyMessage({
+                    type: 'error',
+                    text: 'Passkey registration was cancelled.',
+                });
+                return;
+            }
+            if (!(credential instanceof PublicKeyCredential)) {
+                throw new Error('Unexpected credential type returned by the browser.');
+            }
+            const attestation = attestationToJSON(credential);
+            const result = await api.finishPasskeyRegistration({
+                requestId: options.requestId,
+                credential: attestation,
+            });
+            const responseMessage = result?.message?.trim();
+            setPasskeyMessage({
+                type: 'success',
+                text: responseMessage || 'Passkey registered successfully.',
+            });
+        } catch (error) {
+            if (error instanceof ApiError) {
+                const {message} = extractApiErrorDetails(error);
+                setPasskeyMessage({
+                    type: 'error',
+                    text: message || 'Failed to register a passkey.',
+                });
+            } else if (error instanceof DOMException) {
+                if (error.name === 'NotAllowedError') {
+                    setPasskeyMessage({
+                        type: 'error',
+                        text: 'Passkey registration was cancelled or timed out.',
+                    });
+                } else {
+                    setPasskeyMessage({
+                        type: 'error',
+                        text: error.message || 'Passkey registration failed.',
+                    });
+                }
+            } else {
+                const message = error instanceof Error ? error.message : 'Failed to register a passkey.';
+                setPasskeyMessage({
+                    type: 'error',
+                    text: message || 'Failed to register a passkey.',
+                });
+            }
+        } finally {
+            setPasskeyBusy(false);
         }
     };
 
@@ -1801,6 +1879,49 @@ export default function Dashboard() {
                                                 {mfaActionBusy ? 'Starting…' : 'Enable MFA'}
                                             </Button>
                                         )}
+                                    </Stack>
+                                )}
+                            </Stack>
+                            <Divider/>
+                            <Stack spacing={1.5}>
+                                <Box display="flex" alignItems="center" justifyContent="space-between">
+                                    <Box>
+                                        <Typography variant="h6" fontWeight={700}>Passkeys</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Register a passkey for passwordless or hardware-backed sign-ins.
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                                {passkeyMessage ? (
+                                    <Alert
+                                        severity={passkeyMessage.type}
+                                        onClose={() => setPasskeyMessage(null)}
+                                    >
+                                        {passkeyMessage.text}
+                                    </Alert>
+                                ) : null}
+                                {!passkeySupported ? (
+                                    <Alert severity="warning">
+                                        Passkeys are not supported in this browser. Try updating or switching to a compatible
+                                        browser.
+                                    </Alert>
+                                ) : (
+                                    <Stack spacing={1.5}>
+                                        <Typography variant="body2">
+                                            Use your device or hardware security key to add another secure way to sign in.
+                                        </Typography>
+                                        <Button
+                                            onClick={() => {
+                                                void handleRegisterPasskey();
+                                            }}
+                                            variant="contained"
+                                            disabled={passkeyBusy}
+                                            startIcon={passkeyBusy
+                                                ? <CircularProgress size={18} color="inherit"/>
+                                                : <Key/>}
+                                        >
+                                            {passkeyBusy ? 'Waiting for confirmation…' : 'Register a passkey'}
+                                        </Button>
                                     </Stack>
                                 )}
                             </Stack>
