@@ -158,7 +158,8 @@ public class AuditLogController {
                                              @RequestParam(name = "targetId", required = false) String targetId,
                                              @RequestParam(name = "actor", required = false) String actorIdentifier,
                                              @RequestParam(name = "from", required = false) String from,
-                                             @RequestParam(name = "to", required = false) String to) {
+                                             @RequestParam(name = "to", required = false) String to,
+                                             @RequestParam(name = "format", defaultValue = "csv") String format) {
         ResponseEntity<?> authResult = listAuditLogs(
                 authentication,
                 0,
@@ -176,11 +177,38 @@ public class AuditLogController {
             return authResult;
         }
 
+        String normalizedFormat = normalizeExportFormat(format);
+        if (normalizedFormat == null) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse(400, "INVALID_EXPORT_FORMAT", "Unsupported export format"));
+        }
+
+        if ("json".equals(normalizedFormat)) {
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"audit-log-export.json\"")
+                    .body(response.logs());
+        }
+
         byte[] csvBytes = buildCsv(response.logs()).getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"audit-log-export.csv\"")
                 .body(csvBytes);
+    }
+
+    private String normalizeExportFormat(String requestedFormat) {
+        if (requestedFormat == null) {
+            return "csv";
+        }
+        String normalized = requestedFormat.trim().toLowerCase();
+        if (normalized.isEmpty()) {
+            return "csv";
+        }
+        return switch (normalized) {
+            case "csv", "json" -> normalized;
+            default -> null;
+        };
     }
 
     private Set<String> toNormalizedSet(List<String> values) {

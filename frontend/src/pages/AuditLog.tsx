@@ -6,7 +6,11 @@ import {
     Button,
     CircularProgress,
     Divider,
+    FormControl,
+    InputLabel,
+    MenuItem,
     Paper,
+    Select,
     Stack,
     Table,
     TableBody,
@@ -18,6 +22,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
+import type {SelectChangeEvent} from '@mui/material/Select';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -55,6 +60,8 @@ type FilterState = {
     from: string;
     to: string;
 };
+
+type ExportFormat = 'csv' | 'json';
 
 const DEFAULT_FILTERS: FilterState = {
     search: '',
@@ -94,6 +101,7 @@ export default function AuditLog() {
     const [totalElements, setTotalElements] = useState(0);
     const [filters, setFilters] = useState<FilterState>({...DEFAULT_FILTERS});
     const [draftFilters, setDraftFilters] = useState<FilterState>({...DEFAULT_FILTERS});
+    const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
     const firstLoad = useRef(true);
     const pageRef = useRef(page);
     const pageSizeRef = useRef(pageSize);
@@ -217,6 +225,7 @@ export default function AuditLog() {
         setFilters({...DEFAULT_FILTERS});
         setPage(0);
         setPageSize(50);
+        setExportFormat('csv');
     }, []);
 
     const handlePageChange = useCallback((_: unknown, newPage: number) => {
@@ -235,12 +244,14 @@ export default function AuditLog() {
     const handleExport = useCallback(async () => {
         setExporting(true);
         try {
-            const blob = await api.exportAuditLogs(buildParams({includePagination: false, limit: EXPORT_LIMIT}));
+            const baseParams = buildParams({includePagination: false, limit: EXPORT_LIMIT});
+            const blob = await api.exportAuditLogs({...baseParams, format: exportFormat});
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            link.download = `audit-log-${timestamp}.csv`;
+            const extension = exportFormat === 'json' ? 'json' : 'csv';
+            link.download = `audit-log-${timestamp}.${extension}`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -251,7 +262,12 @@ export default function AuditLog() {
         } finally {
             setExporting(false);
         }
-    }, [buildParams]);
+    }, [buildParams, exportFormat]);
+
+    const handleExportFormatChange = useCallback((event: SelectChangeEvent<ExportFormat>) => {
+        const value = event.target.value as ExportFormat;
+        setExportFormat(value);
+    }, []);
 
     return (
         <Box sx={{paddingTop: (theme) => theme.spacing(4), paddingBottom: (theme) => theme.spacing(4)}}>
@@ -302,6 +318,18 @@ export default function AuditLog() {
                         >
                             Apply filters
                         </Button>
+                        <FormControl size="small" sx={{minWidth: 160}}>
+                            <InputLabel id="audit-log-export-format-label">Export format</InputLabel>
+                            <Select
+                                labelId="audit-log-export-format-label"
+                                value={exportFormat}
+                                label="Export format"
+                                onChange={handleExportFormatChange}
+                            >
+                                <MenuItem value="csv">CSV</MenuItem>
+                                <MenuItem value="json">JSON</MenuItem>
+                            </Select>
+                        </FormControl>
                         <Button
                             variant="contained"
                             color="secondary"
@@ -310,7 +338,7 @@ export default function AuditLog() {
                             onClick={() => void handleExport()}
                             disabled={loading || refreshing || exporting}
                         >
-                            {exporting ? 'Exporting…' : 'Export CSV'}
+                            {exporting ? 'Exporting…' : `Export ${exportFormat.toUpperCase()}`}
                         </Button>
                     </Stack>
                 </Stack>

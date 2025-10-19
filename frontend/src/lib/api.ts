@@ -436,6 +436,7 @@ export interface AuditLogListParams {
     from?: string;
     to?: string;
     limit?: number;
+    format?: 'csv' | 'json';
 }
 
 function buildAuditLogQuery(
@@ -472,6 +473,9 @@ function buildAuditLogQuery(
     }
     if (params.to) {
         searchParams.set('to', params.to);
+    }
+    if (params.format) {
+        searchParams.set('format', params.format);
     }
 
     const appendAll = (key: string, values?: string[]) => {
