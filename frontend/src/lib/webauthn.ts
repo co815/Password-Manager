@@ -43,13 +43,18 @@ function base64ToUint8Array(value: string): Uint8Array {
     return bytes;
 }
 
+function toBase64Url(input: string): string {
+    return input.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
     const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
     let binary = '';
     bytes.forEach((byte) => {
         binary += String.fromCharCode(byte);
     });
-    return binaryToBase64(binary);
+    const base64 = binaryToBase64(binary);
+    return toBase64Url(base64);
 }
 
 function cloneClientOutputs(
