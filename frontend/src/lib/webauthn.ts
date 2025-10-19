@@ -52,11 +52,55 @@ function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
     return binaryToBase64(binary);
 }
 
-function cloneExtensions<T extends AuthenticationExtensionsClientInputs | AuthenticationExtensionsClientOutputs | undefined>(
-    extensions: T,
-): T {
+function cloneClientOutputs(
+    extensions: AuthenticationExtensionsClientOutputs | undefined,
+): AuthenticationExtensionsClientOutputs | undefined {
     if (!extensions) return extensions;
-    return JSON.parse(JSON.stringify(extensions)) as T;
+    return JSON.parse(JSON.stringify(extensions)) as AuthenticationExtensionsClientOutputs;
+}
+
+function normalizeAppIdExtension(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return undefined;
+    }
+    try {
+        const parsed = new URL(trimmed);
+        const isHttps = parsed.protocol === 'https:';
+        const isLocalHttp = parsed.protocol === 'http:'
+            && (parsed.hostname === 'localhost'
+                || parsed.hostname === '127.0.0.1'
+                || parsed.hostname === '[::1]');
+        if (!isHttps && !isLocalHttp) {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
+function cloneClientInputs(
+    extensions: AuthenticationExtensionsClientInputs | undefined,
+): AuthenticationExtensionsClientInputs | undefined {
+    if (!extensions) return extensions;
+    const clone = JSON.parse(JSON.stringify(extensions)) as AuthenticationExtensionsClientInputs;
+    const maybeNormalize = (key: 'appid' | 'appidExclude') => {
+        if (key in clone) {
+            const normalized = normalizeAppIdExtension(clone[key]);
+            if (normalized) {
+                clone[key] = normalized;
+            } else {
+                delete clone[key];
+            }
+        }
+    };
+    maybeNormalize('appid');
+    maybeNormalize('appidExclude');
+    return Object.keys(clone).length > 0 ? clone : undefined;
 }
 
 export interface PublicKeyCredentialUserEntityJSON extends Omit<PublicKeyCredentialUserEntity, 'id'> {
@@ -123,7 +167,7 @@ export function decodeCreationOptions(options: PublicKeyCredentialCreationOption
             id: base64ToUint8Array(options.user.id),
         },
         excludeCredentials: decodeCredentialDescriptors(options.excludeCredentials),
-        extensions: cloneExtensions(options.extensions),
+        extensions: cloneClientInputs(options.extensions),
     };
 }
 
@@ -132,7 +176,7 @@ export function decodeRequestOptions(options: PublicKeyCredentialRequestOptionsJ
         ...options,
         challenge: base64ToUint8Array(options.challenge),
         allowCredentials: decodeCredentialDescriptors(options.allowCredentials),
-        extensions: cloneExtensions(options.extensions),
+        extensions: cloneClientInputs(options.extensions),
     };
 }
 
@@ -158,7 +202,7 @@ export function attestationToJSON(credential: PublicKeyCredential): WebAuthnAtte
         rawId: arrayBufferToBase64(credential.rawId),
         type: credential.type,
         authenticatorAttachment: credential.authenticatorAttachment ?? undefined,
-        clientExtensionResults: cloneExtensions(credential.getClientExtensionResults()),
+        clientExtensionResults: cloneClientOutputs(credential.getClientExtensionResults()),
         response: {
             clientDataJSON: arrayBufferToBase64(response.clientDataJSON),
             attestationObject: arrayBufferToBase64(response.attestationObject),
@@ -180,7 +224,7 @@ export function assertionToJSON(credential: PublicKeyCredential): WebAuthnAssert
         rawId: arrayBufferToBase64(credential.rawId),
         type: credential.type,
         authenticatorAttachment: credential.authenticatorAttachment ?? undefined,
-        clientExtensionResults: cloneExtensions(credential.getClientExtensionResults()),
+        clientExtensionResults: cloneClientOutputs(credential.getClientExtensionResults()),
         response: {
             clientDataJSON: arrayBufferToBase64(response.clientDataJSON),
             authenticatorData: arrayBufferToBase64(response.authenticatorData),
