@@ -41,6 +41,7 @@ import {
     ListAlt,
     ContentCopy,
     AutoFixHigh,
+    LockOpen,
 } from '@mui/icons-material';
 import {passwordTemplates} from '../lib/passwordTemplates';
 import {
@@ -116,7 +117,7 @@ async function encryptField(dek: CryptoKey, text: string) {
 
 export default function Dashboard() {
     const {user, logout, login, refresh} = useAuth();
-    const {dek, locked, setDEK} = useCrypto();
+    const {dek, locked, hadDek, setDEK} = useCrypto();
     const navigate = useNavigate();
 
     const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -130,6 +131,7 @@ export default function Dashboard() {
     const openDialog = dialogMode !== null;
 
     const [showUnlockDialog, setShowUnlockDialog] = useState(false);
+    const [autoPromptedUnlock, setAutoPromptedUnlock] = useState(false);
     const [unlockPassword, setUnlockPassword] = useState('');
     const [showUnlockPwd, setShowUnlockPwd] = useState(false);
     const [unlockBusy, setUnlockBusy] = useState(false);
@@ -206,9 +208,45 @@ export default function Dashboard() {
             assessPasswordStrength(password, [username, title, user?.email ?? '', user?.username ?? '']),
         [password, title, user?.email, user?.username, username]
     );
+
+    const unlockDialogTitle = useMemo(() => {
+        if (pendingDialogMode === 'edit') {
+            return 'Unlock Vault to Edit Credential';
+        }
+        if (pendingDialogMode === 'add') {
+            return 'Unlock Vault to Add Credential';
+        }
+        return 'Unlock vault';
+    }, [pendingDialogMode]);
+
+    const unlockDialogDescription = useMemo(() => {
+        if (pendingDialogMode === 'edit') {
+            return 'Your vault is locked. Enter your master password to edit this credential.';
+        }
+        if (pendingDialogMode === 'add') {
+            return 'Your vault is locked. Enter your master password to add a new credential.';
+        }
+        return 'Enter your master password to decrypt your vault and view credentials.';
+    }, [pendingDialogMode]);
     useEffect(() => {
         setPasskeySupported(isWebAuthnSupported());
     }, []);
+
+    const promptUnlock = useCallback((mode: 'add' | 'edit' | null, target: Credential | null = null) => {
+        setPendingDialogMode(mode);
+        setPendingEditTarget(target);
+        setUnlockPassword('');
+        setUnlockError(null);
+        setShowUnlockPwd(false);
+        setShowUnlockDialog(true);
+    }, []);
+
+    useEffect(() => {
+        if (locked && !hadDek && !autoPromptedUnlock) {
+            promptUnlock(null);
+            setAutoPromptedUnlock(true);
+        }
+    }, [locked, hadDek, autoPromptedUnlock, promptUnlock]);
     const pwdScore = pwdStrength.score;
     const pwdProgress = (pwdScore / 4) * 100;
     const strengthLabel = password ? getPasswordStrengthLabel(pwdScore) : 'No password entered';
@@ -247,7 +285,6 @@ export default function Dashboard() {
         setEditingTarget(null);
         setPendingDialogMode(null);
         setPendingEditTarget(null);
-        setShowUnlockDialog(false);
         setUnlockPassword('');
         setUnlockError(null);
         setShowUnlockPwd(false);
@@ -822,9 +859,7 @@ export default function Dashboard() {
 
     const handleAddClick = () => {
         if (!dek || locked) {
-            setPendingDialogMode('add');
-            setPendingEditTarget(null);
-            setShowUnlockDialog(true);
+            promptUnlock('add');
             return;
         }
         openAddDialog();
@@ -833,9 +868,7 @@ export default function Dashboard() {
     const handleEditClick = () => {
         if (!selected) return;
         if (!dek || locked) {
-            setPendingDialogMode('edit');
-            setPendingEditTarget(selected);
-            setShowUnlockDialog(true);
+            promptUnlock('edit', selected);
             return;
         }
         openEditDialog(selected);
@@ -1397,12 +1430,30 @@ export default function Dashboard() {
                     <Card sx={{minHeight: 420}}>
                         <CardContent>
                             {locked ? (
-                                <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center"
-                                     minHeight={360} textAlign="center" gap={1}>
-                                    <Typography variant="h6" fontWeight={700}>Vault locked</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Unlock your vault to view credential details.
-                                    </Typography>
+                                <Box
+                                    display="flex"
+                                    flexDirection="column"
+                                    alignItems="center"
+                                    justifyContent="center"
+                                    minHeight={360}
+                                    textAlign="center"
+                                    gap={2}
+                                >
+                                    <Box display="flex" flexDirection="column" gap={0.5}>
+                                        <Typography variant="h6" fontWeight={700}>Vault locked</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Unlock your vault to view credential details.
+                                        </Typography>
+                                    </Box>
+                                    <Button
+                                        variant="contained"
+                                        onClick={() => promptUnlock(null)}
+                                        startIcon={<LockOpen/>}
+                                        sx={{fontWeight: 800}}
+                                        data-testid="unlock-vault-button"
+                                    >
+                                        Unlock vault
+                                    </Button>
                                 </Box>
                             ) : (
                                 <>
@@ -2127,11 +2178,10 @@ export default function Dashboard() {
                     paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
                 }}
             >
-                <DialogTitle sx={{fontWeight: 800}}>Unlock Vault to Add Credential</DialogTitle>
+                <DialogTitle sx={{fontWeight: 800}}>{unlockDialogTitle}</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{marginBottom: 2}}>
-                        Your vault is currently locked. Please enter your master password to unlock it and add new
-                        credentials.
+                        {unlockDialogDescription}
                     </Typography>
                     <TextField
                         fullWidth
