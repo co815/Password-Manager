@@ -815,7 +815,11 @@ export default function Dashboard() {
                 return;
             }
             if (!(credential instanceof PublicKeyCredential)) {
-                throw new Error('Unexpected credential type returned by the browser.');
+                setPasskeyMessage({
+                    type: 'error',
+                    text: 'Unexpected credential type returned by the browser.',
+                });
+                return;
             }
             const attestation = attestationToJSON(credential);
             const result = await api.finishPasskeyRegistration({
@@ -1742,9 +1746,6 @@ export default function Dashboard() {
                     </Card>
                 </Box>
             </Box>
-
-
-            {/* Profile settings dialog */}
             <Dialog
                 open={profileDialogOpen}
                 onClose={(_, reason) => {
@@ -2030,14 +2031,14 @@ export default function Dashboard() {
                                                     value={mfaEnrollment.secret}
                                                     fullWidth
                                                     size="small"
-                                                    InputProps={{readOnly: true}}
+                                                    slotProps={{input: {readOnly: true}}}
                                                 />
                                                 <TextField
                                                     label="otpauth URL"
                                                     value={mfaEnrollment.otpauthUrl}
                                                     fullWidth
                                                     size="small"
-                                                    InputProps={{readOnly: true}}
+                                                    slotProps={{input: {readOnly: true}}}
                                                     multiline
                                                     minRows={2}
                                                 />
@@ -2138,8 +2139,6 @@ export default function Dashboard() {
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Add Credential Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleDialogClose}

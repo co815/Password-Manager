@@ -138,7 +138,8 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                 return;
             }
             if (!(credential instanceof PublicKeyCredential)) {
-                throw new Error('Unexpected credential type returned by the browser.');
+                setMsg({type: 'error', text: 'Unexpected credential type returned by the browser.'});
+                return;
             }
             const assertion = assertionToJSON(credential);
 
@@ -169,7 +170,6 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                 const remembered = await restoreDek(data.user.id);
                 if (remembered) {
                     setDEK(remembered);
-                    unlocked = true;
                 } else if (!mp) {
                     setDEK(null);
                 }
@@ -266,7 +266,13 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
             }
 
             if (!loginEmail || !saltClient) {
-                throw new Error('Unable to determine login credentials');
+                setMsg({type: 'error', text: 'Unable to determine login credentials'});
+                setPendingLogin(null);
+                setMfaRequired(false);
+                setMfaCode('');
+                setRecoveryCode('');
+                setUnverifiedEmail(null);
+                return;
             }
 
             const verifier = await makeVerifier(loginEmail, mp, saltClient);

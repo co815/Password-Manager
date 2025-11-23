@@ -172,9 +172,9 @@ export default function AuditLog() {
             const response = await api.listAuditLogs(buildParams());
             setLogs(response.logs ?? []);
 
-            const responsePageSize = typeof response.pageSize === 'number' ? response.pageSize : undefined;
-            const responseTotalElements = typeof response.totalElements === 'number' ? response.totalElements : undefined;
-            const responsePage = typeof response.page === 'number' ? response.page : undefined;
+            const responsePageSize = response.pageSize;
+            const responseTotalElements = response.totalElements;
+            const responsePage = response.page;
 
             const nextPageSize = responsePageSize ?? pageSizeRef.current;
             setPageSize((prevPageSize) => (nextPageSize !== prevPageSize ? nextPageSize : prevPageSize));
@@ -182,13 +182,11 @@ export default function AuditLog() {
             const nextTotalElements = responseTotalElements ?? totalElementsRef.current;
             setTotalElements((prevTotalElements) => (nextTotalElements !== prevTotalElements ? nextTotalElements : prevTotalElements));
 
-            const totalPagesFromResponse = typeof response.totalPages === 'number'
-                ? response.totalPages
-                : nextPageSize > 0
-                    ? Math.ceil(nextTotalElements / nextPageSize)
-                    : 0;
+            const totalPagesFromResponse = response.totalPages ?? (nextPageSize > 0
+                ? Math.ceil(nextTotalElements / nextPageSize)
+                : 0);
 
-            if (typeof responsePage === 'number') {
+            if (responsePage !== undefined) {
                 const clampedPage = totalPagesFromResponse > 0
                     ? Math.min(responsePage, totalPagesFromResponse - 1)
                     : 0;
@@ -393,7 +391,7 @@ export default function AuditLog() {
                         value={draftFilters.from}
                         size="small"
                         onChange={(event) => handleDraftChange('from', event.target.value)}
-                        InputLabelProps={{shrink: true}}
+                        slotProps={{inputLabel: {shrink: true}}}
                     />
                     <TextField
                         label="To"
@@ -401,7 +399,7 @@ export default function AuditLog() {
                         value={draftFilters.to}
                         size="small"
                         onChange={(event) => handleDraftChange('to', event.target.value)}
-                        InputLabelProps={{shrink: true}}
+                        slotProps={{inputLabel: {shrink: true}}}
                     />
                 </Stack>
             </Paper>
