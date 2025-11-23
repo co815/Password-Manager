@@ -94,12 +94,13 @@ function cloneClientInputs(
     if (!extensions) return extensions;
     const clone = JSON.parse(JSON.stringify(extensions)) as AuthenticationExtensionsClientInputs;
     const maybeNormalize = (key: 'appid' | 'appidExclude') => {
-        if (key in clone) {
-            const normalized = normalizeAppIdExtension(clone[key]);
+        const cloneAny = clone as any;
+        if (key in cloneAny) {
+            const normalized = normalizeAppIdExtension(cloneAny[key]);
             if (normalized) {
-                clone[key] = normalized;
+                cloneAny[key] = normalized;
             } else {
-                delete clone[key];
+                delete cloneAny[key];
             }
         }
     };
@@ -205,13 +206,13 @@ export function attestationToJSON(credential: PublicKeyCredential): WebAuthnAtte
     return {
         id: credential.id,
         rawId: arrayBufferToBase64(credential.rawId),
-        type: credential.type,
-        authenticatorAttachment: credential.authenticatorAttachment ?? undefined,
-        clientExtensionResults: cloneClientOutputs(credential.getClientExtensionResults()),
+        type: credential.type as PublicKeyCredentialType,
+        authenticatorAttachment: (credential.authenticatorAttachment ?? undefined) as AuthenticatorAttachment | undefined,
+        clientExtensionResults: cloneClientOutputs(credential.getClientExtensionResults()) ?? {},
         response: {
             clientDataJSON: arrayBufferToBase64(response.clientDataJSON),
             attestationObject: arrayBufferToBase64(response.attestationObject),
-            transports: transports && transports.length > 0 ? [...transports] : undefined,
+            transports: transports && transports.length > 0 ? [...transports] as AuthenticatorTransport[] : undefined,
         },
     };
 }
@@ -227,9 +228,9 @@ export function assertionToJSON(credential: PublicKeyCredential): WebAuthnAssert
     return {
         id: credential.id,
         rawId: arrayBufferToBase64(credential.rawId),
-        type: credential.type,
-        authenticatorAttachment: credential.authenticatorAttachment ?? undefined,
-        clientExtensionResults: cloneClientOutputs(credential.getClientExtensionResults()),
+        type: credential.type as PublicKeyCredentialType,
+        authenticatorAttachment: (credential.authenticatorAttachment ?? undefined) as AuthenticatorAttachment | undefined,
+        clientExtensionResults: cloneClientOutputs(credential.getClientExtensionResults()) ?? {},
         response: {
             clientDataJSON: arrayBufferToBase64(response.clientDataJSON),
             authenticatorData: arrayBufferToBase64(response.authenticatorData),

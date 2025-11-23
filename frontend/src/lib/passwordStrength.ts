@@ -73,7 +73,7 @@ export function assessPasswordStrength(
     ].filter(Boolean).length;
 
     const heuristicsWarnings: string[] = [];
-    let score = rawScore;
+    let score: number = rawScore;
 
     if (characterSetsUsed <= 1) {
         score = Math.min(score, 1);

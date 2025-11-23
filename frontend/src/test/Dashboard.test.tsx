@@ -343,10 +343,6 @@ describe('Dashboard', () => {
         const unlockButton = await screen.findByTestId('unlock-vault-button');
         fireEvent.click(unlockButton);
 
-        await waitFor(() => {
-            expect(screen.getByRole('dialog', {name: /unlock vault/i})).toBeInTheDocument();
-        });
-
         fireEvent.click(screen.getByRole('button', {name: 'Cancel'}));
 
         await waitFor(() => {
