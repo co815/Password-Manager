@@ -219,6 +219,24 @@ class AuthRateLimitingFilterTest {
                 .andExpect(status().isTooManyRequests());
     }
 
+    @Test
+    void rejectsLargeRequests() throws Exception {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"email\":\"user@example.com\",");
+        sb.append("\"junk\":\"");
+        for (int i = 0; i < 20 * 1024; i++) {
+            sb.append("a");
+        }
+        sb.append("\"}");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .content(sb.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .with(client(CLIENT_IP)))
+                .andExpect(status().isPayloadTooLarge());
+    }
+
     private String loginPayload(String email, String captchaToken) {
         StringBuilder builder = new StringBuilder();
         builder.append('{')

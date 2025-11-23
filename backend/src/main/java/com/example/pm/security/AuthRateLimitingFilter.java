@@ -65,6 +65,12 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
             body = readBody(cached);
         } catch (IOException ex) {
             log.debug("Unable to cache request body: {}", ex.getMessage());
+            if (ex.getMessage().contains("too large")) {
+                writePayloadTooLarge(response);
+                return;
+            }
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid request");
+            return;
         }
 
         String clientIp = extractClientIp(workingRequest);
@@ -91,7 +97,7 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
         try {
             return objectMapper.readTree(content);
         } catch (IOException e) {
-            log.debug("Unable to parse auth request body: {}", e.getMessage());
+            log.debug("Unable to parse auth request body");
             return null;
         }
     }
@@ -198,5 +204,13 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
         objectMapper.writeValue(response.getWriter(),
                 new ErrorResponse(HttpStatus.TOO_MANY_REQUESTS.value(), "TOO_MANY_REQUESTS",
                         "Too many authentication attempts"));
+    }
+
+    private void writePayloadTooLarge(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(),
+                new ErrorResponse(HttpStatus.PAYLOAD_TOO_LARGE.value(), "PAYLOAD_TOO_LARGE",
+                        "Request body too large"));
     }
 }
