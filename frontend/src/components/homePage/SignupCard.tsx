@@ -189,7 +189,7 @@ export default function SignupCard({onSwitchToLogin}: Props) {
             elevation={1}
             sx={{
                 width: '100%',
-                maxWidth: 480,
+                maxWidth: { xs: '100%', sm: 480 },
                 borderRadius: 2,
             }}
         >

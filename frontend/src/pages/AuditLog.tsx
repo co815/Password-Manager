@@ -4,6 +4,7 @@ import {
     Alert,
     Box,
     Button,
+    Container,
     CircularProgress,
     Divider,
     FormControl,
@@ -276,7 +277,7 @@ export default function AuditLog() {
     }, []);
 
     return (
-        <Box sx={{paddingTop: (theme) => theme.spacing(4), paddingBottom: (theme) => theme.spacing(4)}}>
+        <Container maxWidth="xl" sx={{paddingTop: (theme) => theme.spacing(4), paddingBottom: (theme) => theme.spacing(4)}}>
             <Stack
                 direction="row"
                 alignItems="center"
@@ -494,6 +495,6 @@ export default function AuditLog() {
                     showLastButton
                 />
             )}
-        </Box>
+        </Container>
     );
 } 
