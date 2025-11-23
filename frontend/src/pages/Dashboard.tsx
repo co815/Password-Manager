@@ -19,7 +19,8 @@ import {
     Avatar, TextField, IconButton, Card, CardContent, Button, InputAdornment, Tooltip,
     Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Snackbar, Stack, LinearProgress,
     CircularProgress,
-    Menu, MenuItem, Chip, FormControlLabel, Checkbox
+    Menu, MenuItem, Chip, FormControlLabel, Checkbox,
+    useMediaQuery, useTheme
 } from '@mui/material';
 
 import {
@@ -43,6 +44,8 @@ import {
     ContentCopy,
     AutoFixHigh,
     LockOpen,
+    Menu as MenuIcon,
+    Logout,
 } from '@mui/icons-material';
 import {passwordTemplates} from '../lib/passwordTemplates';
 import {
@@ -120,6 +123,25 @@ export default function Dashboard() {
     const {user, logout, login, refresh} = useAuth();
     const {dek, locked, hadDek, setDEK} = useCrypto();
     const navigate = useNavigate();
+
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [searchExpanded, setSearchExpanded] = useState(false);
+    const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+    const userMenuOpen = Boolean(userMenuAnchor);
+
+    const handleDrawerToggle = () => {
+        setMobileOpen(!mobileOpen);
+    };
+
+    const handleUserMenuOpen = (event: MouseEvent<HTMLElement>) => {
+        setUserMenuAnchor(event.currentTarget);
+    };
+
+    const handleUserMenuClose = () => {
+        setUserMenuAnchor(null);
+    };
 
     const [credentials, setCredentials] = useState<Credential[]>([]);
     const [selected, setSelected] = useState<Credential | null>(null);
@@ -1295,6 +1317,46 @@ export default function Dashboard() {
         handleGeneratorMenuClose();
     };
 
+    const drawerContent = (
+        <>
+            <Box p={2}>
+                <Typography variant="h6" fontWeight={700} gutterBottom>
+                    {activeCategory
+                        ? `${activeCategory.label} (${activeCategory.count})`
+                        : `All Credentials (${credentials.length})`}
+                </Typography>
+            </Box>
+            <Divider/>
+            <List dense>
+                {categoryItems.map((category) => (
+                    <ListItemButton
+                        key={category.id}
+                        selected={selectedCategory === category.id}
+                        onClick={() => {
+                            setSelectedCategory(category.id);
+                            if (isMobile) setMobileOpen(false);
+                        }}
+                    >
+                        <ListItemIcon sx={{minWidth: 36}}>{renderCategoryIcon(category.id)}</ListItemIcon>
+                        <ListItemText primary={`${category.label} (${category.count})`}/>
+                    </ListItemButton>
+                ))}
+                {isAuditAdmin && (
+                    <>
+                        <Divider sx={{my: 1}}/>
+                        <ListItemButton onClick={() => {
+                            navigate('/audit-log');
+                            if (isMobile) setMobileOpen(false);
+                        }}>
+                            <ListItemIcon sx={{minWidth: 36}}><ListAlt/></ListItemIcon>
+                            <ListItemText primary="Audit Log"/>
+                        </ListItemButton>
+                    </>
+                )}
+            </List>
+        </>
+    );
+
     return (
         <Box display="flex" minHeight="100vh" sx={{bgcolor: 'background.default'}}>
             <input
@@ -1305,39 +1367,34 @@ export default function Dashboard() {
                 onChange={handleImportFileChange}
             />
             <Drawer
-                variant="permanent"
-                anchor="left"
-                slotProps={{
-                    paper: {
-                        sx: {
-                            width: 260,
-                            borderRight: '1px solid',
-                            borderColor: 'divider',
-                            bgcolor: 'background.paper',
-                        },
-                    },
+                variant="temporary"
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                ModalProps={{keepMounted: true}}
+                sx={{
+                    display: {xs: 'block', md: 'none'},
+                    '& .MuiDrawer-paper': {boxSizing: 'border-box', width: 260},
                 }}
             >
-                <Box p={2}>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>
-                        {activeCategory
-                            ? `${activeCategory.label} (${activeCategory.count})`
-                            : `All Credentials (${credentials.length})`}
-                    </Typography>
-                </Box>
-                <Divider/>
-                <List dense>
-                    {categoryItems.map((category) => (
-                        <ListItemButton
-                            key={category.id}
-                            selected={selectedCategory === category.id}
-                            onClick={() => setSelectedCategory(category.id)}
-                        >
-                            <ListItemIcon sx={{minWidth: 36}}>{renderCategoryIcon(category.id)}</ListItemIcon>
-                            <ListItemText primary={`${category.label} (${category.count})`}/>
-                        </ListItemButton>
-                    ))}
-                </List>
+                {drawerContent}
+            </Drawer>
+
+            <Drawer
+                variant="permanent"
+                anchor="left"
+                sx={{
+                    display: {xs: 'none', md: 'block'},
+                    '& .MuiDrawer-paper': {
+                        width: 260,
+                        borderRight: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'background.paper',
+                        boxSizing: 'border-box',
+                    },
+                }}
+                open
+            >
+                {drawerContent}
             </Drawer>
 
             <Box
@@ -1345,56 +1402,88 @@ export default function Dashboard() {
                 p={3}
                 sx={{
                     marginLeft: {xs: 0, md: '260px'},
+                    width: {md: `calc(100% - 260px)`},
                 }}
             >
                 <Box display="flex" alignItems="center" justifyContent="space-between" marginBottom={2} gap={2}>
-                    <TextField
-                        placeholder="Search"
-                        value={searchQuery}
-                        onChange={(event) => setSearchQuery(event.target.value)}
-                        size="small"
-                        sx={{maxWidth: 420}}
-                        slotProps={{
-                            input: {
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Search fontSize="small"/>
-                                    </InputAdornment>
-                                ),
-                            },
-                        }}
-                    />
-                    <Box display="flex" alignItems="center" gap={2}>
-                        {isAuditAdmin && (
-                            <Button
-                                onClick={() => navigate('/audit-log')}
-                                variant="contained"
-                                size="small"
-                                startIcon={<ListAlt fontSize="small"/>}
-                                color="secondary"
+                    <Box display="flex" alignItems="center" gap={1} flex={1}>
+                        {isMobile && (
+                            <IconButton
+                                color="inherit"
+                                aria-label="open drawer"
+                                edge="start"
+                                onClick={handleDrawerToggle}
+                                sx={{mr: 1}}
                             >
-                                Audit log
-                            </Button>
+                                <MenuIcon/>
+                            </IconButton>
                         )}
-                        <Button
-                            onClick={handleProfileDialogOpen}
-                            variant="outlined"
-                            size="small"
-                            startIcon={<Settings fontSize="small"/>}
+                        {(!isMobile || searchExpanded) && (
+                            <TextField
+                                placeholder="Search"
+                                value={searchQuery}
+                                onChange={(event) => setSearchQuery(event.target.value)}
+                                size="small"
+                                autoFocus={isMobile && searchExpanded}
+                                onBlur={() => {
+                                    if (isMobile && !searchQuery) setSearchExpanded(false);
+                                }}
+                                sx={{maxWidth: 420, width: isMobile ? '100%' : 'auto', flex: 1}}
+                                slotProps={{
+                                    input: {
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <Search fontSize="small"/>
+                                            </InputAdornment>
+                                        ),
+                                    },
+                                }}
+                            />
+                        )}
+                        {isMobile && !searchExpanded && (
+                            <IconButton onClick={() => setSearchExpanded(true)}>
+                                <Search/>
+                            </IconButton>
+                        )}
+                    </Box>
+
+                    <Box display="flex" alignItems="center" gap={2}>
+
+                        <IconButton onClick={handleUserMenuOpen} sx={{p: 0}}>
+                            <Avatar
+                                alt={user?.email ?? 'User'}
+                                src={avatarLoadError ? undefined : avatarSrc ?? undefined}
+                                slotProps={{img: {onError: () => setAvatarLoadError(true)}}}
+                            >
+                                {avatarInitials}
+                            </Avatar>
+                        </IconButton>
+                        {!isMobile && (
+                            <Typography variant="body2">{user?.email ?? 'No user email found'}</Typography>
+                        )}
+                        <Menu
+                            anchorEl={userMenuAnchor}
+                            open={userMenuOpen}
+                            onClose={handleUserMenuClose}
+                            onClick={handleUserMenuClose}
+                            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                         >
-                            Settings
-                        </Button>
-                        <Button onClick={handleLogoutClick} variant="outlined" size="small">
-                            Log out
-                        </Button>
-                        <Avatar
-                            alt={user?.email ?? 'User'}
-                            src={avatarLoadError ? undefined : avatarSrc ?? undefined}
-                            slotProps={{img: {onError: () => setAvatarLoadError(true)}}}
-                        >
-                            {avatarInitials}
-                        </Avatar>
-                        <Typography variant="body2">{user?.email ?? 'No user email found'}</Typography>
+                            <MenuItem disabled sx={{opacity: 1, color: 'text.primary', fontWeight: 600}}>
+                                <Typography variant="body2">{user?.email ?? 'User'}</Typography>
+                            </MenuItem>
+                            <Divider/>
+                            <MenuItem onClick={handleProfileDialogOpen}>
+                                <ListItemIcon><Settings fontSize="small"/></ListItemIcon>
+                                <ListItemText>Settings</ListItemText>
+                            </MenuItem>
+                            <MenuItem onClick={() => {
+                                handleLogoutClick();
+                            }}>
+                                <ListItemIcon><Logout fontSize="small"/></ListItemIcon>
+                                <ListItemText>Log out</ListItemText>
+                            </MenuItem>
+                        </Menu>
                     </Box>
                 </Box>
 

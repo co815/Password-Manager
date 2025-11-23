@@ -21,6 +21,10 @@ import {
     TableRow,
     TextField,
     Typography,
+    Card,
+    CardContent,
+    useMediaQuery,
+    useTheme,
 } from '@mui/material';
 import type {SelectChangeEvent} from '@mui/material/Select';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -102,6 +106,8 @@ export default function AuditLog() {
     const [filters, setFilters] = useState<FilterState>({...DEFAULT_FILTERS});
     const [draftFilters, setDraftFilters] = useState<FilterState>({...DEFAULT_FILTERS});
     const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const firstLoad = useRef(true);
     const pageRef = useRef(page);
     const pageSizeRef = useRef(pageSize);
@@ -408,7 +414,7 @@ export default function AuditLog() {
                 </Alert>
             )}
 
-            <TableContainer component={Paper}>
+            <Paper>
                 {loading ? (
                     <Box display="flex" justifyContent="center" alignItems="center" minHeight={240}>
                         <CircularProgress />
@@ -422,33 +428,59 @@ export default function AuditLog() {
                             Actions from the backend will appear here once they are recorded.
                         </Typography>
                     </Box>
-                ) : (
-                    <Table size="small">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell sx={{width: 220}}>Timestamp</TableCell>
-                                <TableCell sx={{width: 220}}>Actor</TableCell>
-                                <TableCell>Action</TableCell>
-                                <TableCell>Target</TableCell>
-                                <TableCell>Details</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {logs.map((entry) => (
-                                <TableRow key={entry.id} hover>
-                                    <TableCell>{formatTimestamp(entry.createdDate)}</TableCell>
-                                    <TableCell>{formatActor(entry)}</TableCell>
-                                    <TableCell sx={{textTransform: 'capitalize'}}>{entry.action.toLowerCase()}</TableCell>
-                                    <TableCell>{formatTarget(entry)}</TableCell>
-                                    <TableCell sx={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
+                ) : isMobile ? (
+                    <Stack spacing={2} p={2}>
+                        {logs.map((entry) => (
+                            <Card key={entry.id} variant="outlined">
+                                <CardContent>
+                                    <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                                        {formatTimestamp(entry.createdDate)}
+                                    </Typography>
+                                    <Typography variant="subtitle2" component="div" gutterBottom>
+                                        {entry.action}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                                        Actor: {formatActor(entry)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                                        Target: {formatTarget(entry)}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', mt: 1 }}>
                                         {entry.details ?? '—'}
-                                    </TableCell>
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </Stack>
+                ) : (
+                    <TableContainer>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell sx={{width: 220}}>Timestamp</TableCell>
+                                    <TableCell sx={{width: 220}}>Actor</TableCell>
+                                    <TableCell>Action</TableCell>
+                                    <TableCell>Target</TableCell>
+                                    <TableCell>Details</TableCell>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHead>
+                            <TableBody>
+                                {logs.map((entry) => (
+                                    <TableRow key={entry.id} hover>
+                                        <TableCell>{formatTimestamp(entry.createdDate)}</TableCell>
+                                        <TableCell>{formatActor(entry)}</TableCell>
+                                        <TableCell sx={{textTransform: 'capitalize'}}>{entry.action.toLowerCase()}</TableCell>
+                                        <TableCell>{formatTarget(entry)}</TableCell>
+                                        <TableCell sx={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
+                                            {entry.details ?? '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
                 )}
-            </TableContainer>
+            </Paper>
             {hasLogs && (
                 <TablePagination
                     component="div"
