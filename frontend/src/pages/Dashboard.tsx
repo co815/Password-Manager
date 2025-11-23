@@ -1400,9 +1400,14 @@ export default function Dashboard() {
             <Box
                 flex={1}
                 p={3}
+                component="main"
                 sx={{
                     marginLeft: {xs: 0, md: '260px'},
                     width: {md: `calc(100% - 260px)`},
+                    height: {md: '100vh'},
+                    overflow: {md: 'hidden'},
+                    display: {md: 'flex'},
+                    flexDirection: {md: 'column'},
                 }}
             >
                 <Box display="flex" alignItems="center" justifyContent="space-between" marginBottom={2} gap={2}>
@@ -1487,9 +1492,32 @@ export default function Dashboard() {
                     </Box>
                 </Box>
 
-                <Box display="grid" gridTemplateColumns={{xs: '1fr', md: '280px 1fr'}} gap={2}>
-                    <Card variant="outlined" sx={{overflow: 'hidden'}}>
-                        <List dense disablePadding>
+                <Box
+                    display="grid"
+                    gridTemplateColumns={{xs: '1fr', md: '280px 1fr'}}
+                    gap={2}
+                    sx={{
+                        flex: {md: 1},
+                        minHeight: {md: 0},
+                    }}
+                >
+                    <Card
+                        variant="outlined"
+                        sx={{
+                            overflow: 'hidden',
+                            height: {md: '100%'},
+                            display: {md: 'flex'},
+                            flexDirection: {md: 'column'},
+                        }}
+                    >
+                        <List
+                            dense
+                            disablePadding
+                            sx={{
+                                overflowY: {md: 'auto'},
+                                flex: {md: 1},
+                            }}
+                        >
                             {locked ? (
                                 <ListItem>
                                     <ListItemText primary="Vault locked" secondary="Unlock to view credentials."/>
@@ -1535,7 +1563,15 @@ export default function Dashboard() {
                         </List>
                     </Card>
 
-                    <Card sx={{minHeight: 420}} elevation={0} variant="outlined">
+                    <Card
+                        sx={{
+                            minHeight: 420,
+                            height: {md: '100%'},
+                            overflowY: {md: 'auto'},
+                        }}
+                        elevation={0}
+                        variant="outlined"
+                    >
                         <CardContent>
                             {locked ? (
                                 <Box
