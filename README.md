@@ -1,7 +1,3 @@
-
-+20
--0
-
 # Password Manager
 
 ## Email verification configuration
