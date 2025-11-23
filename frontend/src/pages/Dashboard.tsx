@@ -1425,10 +1425,9 @@ export default function Dashboard() {
                                             onClick={() => setSelected(credential)}
                                             sx={{
                                                 '&.Mui-selected': {
-                                                    bgcolor: (t) =>
-                                                        t.palette.mode === 'dark'
-                                                            ? 'rgba(99,102,241,.12)'
-                                                            : 'rgba(99,102,241,.08)',
+                                                    bgcolor: 'action.selected',
+                                                    borderLeft: '4px solid',
+                                                    borderColor: 'primary.main'
                                                 },
                                             }}
                                         >
@@ -1447,7 +1446,7 @@ export default function Dashboard() {
                         </List>
                     </Card>
 
-                    <Card sx={{minHeight: 420}}>
+                    <Card sx={{minHeight: 420}} elevation={0} variant="outlined">
                         <CardContent>
                             {locked ? (
                                 <Box
@@ -1469,8 +1468,8 @@ export default function Dashboard() {
                                         variant="contained"
                                         onClick={() => promptUnlock(null)}
                                         startIcon={<LockOpen/>}
-                                        sx={{fontWeight: 800}}
                                         data-testid="unlock-vault-button"
+                                        disableElevation
                                     >
                                         Unlock vault
                                     </Button>
@@ -2008,7 +2007,7 @@ export default function Dashboard() {
                         }}
                         disabled={avatarSaving || !avatarChanged}
                         variant="contained"
-                        sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
+                        disableElevation
                     >
                         {avatarSaving ? 'Saving…' : 'Save'}
                     </Button>
@@ -2180,7 +2179,7 @@ export default function Dashboard() {
                         }}
                         disabled={saveDisabled}
                         variant="contained"
-                        sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
+                        disableElevation
                     >
                         {busy ? 'Saving…' : dialogMode === 'edit' ? 'Save changes' : 'Save'}
                     </Button>
@@ -2244,7 +2243,7 @@ export default function Dashboard() {
                         }}
                         disabled={!unlockPassword || unlockBusy}
                         variant="contained"
-                        sx={{fontWeight: 800, background: 'linear-gradient(90deg,#2563eb,#6366f1 50%,#7c3aed)'}}
+                        disableElevation
                     >
                         {unlockBusy ? 'Unlocking…' : 'Unlock'}
                     </Button>
@@ -2277,7 +2276,7 @@ export default function Dashboard() {
                         disabled={deleteBusy}
                         color="error"
                         variant="contained"
-                        sx={{fontWeight: 800}}
+                        disableElevation
                     >
                         {deleteBusy ? 'Deleting…' : 'Delete'}
                     </Button>

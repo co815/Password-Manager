@@ -4,6 +4,8 @@ import {
     Alert,
     Box,
     Button,
+    Card,
+    CardContent,
     CircularProgress,
     FormControl,
     FormHelperText,
@@ -26,7 +28,6 @@ import {ApiError, api, primeCsrfToken} from '../../lib/api';
 import {createAccountMaterial} from '../../lib/crypto/keys';
 import {makeVerifier} from '../../lib/crypto/argon2';
 import CaptchaChallenge from './CaptchaChallenge';
-import {authButtonStyles, createFieldStyles} from './authStyles';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
 import {extractApiErrorDetails} from '../../lib/api-error';
 import {
@@ -78,9 +79,9 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     const strengthSuggestions = mp
         ? pwdStrength.suggestions
         : [
-              'Use a long, unique passphrase to protect your vault.',
-              'Avoid personal information or common phrases that can be guessed.',
-          ];
+            'Use a long, unique passphrase to protect your vault.',
+            'Avoid personal information or common phrases that can be guessed.',
+        ];
     const strengthColor = getPasswordStrengthColor(pwdScore);
     const passwordTooWeak =
         Boolean(mp) && (pwdStrength.compromised || pwdStrength.score < MIN_ACCEPTABLE_PASSWORD_SCORE);
@@ -180,269 +181,230 @@ export default function SignupCard({onSwitchToLogin}: Props) {
     };
 
     return (
-        <Box
-            sx={(theme) => ({
+        <Card
+            elevation={1}
+            sx={{
                 width: '100%',
-                maxWidth: {xs: 600, sm: 600},
-                mx: 'auto',
-                p: {xs: 3, sm: 4},
-                borderRadius: 4,
-                background:
-                    theme.palette.mode === 'dark'
-                        ? 'linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(76,29,149,0.85) 45%, rgba(129,140,248,0.82) 100%)'
-                        : 'linear-gradient(135deg, rgba(129,140,248,0.95) 0%, rgba(59,130,246,0.9) 45%, rgba(6,182,212,0.9) 100%)',
-                color: '#f8fafc',
-                boxShadow:
-                    theme.palette.mode === 'dark'
-                        ? '0 24px 52px rgba(15,23,42,0.65)'
-                        : '0 28px 56px rgba(79,70,229,0.28)',
-                backdropFilter: 'blur(20px)',
-            })}
+                maxWidth: 480,
+                borderRadius: 2,
+            }}
         >
-            <Stack spacing={3}>
-                <Stack spacing={1}>
-                    <Typography variant="overline" sx={{letterSpacing: 1.6, fontWeight: 700, opacity: 0.85}}>
-                        Create your vault
-                    </Typography>
-                    <Typography variant="h4" sx={{fontWeight: 800, lineHeight: 1.1}}>
-                        Join Password Manager
-                    </Typography>
-                    <Typography variant="body2" sx={{opacity: 0.9}}>
-                        Choose a username and a strong master password to keep your secrets safe.
-                    </Typography>
-                </Stack>
-
-                <Stack spacing={2}>
-                    <FormControl fullWidth variant="outlined" sx={(theme) => createFieldStyles(theme)}>
-                        <InputLabel htmlFor="signup-email">Email *</InputLabel>
-                        <OutlinedInput
-                            id="signup-email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            onKeyDown={submitOnEnter}
-                            startAdornment={
-                                <InputAdornment position="start">
-                                    <EmailOutlined fontSize="small"/>
-                                </InputAdornment>
-                            }
-                            label="Email *"
-                        />
-                    </FormControl>
-
-                    <FormControl fullWidth variant="outlined" error={usernameError} sx={(theme) => createFieldStyles(theme)}>
-                        <InputLabel htmlFor="signup-username">Username *</InputLabel>
-                        <OutlinedInput
-                            id="signup-username"
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            onKeyDown={submitOnEnter}
-                            startAdornment={
-                                <InputAdornment position="start">
-                                    <PersonOutline fontSize="small"/>
-                                </InputAdornment>
-                            }
-                            label="Username *"
-                        />
-                        <FormHelperText>
-                            {usernameError ? 'Username must be at least 4 characters long' : ' '}
-                        </FormHelperText>
-                    </FormControl>
-
-                    <FormControl fullWidth variant="outlined" sx={(theme) => createFieldStyles(theme)}>
-                        <InputLabel htmlFor="signup-password">Master Password *</InputLabel>
-                        <OutlinedInput
-                            id="signup-password"
-                            type={show ? 'text' : 'password'}
-                            value={mp}
-                            onChange={(e) => setMp(e.target.value)}
-                            onKeyDown={submitOnEnter}
-                            startAdornment={
-                                <InputAdornment position="start">
-                                    <LockOutlined fontSize="small"/>
-                                </InputAdornment>
-                            }
-                            endAdornment={
-                                <InputAdornment position="end">
-                                    <IconButton onClick={() => setShow((s) => !s)} edge="end"
-                                                aria-label="toggle password visibility">
-                                        {show ? <VisibilityOff/> : <Visibility/>}
-                                    </IconButton>
-                                </InputAdornment>
-                            }
-                            label="Master Password *"
-                        />
-                    </FormControl>
-
-                    <LinearProgress
-                        variant="determinate"
-                        value={pwdProgress}
-                        sx={{
-                            height: 6,
-                            borderRadius: 3,
-                            mx: 0.5,
-                            '& .MuiLinearProgress-bar': {
-                                background: strengthColor,
-                            },
-                            backgroundColor: 'rgba(148,163,184,0.35)',
-                        }}
-                    />
-                    <Box sx={{px: 0.5, mt: 0.5}}>
-                        <Typography
-                            variant="caption"
-                            sx={{fontWeight: 600, display: 'block'}}
-                            color={pwdStrength.compromised ? 'error.main' : 'inherit'}
-                        >
-                            {strengthLabel}
+            <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
+                <Stack spacing={3}>
+                    <Box textAlign="center">
+                        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+                            Create your vault
                         </Typography>
-                        {mp ? (
-                            <Typography
-                                variant="caption"
-                                color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
-                                sx={{display: 'block'}}
-                            >
-                                Estimated crack time: {pwdStrength.crackTime}
-                            </Typography>
-                        ) : null}
-                        <Stack
-                            component="ul"
-                            spacing={0.25}
-                            sx={{
-                                listStyleType: 'disc',
-                                pl: 2,
-                                mt: 0.5,
-                                mb: 0,
-                                color: pwdStrength.compromised ? 'error.main' : 'text.secondary',
-                            }}
-                        >
-                            {strengthSuggestions.map((suggestion, index) => (
-                                <Typography key={`${suggestion}-${index}`} component="li" variant="caption">
-                                    {suggestion}
-                                </Typography>
-                            ))}
-                        </Stack>
-                        {passwordWarning ? (
-                            <Typography
-                                variant="caption"
-                                color="error.main"
-                                sx={{display: 'block', fontWeight: 600, mt: 0.75}}
-                            >
-                                {passwordWarning}
-                            </Typography>
-                        ) : null}
+                        <Typography variant="body2" color="text.secondary">
+                            Join Password Manager securely
+                        </Typography>
                     </Box>
 
-                    <FormControl fullWidth variant="outlined" error={confirmError} sx={(theme) => createFieldStyles(theme)}>
-                        <InputLabel htmlFor="signup-confirm">Confirm Password *</InputLabel>
-                        <OutlinedInput
-                            id="signup-confirm"
-                            type={show ? 'text' : 'password'}
-                            value={mp2}
-                            onChange={(e) => setMp2(e.target.value)}
-                            onKeyDown={submitOnEnter}
-                            label="Confirm Password *"
-                        />
-                        <FormHelperText>{confirmError ? 'Passwords do not match' : ' '}</FormHelperText>
-                    </FormControl>
-                    {captchaLoading ? (
-                        <Stack spacing={1} alignItems="center">
-                            <CircularProgress size={32} color="inherit"/>
-                            <Typography variant="body2" sx={{opacity: 0.85}}>
-                                Preparing CAPTCHA challenge…
-                            </Typography>
-                        </Stack>
-                    ) : null}
-                    {captchaConfigError ? (
-                        <Alert
-                            severity="error"
-                            action={(
-                                <Button
-                                    color="inherit"
-                                    size="small"
-                                    onClick={() => {
-                                        reloadCaptchaConfig().catch(() => undefined);
-                                    }}
-                                    disabled={captchaLoading}
-                                >
-                                    Retry
-                                </Button>
-                            )}
-                        >
-                            Unable to load the CAPTCHA challenge. Please try again.
-                        </Alert>
-                    ) : null}
-                    {captchaEnabled ? (
-                        <Stack spacing={1} alignItems="center">
-                            <CaptchaChallenge
-                                ref={captchaRef}
-                                provider={captchaProvider}
-                                siteKey={siteKey}
-                                theme={captchaTheme}
-                                onChange={(token) => {
-                                    setCaptchaToken(token ?? null);
-                                }}
-                                onExpired={() => {
-                                    setCaptchaToken(null);
-                                    setCaptchaError('The CAPTCHA challenge expired. Please try again.');
-                                }}
-                                onErrored={(message) => {
-                                    setCaptchaToken(null);
-                                    setCaptchaError(message
-                                        ?? 'Unable to load the CAPTCHA challenge. Please try again.'
-                                    );
+                    <Stack spacing={2}>
+                        <FormControl fullWidth variant="outlined">
+                            <InputLabel htmlFor="signup-email">Email</InputLabel>
+                            <OutlinedInput
+                                id="signup-email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                onKeyDown={submitOnEnter}
+                                startAdornment={
+                                    <InputAdornment position="start">
+                                        <EmailOutlined fontSize="small" color="action"/>
+                                    </InputAdornment>
+                                }
+                                label="Email"
+                            />
+                        </FormControl>
+
+                        <FormControl fullWidth variant="outlined" error={usernameError}>
+                            <InputLabel htmlFor="signup-username">Username</InputLabel>
+                            <OutlinedInput
+                                id="signup-username"
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                onKeyDown={submitOnEnter}
+                                startAdornment={
+                                    <InputAdornment position="start">
+                                        <PersonOutline fontSize="small" color="action"/>
+                                    </InputAdornment>
+                                }
+                                label="Username"
+                            />
+                            <FormHelperText>
+                                {usernameError ? 'Username must be at least 4 characters long' : ' '}
+                            </FormHelperText>
+                        </FormControl>
+
+                        <FormControl fullWidth variant="outlined">
+                            <InputLabel htmlFor="signup-password">Master Password</InputLabel>
+                            <OutlinedInput
+                                id="signup-password"
+                                type={show ? 'text' : 'password'}
+                                value={mp}
+                                onChange={(e) => setMp(e.target.value)}
+                                onKeyDown={submitOnEnter}
+                                startAdornment={
+                                    <InputAdornment position="start">
+                                        <LockOutlined fontSize="small" color="action"/>
+                                    </InputAdornment>
+                                }
+                                endAdornment={
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            onClick={() => setShow((s) => !s)}
+                                            edge="end"
+                                            aria-label="toggle password visibility"
+                                        >
+                                            {show ? <VisibilityOff/> : <Visibility/>}
+                                        </IconButton>
+                                    </InputAdornment>
+                                }
+                                label="Master Password"
+                            />
+                        </FormControl>
+
+                        <Box>
+                            <LinearProgress
+                                variant="determinate"
+                                value={pwdProgress}
+                                sx={{
+                                    height: 4,
+                                    borderRadius: 2,
+                                    mb: 1,
+                                    '& .MuiLinearProgress-bar': {
+                                        backgroundColor: strengthColor,
+                                    },
+                                    backgroundColor: 'action.hover',
                                 }}
                             />
-                            {captchaError ? (
-                                <FormHelperText error>{captchaError}</FormHelperText>
-                            ) : null}
-                        </Stack>
-                    ) : null}
-                </Stack>
+                            <Typography
+                                variant="caption"
+                                display="block"
+                                fontWeight={600}
+                                color={pwdStrength.compromised ? 'error' : 'text.primary'}
+                            >
+                                {strengthLabel}
+                            </Typography>
+                            {mp && (
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                    Estimated crack time: {pwdStrength.crackTime}
+                                </Typography>
+                            )}
+                            <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
+                                {strengthSuggestions.map((suggestion, index) => (
+                                    <Typography key={index} component="li" variant="caption" color="text.secondary">
+                                        {suggestion}
+                                    </Typography>
+                                ))}
+                            </Box>
+                            {passwordWarning && (
+                                <Typography variant="caption" color="error" fontWeight={600} sx={{ mt: 1, display: 'block' }}>
+                                    {passwordWarning}
+                                </Typography>
+                            )}
+                        </Box>
 
-                <Stack spacing={2}>
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={disabled}
-                        sx={authButtonStyles}
-                        variant="contained"
-                    >
-                        {busy ? <CircularProgress size={22} sx={{color: '#fff'}}/> : 'Create account'}
-                    </Button>
+                        <FormControl fullWidth variant="outlined" error={confirmError}>
+                            <InputLabel htmlFor="signup-confirm">Confirm Password</InputLabel>
+                            <OutlinedInput
+                                id="signup-confirm"
+                                type={show ? 'text' : 'password'}
+                                value={mp2}
+                                onChange={(e) => setMp2(e.target.value)}
+                                onKeyDown={submitOnEnter}
+                                label="Confirm Password"
+                            />
+                            <FormHelperText>{confirmError ? 'Passwords do not match' : ' '}</FormHelperText>
+                        </FormControl>
 
-                    {msg && (
-                        <Alert
-                            severity={msg.type}
-                            variant="filled"
-                            sx={{
-                                borderRadius: 2,
-                                backgroundColor: msg.type === 'error' ? 'rgba(248,113,113,0.85)' : 'rgba(34,197,94,0.85)',
-                                color: '#fff',
-                                boxShadow: '0 16px 34px rgba(15,23,42,0.55)',
-                            }}
-                        >
-                            {msg.text}
-                        </Alert>
-                    )}
+                        {captchaLoading ? (
+                            <Stack spacing={1} alignItems="center">
+                                <CircularProgress size={32}/>
+                                <Typography variant="body2" color="text.secondary">
+                                    Preparing CAPTCHA challenge…
+                                </Typography>
+                            </Stack>
+                        ) : null}
+                        {captchaConfigError ? (
+                            <Alert
+                                severity="error"
+                                action={(
+                                    <Button
+                                        color="inherit"
+                                        size="small"
+                                        onClick={() => {
+                                            reloadCaptchaConfig().catch(() => undefined);
+                                        }}
+                                        disabled={captchaLoading}
+                                    >
+                                        Retry
+                                    </Button>
+                                )}
+                            >
+                                Unable to load the CAPTCHA challenge.
+                            </Alert>
+                        ) : null}
+                        {captchaEnabled ? (
+                            <Stack spacing={1} alignItems="center">
+                                <CaptchaChallenge
+                                    ref={captchaRef}
+                                    provider={captchaProvider}
+                                    siteKey={siteKey}
+                                    theme={captchaTheme}
+                                    onChange={(token) => {
+                                        setCaptchaToken(token ?? null);
+                                    }}
+                                    onExpired={() => {
+                                        setCaptchaToken(null);
+                                        setCaptchaError('The CAPTCHA challenge expired.');
+                                    }}
+                                    onErrored={(message) => {
+                                        setCaptchaToken(null);
+                                        setCaptchaError(message ?? 'Unable to load CAPTCHA.');
+                                    }}
+                                />
+                                {captchaError ? (
+                                    <FormHelperText error>{captchaError}</FormHelperText>
+                                ) : null}
+                            </Stack>
+                        ) : null}
+                    </Stack>
 
-                    <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                        <Typography
-                            variant="body2"
-                            sx={{opacity: 0.85, display: 'flex', alignItems: 'center'}}
-                        >
-                            Already have an account?
-                        </Typography>
+                    <Stack spacing={2}>
                         <Button
-                            onClick={handleSwitchToLogin}
-                            color="inherit"
-                            size="small"
-                            sx={{textTransform: 'none', fontWeight: 700, px: 0, minWidth: 0}}
+                            onClick={handleSubmit}
+                            disabled={disabled}
+                            variant="contained"
+                            size="large"
+                            disableElevation
                         >
-                            Log in
+                            {busy ? <CircularProgress size={24} color="inherit"/> : 'Create account'}
                         </Button>
+
+                        {msg && (
+                            <Alert severity={msg.type}>
+                                {msg.text}
+                            </Alert>
+                        )}
+
+                        <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
+                            <Typography variant="body2" color="text.secondary">
+                                Already have an account?
+                            </Typography>
+                            <Button
+                                onClick={handleSwitchToLogin}
+                                color="primary"
+                                sx={{ fontWeight: 600 }}
+                            >
+                                Log in
+                            </Button>
+                        </Box>
                     </Stack>
                 </Stack>
-            </Stack>
-        </Box>
+            </CardContent>
+        </Card>
     );
 }

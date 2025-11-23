@@ -94,13 +94,13 @@ function cloneClientInputs(
     if (!extensions) return extensions;
     const clone = JSON.parse(JSON.stringify(extensions)) as AuthenticationExtensionsClientInputs;
     const maybeNormalize = (key: 'appid' | 'appidExclude') => {
-        const cloneAny = clone as any;
-        if (key in cloneAny) {
-            const normalized = normalizeAppIdExtension(cloneAny[key]);
+        const cloneRecord = clone as Record<string, unknown>;
+        if (key in cloneRecord) {
+            const normalized = normalizeAppIdExtension(cloneRecord[key]);
             if (normalized) {
-                cloneAny[key] = normalized;
+                cloneRecord[key] = normalized;
             } else {
-                delete cloneAny[key];
+                delete cloneRecord[key];
             }
         }
     };
