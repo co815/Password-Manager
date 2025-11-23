@@ -29,20 +29,20 @@ export default function Home() {
                 flexDirection: 'column',
                 justifyContent: 'center',
                 bgcolor: 'background.default',
-                py: 4,
+                py: 2,
             }}
         >
             <Container maxWidth="sm">
-                <Box sx={{ mb: 4, textAlign: 'center' }}>
+                <Box sx={{ mb: 2, textAlign: 'center' }}> {}
                     <Typography
-                        variant="h4"
+                        variant="h5"
                         component="h1"
                         gutterBottom
-                        sx={{ fontWeight: 700, color: 'text.primary' }}
+                        sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}
                     >
                         Password Manager
                     </Typography>
-                    <Typography variant="body1" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary">
                         Secure, encrypted, and simple.
                     </Typography>
                 </Box>

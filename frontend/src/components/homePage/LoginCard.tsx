@@ -420,19 +420,19 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                 borderRadius: 2,
             }}
         >
-            <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
-                <Stack spacing={3}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Stack spacing={2}>
                     <Box textAlign="center">
-                        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
                             Welcome back
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary">
                             Sign in to access your vault
                         </Typography>
                     </Box>
 
-                    <Stack spacing={2}>
-                        <FormControl fullWidth variant="outlined">
+                    <Stack spacing={1.5}>
+                        <FormControl fullWidth variant="outlined" size="small">
                             <InputLabel htmlFor="login-identifier">Email or Username</InputLabel>
                             <OutlinedInput
                                 id="login-identifier"
@@ -449,7 +449,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                             />
                         </FormControl>
 
-                        <FormControl fullWidth variant="outlined">
+                        <FormControl fullWidth variant="outlined" size="small">
                             <InputLabel htmlFor="login-password">Master Password</InputLabel>
                             <OutlinedInput
                                 id="login-password"
@@ -467,9 +467,10 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                         <IconButton
                                             onClick={() => setShow((s) => !s)}
                                             edge="end"
+                                            size="small"
                                             aria-label="toggle password visibility"
                                         >
-                                            {show ? <VisibilityOff/> : <Visibility/>}
+                                            {show ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}
                                         </IconButton>
                                     </InputAdornment>
                                 }
@@ -478,9 +479,9 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                         </FormControl>
                         {captchaLoading ? (
                             <Stack spacing={1} alignItems="center">
-                                <CircularProgress size={32}/>
-                                <Typography variant="body2" color="text.secondary">
-                                    Preparing CAPTCHA challenge…
+                                <CircularProgress size={24}/>
+                                <Typography variant="caption" color="text.secondary">
+                                    Preparing CAPTCHA...
                                 </Typography>
                             </Stack>
                         ) : null}
@@ -500,7 +501,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                     </Button>
                                 )}
                             >
-                                Unable to load the CAPTCHA challenge.
+                                Captcha Error
                             </Alert>
                         ) : null}
                         {captchaEnabled ? (
@@ -515,11 +516,11 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                     }}
                                     onExpired={() => {
                                         setCaptchaToken(null);
-                                        setCaptchaError('The CAPTCHA challenge expired.');
+                                        setCaptchaError('Expired');
                                     }}
                                     onErrored={(message) => {
                                         setCaptchaToken(null);
-                                        setCaptchaError(message ?? 'Unable to load CAPTCHA.');
+                                        setCaptchaError(message ?? 'Error');
                                     }}
                                 />
                                 {captchaError ? (
@@ -528,11 +529,11 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                             </Stack>
                         ) : null}
                         {mfaRequired ? (
-                            <Stack spacing={2} sx={{ mt: 1, p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
-                                <Typography variant="body2" fontWeight={500}>
+                            <Stack spacing={1.5} sx={{ mt: 1, p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+                                <Typography variant="caption" fontWeight={600}>
                                     Two-factor authentication required
                                 </Typography>
-                                <FormControl fullWidth variant="outlined">
+                                <FormControl fullWidth variant="outlined" size="small">
                                     <InputLabel htmlFor="login-mfa-code">Authenticator code</InputLabel>
                                     <OutlinedInput
                                         id="login-mfa-code"
@@ -552,8 +553,8 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                         label="Authenticator code"
                                     />
                                 </FormControl>
-                                <Divider>OR</Divider>
-                                <FormControl fullWidth variant="outlined">
+                                <Divider><Typography variant="caption">OR</Typography></Divider>
+                                <FormControl fullWidth variant="outlined" size="small">
                                     <InputLabel htmlFor="login-recovery-code">Recovery code</InputLabel>
                                     <OutlinedInput
                                         id="login-recovery-code"
@@ -577,16 +578,17 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                         ) : null}
                     </Stack>
 
-                    <Stack spacing={2}>
+                    <Stack spacing={1.5}>
                         {passkeySupported ? (
                             <Button
                                 onClick={() => { void handlePasskeyLogin(); }}
                                 disabled={passkeyDisabled}
                                 variant="outlined"
                                 color="secondary"
-                                startIcon={passkeyBusy ? <CircularProgress size={18} color="inherit"/> : <VpnKey/>}
+                                size="medium"
+                                startIcon={passkeyBusy ? <CircularProgress size={16} color="inherit"/> : <VpnKey/>}
                             >
-                                {passkeyBusy ? 'Waiting for passkey…' : 'Sign in with passkey'}
+                                {passkeyBusy ? 'Waiting...' : 'Sign in with passkey'}
                             </Button>
                         ) : null}
 
@@ -594,24 +596,24 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                             onClick={handleSubmit}
                             disabled={disabled}
                             variant="contained"
-                            size="large"
+                            size="medium"
                             disableElevation
                         >
-                            {busy ? <CircularProgress size={24} color="inherit"/> : 'Log in'}
+                            {busy ? <CircularProgress size={20} color="inherit"/> : 'Log in'}
                         </Button>
 
                         {msg && (
-                            <Alert severity={msg.type}>
+                            <Alert severity={msg.type} sx={{ py: 0, alignItems: 'center' }}>
                                 {msg.text}
                             </Alert>
                         )}
 
                         {unverifiedEmail && (
                             <Stack
-                                spacing={2}
-                                sx={{ p: 2, bgcolor: 'warning.light', borderRadius: 1 }}
+                                spacing={1}
+                                sx={{ p: 1.5, bgcolor: 'warning.light', borderRadius: 1 }}
                             >
-                                <Typography variant="body2" color="warning.contrastText">
+                                <Typography variant="caption" color="warning.contrastText">
                                     Email <strong>{unverifiedEmail}</strong> not verified.
                                 </Typography>
                                 <Button
@@ -620,6 +622,7 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                                     variant="outlined"
                                     color="inherit"
                                     size="small"
+                                    sx={{ py: 0 }}
                                 >
                                     {resendBusy ? 'Sending…' : 'Resend verification'}
                                 </Button>
@@ -627,13 +630,14 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                         )}
 
                         <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary">
                                 New here?
                             </Typography>
                             <Button
                                 onClick={handleSwitchToSignupClick}
                                 color="primary"
-                                sx={{ fontWeight: 600 }}
+                                size="small"
+                                sx={{ fontWeight: 600, minWidth: 'auto', p: 0.5 }}
                             >
                                 Create an account
                             </Button>

@@ -1,8 +1,8 @@
 import { defineConfig, type UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import type { UserConfig as VitestUserConfig } from 'vitest/config';
+import type { InlineConfig } from 'vitest/node';
 
-type ViteWithVitestConfig = UserConfig & { test: VitestUserConfig['test'] };
+type ViteWithVitestConfig = UserConfig & { test: InlineConfig };
 
 const config = {
     plugins: [react()],
