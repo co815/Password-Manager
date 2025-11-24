@@ -336,9 +336,7 @@ export interface RevokeSessionsResponse {
     tokenVersion: number;
 }
 
-export interface VaultItem {
-    id?: string;
-    userId?: string;
+export interface VaultItemRequest {
     titleCipher: string;
     titleNonce: string;
     usernameCipher: string;
@@ -348,10 +346,15 @@ export interface VaultItem {
     url?: string;
     notesCipher?: string;
     notesNonce?: string;
-    createdAt?: string;
-    updatedAt?: string;
     favorite?: boolean;
     collections?: string[];
+}
+
+export interface VaultItem extends VaultItemRequest {
+    id: string;
+    userId: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface VaultMetadataUpdateRequest {
@@ -566,9 +569,9 @@ export const api = {
     revokeSessions: () =>
         req<RevokeSessionsResponse>(`/auth/sessions/revoke`, {method: 'POST'}),
     listVault: () => req<VaultItem[]>(`/vault`),
-    createVault: (body: Partial<VaultItem>) =>
+    createVault: (body: VaultItemRequest) =>
         req<VaultItem>(`/vault`, {method: 'POST', body: JSON.stringify(body)}),
-    updateVault: (id: string, body: Partial<VaultItem>) =>
+    updateVault: (id: string, body: VaultItemRequest) =>
         req<VaultItem>(`/vault/${id}`, {method: 'PUT', body: JSON.stringify(body)}),
     updateVaultMetadata: (id: string, body: VaultMetadataUpdateRequest) =>
         req<VaultItem>(`/vault/${id}/metadata`, {method: 'PUT', body: JSON.stringify(body)}),

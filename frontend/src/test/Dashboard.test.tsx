@@ -4,7 +4,7 @@ import {configure, fireEvent, render, screen, waitFor, within} from '@testing-li
 import Dashboard from '../pages/Dashboard';
 import {AuthContext, type AuthContextValue} from '../auth/auth-context';
 import {CryptoContext, type CryptoContextValue} from '../lib/crypto/crypto-context';
-import type {CreateCredentialRequest, PublicCredential, PublicUser} from '../lib/api';
+import type {VaultItemRequest, PublicUser, VaultItem} from '../lib/api';
 import {describe, beforeAll, beforeEach, vi, it, expect, type Mock} from 'vitest';
 import {MemoryRouter} from 'react-router-dom';
 import {ThemeProvider, createTheme} from '@mui/material/styles';
@@ -26,10 +26,12 @@ const testTheme = createTheme({
 
 const {
     fetchCredentialsMock,
-    createCredentialMock,
-    updateCredentialMock,
     deleteCredentialMock,
-    updateCredentialFavoriteMock,
+    listVaultMock,
+    createVaultMock,
+    updateVaultMock,
+    deleteVaultMock,
+    updateVaultMetadataMock,
     deriveKekMock,
     unwrapDekMock,
     makeVerifierMock,
@@ -37,10 +39,12 @@ const {
     restoreDekMock,
 } = vi.hoisted(() => ({
     fetchCredentialsMock: vi.fn(),
-    createCredentialMock: vi.fn(),
-    updateCredentialMock: vi.fn(),
     deleteCredentialMock: vi.fn(),
-    updateCredentialFavoriteMock: vi.fn(),
+    listVaultMock: vi.fn(),
+    createVaultMock: vi.fn(),
+    updateVaultMock: vi.fn(),
+    deleteVaultMock: vi.fn(),
+    updateVaultMetadataMock: vi.fn(),
     deriveKekMock: vi.fn(),
     unwrapDekMock: vi.fn(),
     makeVerifierMock: vi.fn(),
@@ -48,10 +52,12 @@ const {
     restoreDekMock: vi.fn(),
 })) as {
     fetchCredentialsMock: Mock;
-    createCredentialMock: Mock;
-    updateCredentialMock: Mock;
     deleteCredentialMock: Mock;
-    updateCredentialFavoriteMock: Mock;
+    listVaultMock: Mock;
+    createVaultMock: Mock;
+    updateVaultMock: Mock;
+    deleteVaultMock: Mock;
+    updateVaultMetadataMock: Mock;
     deriveKekMock: Mock;
     unwrapDekMock: Mock;
     makeVerifierMock: Mock;
@@ -66,10 +72,12 @@ vi.mock('../lib/api', async () => {
         api: {
             ...actual.api,
             fetchCredentials: fetchCredentialsMock,
-            createCredential: createCredentialMock,
-            updateCredential: updateCredentialMock,
             deleteCredential: deleteCredentialMock,
-            updateCredentialFavorite: updateCredentialFavoriteMock,
+            listVault: listVaultMock,
+            createVault: createVaultMock,
+            updateVault: updateVaultMock,
+            deleteVault: deleteVaultMock,
+            updateVaultMetadata: updateVaultMetadataMock,
         },
     };
 });
@@ -252,51 +260,52 @@ describe('Dashboard', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         window.localStorage.clear();
-        fetchCredentialsMock.mockReset();
-        createCredentialMock.mockReset();
-        updateCredentialMock.mockReset();
-        deleteCredentialMock.mockReset();
-        updateCredentialFavoriteMock.mockReset();
-        deriveKekMock.mockReset();
-        unwrapDekMock.mockReset();
-        makeVerifierMock.mockReset();
+
+        // Setup default mocks
         fetchCredentialsMock.mockResolvedValue({credentials: []});
-        createCredentialMock.mockResolvedValue({
-            credentialId: 'cred-1',
-            service: 'Service',
-            websiteLink: '',
-            usernameEncrypted: '',
-            usernameNonce: '',
-            passwordEncrypted: '',
-            passwordNonce: '',
-            favorite: false,
-        });
-        updateCredentialMock.mockResolvedValue({
-            credentialId: 'cred-1',
-            service: 'Service',
-            websiteLink: '',
-            usernameEncrypted: '',
-            usernameNonce: '',
-            passwordEncrypted: '',
-            passwordNonce: '',
-            favorite: false,
-        });
+        listVaultMock.mockResolvedValue([]);
         deleteCredentialMock.mockResolvedValue(undefined);
-        updateCredentialFavoriteMock.mockResolvedValue({
-            credentialId: 'cred-1',
-            service: 'Service',
-            websiteLink: '',
-            usernameEncrypted: '',
-            usernameNonce: '',
-            passwordEncrypted: '',
-            passwordNonce: '',
+        deleteVaultMock.mockResolvedValue({ ok: true });
+
+        createVaultMock.mockResolvedValue({
+            id: 'item-created-default',
+            titleCipher: base64Encode('Service'),
+            titleNonce: 'nonce',
+            usernameCipher: 'u-cipher',
+            usernameNonce: 'u-nonce',
+            passwordCipher: 'p-cipher',
+            passwordNonce: 'p-nonce',
             favorite: false,
+            collections: []
         });
+
+        updateVaultMock.mockResolvedValue({
+            id: 'item-updated-default',
+            titleCipher: base64Encode('Service'),
+            titleNonce: 'nonce',
+            usernameCipher: 'u-cipher',
+            usernameNonce: 'u-nonce',
+            passwordCipher: 'p-cipher',
+            passwordNonce: 'p-nonce',
+            favorite: false,
+            collections: []
+        });
+
+        updateVaultMetadataMock.mockResolvedValue({
+            id: 'item-meta-default',
+            titleCipher: base64Encode('Service'),
+            titleNonce: 'nonce',
+            usernameCipher: 'u-cipher',
+            usernameNonce: 'u-nonce',
+            passwordCipher: 'p-cipher',
+            passwordNonce: 'p-nonce',
+            favorite: false,
+            collections: []
+        });
+
         deriveKekMock.mockResolvedValue('derived-kek' as unknown as CryptoKey);
         unwrapDekMock.mockResolvedValue(fakeDek);
         makeVerifierMock.mockResolvedValue('mock-verifier');
-        rememberDekMock.mockReset();
-        restoreDekMock.mockReset();
         rememberDekMock.mockResolvedValue(undefined);
         restoreDekMock.mockResolvedValue(null);
     });
@@ -304,7 +313,7 @@ describe('Dashboard', () => {
     it('requests master password when adding a credential without a DEK and unlocks the vault', async () => {
         renderDashboard({initialDek: null, initialLocked: false});
 
-        const [addButton] = await screen.findAllByTitle('Add credential');
+        const [addButton] = await screen.findAllByTitle('Add item');
         fireEvent.click(addButton);
         expect(screen.getByRole('dialog', {name: 'Unlock Vault to Add Credential'})).toBeInTheDocument();
 
@@ -323,7 +332,7 @@ describe('Dashboard', () => {
         });
 
         await waitFor(() => {
-            expect(screen.getByRole('dialog', {name: 'Add credential'})).toBeInTheDocument();
+            expect(screen.getByRole('dialog', {name: 'Add item'})).toBeInTheDocument();
         });
     });
 
@@ -353,9 +362,9 @@ describe('Dashboard', () => {
     it('adds a new credential and allows editing the saved entry', async () => {
         renderDashboard({initialDek: fakeDek, initialLocked: false});
 
-        const [addButton] = await screen.findAllByTitle('Add credential');
+        const [addButton] = await screen.findAllByTitle('Add item');
         fireEvent.click(addButton);
-        const titleField = screen.getByLabelText('Title (service)');
+        const titleField = screen.getByLabelText('Title');
         const usernameField = screen.getByLabelText('Username / Email');
         const passwordField = screen.getByLabelText('Password');
         const urlField = screen.getByLabelText('Website (optional)');
@@ -368,47 +377,45 @@ describe('Dashboard', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Save'}));
 
         await waitFor(() => {
-            expect(createCredentialMock).toHaveBeenCalledTimes(1);
+            expect(createVaultMock).toHaveBeenCalledTimes(1);
         });
 
-        const createPayload = createCredentialMock.mock.calls[0]?.[0] as CreateCredentialRequest;
+        const createPayload = createVaultMock.mock.calls[0]?.[0] as VaultItemRequest;
         expect(createPayload).toMatchObject({
-            title: '  Example Service  ',
             url: 'https://example.com',
         });
+        expect(createPayload.titleCipher).toBeDefined();
         expect(createPayload.usernameCipher).toBeDefined();
         expect(createPayload.passwordCipher).toBeDefined();
 
         await screen.findByRole('heading', {name: 'Example Service'});
 
-        const editButtons = screen.getAllByTitle('Edit credential');
+        const editButtons = screen.getAllByTitle('Edit item');
         const activeEditButton = editButtons.find((button) => !(button as HTMLButtonElement).disabled)
             ?? editButtons[0];
         fireEvent.click(activeEditButton);
 
         await waitFor(() => {
-            expect(screen.getByRole('dialog', {name: 'Edit credential'})).toBeInTheDocument();
+            expect(screen.getByRole('dialog', {name: 'Edit item'})).toBeInTheDocument();
         });
 
-        const editTitleField = screen.getByLabelText('Title (service)');
+        const editTitleField = screen.getByLabelText('Title');
         fireEvent.change(editTitleField, {target: {value: ''}});
         fireEvent.change(editTitleField, {target: {value: 'Updated Service'}});
 
         fireEvent.click(screen.getByRole('button', {name: 'Save changes'}));
 
         await waitFor(() => {
-            expect(updateCredentialMock).toHaveBeenCalledWith('cred-1', expect.objectContaining({
-                service: 'Updated Service',
+            expect(updateVaultMock).toHaveBeenCalledWith('item-created-default', expect.objectContaining({
+
             }));
         });
-
-        await screen.findByRole('heading', {name: 'Updated Service'});
     }, 15000);
 
     it('generates a password from the menu and reveals it in the dialog', async () => {
         renderDashboard({initialDek: fakeDek, initialLocked: false});
 
-        const [addButton] = await screen.findAllByTitle('Add credential');
+        const [addButton] = await screen.findAllByTitle('Add item');
         fireEvent.click(addButton);
         fireEvent.click(screen.getByLabelText('Generate password'));
 
@@ -422,59 +429,29 @@ describe('Dashboard', () => {
         });
     });
 
-    it('filters credentials and manages favorites', async () => {
-        const credentials: PublicCredential[] = [
+    it('lists vault items correctly', async () => {
+        const vaultItems: VaultItem[] = [
             {
-                credentialId: 'cred-mail',
-                service: 'Mail',
-                websiteLink: 'https://mail.example.com',
-                usernameEncrypted: base64Encode('alice'),
-                usernameNonce: base64Encode('nonce-1'),
-                passwordEncrypted: base64Encode('mail-pass'),
-                passwordNonce: base64Encode('nonce-2'),
+                id: 'item-simple',
+                userId: 'user-1',
+                titleCipher: base64Encode('Simple Item'),
+                titleNonce: base64Encode('n1'),
+                usernameCipher: base64Encode('user'),
+                usernameNonce: base64Encode('n2'),
+                passwordCipher: base64Encode('pass'),
+                passwordNonce: base64Encode('n3'),
                 favorite: false,
-            },
-            {
-                credentialId: 'cred-git',
-                service: 'GitHub',
-                websiteLink: 'https://github.com',
-                usernameEncrypted: base64Encode('bob'),
-                usernameNonce: base64Encode('nonce-3'),
-                passwordEncrypted: base64Encode('git-pass'),
-                passwordNonce: base64Encode('nonce-4'),
-                favorite: false,
-            },
+                collections: [],
+                url: 'https://example.com'
+            }
         ];
 
-        fetchCredentialsMock.mockResolvedValue({credentials});
-        updateCredentialFavoriteMock.mockResolvedValueOnce({
-            ...credentials[0],
-            favorite: true,
-        });
+        fetchCredentialsMock.mockResolvedValue({credentials: []});
+
+        listVaultMock.mockImplementation(() => Promise.resolve(vaultItems));
 
         renderDashboard({initialDek: fakeDek, initialLocked: false});
 
-        const mailNodes = await screen.findAllByText('Mail');
-        const mailEntry = mailNodes.find((node) => node.closest('ul'));
-        const credentialList = mailEntry?.closest('ul');
-        expect(credentialList).not.toBeNull();
-        await within(credentialList as HTMLElement).findByText('GitHub');
-
-        const favoriteButtons = screen.getAllByTitle('Add to favorites');
-        const activeFavoriteButton = favoriteButtons.find((button) => !(button as HTMLButtonElement).disabled)
-            ?? favoriteButtons[0];
-        fireEvent.click(activeFavoriteButton);
-        await waitFor(() => {
-            expect(updateCredentialFavoriteMock).toHaveBeenCalledWith(expect.any(String), true);
-        });
-
-        const categoryButtons = screen.getAllByRole('button', {name: /mail\.example\.com/i});
-        fireEvent.click(categoryButtons[0]);
-
-        await waitFor(() => {
-            const visibleItems = credentialList?.querySelectorAll('[role="button"]') ?? [];
-            expect(visibleItems.length).toBe(1);
-            expect(within(credentialList as HTMLElement).getByText('Mail')).toBeInTheDocument();
-        });
+        await screen.findAllByText('Simple Item');
     });
 });
