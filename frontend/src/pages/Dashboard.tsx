@@ -13,6 +13,7 @@ import {deserializeVaultCredentials, serializeVaultCredentials} from '../lib/vau
 import {extractApiErrorDetails} from '../lib/api-error';
 import {attestationToJSON, decodeCreationOptions, isWebAuthnSupported} from '../lib/webauthn';
 import {rememberDek, restoreDek} from '../lib/crypto/dek-storage';
+import * as OTPAuth from 'otpauth';
 
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Typography,
@@ -46,6 +47,7 @@ import {
     LockOpen,
     Menu as MenuIcon,
     Logout,
+    Timer,
 } from '@mui/icons-material';
 import {passwordTemplates} from '../lib/passwordTemplates';
 import {
@@ -76,6 +78,7 @@ export type Credential = {
     username: string;
     password: string;
     notes?: string;
+    totpSecret?: string;
     favorite: boolean;
     collections: string[];
 };
@@ -171,6 +174,7 @@ export default function Dashboard() {
     const [url, setUrl] = useState('');
     const [notes, setNotes] = useState('');
     const [tags, setTags] = useState('');
+    const [totpSecret, setTotpSecret] = useState('');
     const [showPwd, setShowPwd] = useState(false);
     const [generatorAnchorEl, setGeneratorAnchorEl] = useState<null | HTMLElement>(null);
     const generatorMenuOpen = Boolean(generatorAnchorEl);
@@ -207,8 +211,10 @@ export default function Dashboard() {
     const [rotateMessage, setRotateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [revokeBusy, setRevokeBusy] = useState(false);
 
-    // Migration state
     const [migrating, setMigrating] = useState(false);
+
+    const [totpCode, setTotpCode] = useState<string | null>(null);
+    const [totpProgress, setTotpProgress] = useState(0);
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -343,6 +349,7 @@ export default function Dashboard() {
         setUrl('');
         setNotes('');
         setTags('');
+        setTotpSecret('');
         setShowPwd(false);
         setBusy(false);
         setDeleteBusy(false);
@@ -357,14 +364,12 @@ export default function Dashboard() {
         setFavoriteBusy(false);
     }, [dek, locked]);
 
-    // Migration and Load Effect
     useEffect(() => {
         if (!dek) return;
         if (!user) return;
 
         (async () => {
             try {
-                // 1. Check for legacy credentials
                 const legacyResponse = await api.fetchCredentials();
                 const legacyCreds = legacyResponse.credentials;
 
@@ -376,10 +381,8 @@ export default function Dashboard() {
                         try {
                             const inferredTag = inferCategoryFromLegacy(old.service, old.websiteLink);
 
-                            // Encrypt title (service) which was plaintext
                             const {cipher: titleCipher, nonce: titleNonce} = await encryptField(dek, old.service);
 
-                            // Create new Vault Item
                             await api.createVault({
                                 titleCipher,
                                 titleNonce,
@@ -389,10 +392,9 @@ export default function Dashboard() {
                                 passwordNonce: old.passwordNonce,
                                 url: old.websiteLink || undefined,
                                 favorite: old.favorite,
-                                collections: [inferredTag] // Auto-tag
+                                collections: [inferredTag]
                             });
 
-                            // Delete old credential
                             await api.deleteCredential(old.credentialId);
                         } catch (err) {
                             console.error("Migration failed for item", old.credentialId, err);
@@ -402,7 +404,6 @@ export default function Dashboard() {
                     setMigrating(false);
                 }
 
-                // 2. Load Vault Items
                 const vaultItems: VaultItem[] = await api.listVault();
                 const decrypted: Credential[] = [];
 
@@ -413,6 +414,9 @@ export default function Dashboard() {
                     const notesDec = (item.notesCipher && item.notesNonce)
                         ? await decryptField(dek, item.notesCipher, item.notesNonce)
                         : '';
+                    const totpDec = (item.totpCipher && item.totpNonce)
+                        ? await decryptField(dek, item.totpCipher, item.totpNonce)
+                        : '';
 
                     decrypted.push({
                         id: item.id!,
@@ -421,6 +425,7 @@ export default function Dashboard() {
                         username: usernameDec,
                         password: passwordDec,
                         notes: notesDec,
+                        totpSecret: totpDec,
                         favorite: !!item.favorite,
                         collections: item.collections || []
                     });
@@ -443,6 +448,44 @@ export default function Dashboard() {
     useEffect(() => {
         setShowSelectedPassword(false);
     }, [selected?.id]);
+
+    useEffect(() => {
+        if (!selected?.totpSecret) {
+            setTotpCode(null);
+            setTotpProgress(0);
+            return;
+        }
+
+        let totp: OTPAuth.TOTP | null = null;
+        try {
+            const secret = selected.totpSecret.replace(/\s+/g, '');
+            totp = new OTPAuth.TOTP({
+                secret: OTPAuth.Secret.fromBase32(secret),
+                algorithm: 'SHA1',
+                digits: 6,
+                period: 30
+            });
+        } catch (e) {
+            console.error('Invalid TOTP secret', e);
+            setTotpCode('Invalid Secret');
+            return;
+        }
+
+        const update = () => {
+            if (!totp) return;
+            const code = totp.generate();
+            setTotpCode(code);
+
+            const epoch = Math.floor(Date.now() / 1000);
+            const period = 30;
+            const progress = ((epoch % period) / period) * 100;
+            setTotpProgress(progress);
+        };
+
+        update();
+        const interval = setInterval(update, 1000);
+        return () => clearInterval(interval);
+    }, [selected?.totpSecret]);
 
     useEffect(() => {
         if (!profileDialogOpen) {
@@ -523,7 +566,6 @@ export default function Dashboard() {
 
         return credentials.filter((credential) => {
             if (selectedCategory !== ALL_CATEGORY_ID) {
-                // If filtering by category, check if item has that tag
                 if (selectedCategory === UNCATEGORIZED_LABEL) {
                     if (credential.collections && credential.collections.length > 0) return false;
                 } else {
@@ -580,6 +622,7 @@ export default function Dashboard() {
         setUrl('');
         setNotes('');
         setTags('');
+        setTotpSecret('');
         setShowPwd(false);
     };
 
@@ -662,9 +705,6 @@ export default function Dashboard() {
             setAvatarSaving(false);
         }
     };
-
-    // ... (Master Password and MFA handlers unchanged) ...
-    // Note: In a real refactor I would split this file, but to minimize diff noise I will keep existing handlers
 
     const handleRotateMasterPassword = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -951,6 +991,7 @@ export default function Dashboard() {
         setUrl(credential.url ?? '');
         setNotes(credential.notes ?? '');
         setTags(credential.collections.join(', '));
+        setTotpSecret(credential.totpSecret ?? '');
         setShowPwd(false);
     };
 
@@ -1047,6 +1088,7 @@ export default function Dashboard() {
             const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, password);
             const {cipher: titleCipher, nonce: titleNonce} = await encryptField(dek, title);
             const {cipher: notesCipher, nonce: notesNonce} = await encryptField(dek, notes);
+            const {cipher: totpCipher, nonce: totpNonce} = await encryptField(dek, totpSecret);
 
             const trimmedTitle = title.trim();
             const trimmedUrl = url.trim();
@@ -1064,6 +1106,8 @@ export default function Dashboard() {
                     url: trimmedUrl,
                     notesCipher,
                     notesNonce,
+                    totpCipher,
+                    totpNonce,
                     collections: collectionList
                 });
 
@@ -1074,6 +1118,7 @@ export default function Dashboard() {
                     username: trimmedUsername,
                     password: password,
                     notes: notes,
+                    totpSecret: totpSecret,
                     favorite: !!created.favorite,
                     collections: created.collections || [],
                 };
@@ -1092,6 +1137,8 @@ export default function Dashboard() {
                     url: trimmedUrl,
                     notesCipher,
                     notesNonce,
+                    totpCipher,
+                    totpNonce,
                     collections: collectionList
                 });
 
@@ -1102,6 +1149,7 @@ export default function Dashboard() {
                     username: trimmedUsername,
                     password: password,
                     notes: notes,
+                    totpSecret: totpSecret,
                     favorite: !!updated.favorite,
                     collections: updated.collections || []
                 };
@@ -1244,7 +1292,7 @@ export default function Dashboard() {
                 const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, cred.password);
                 const {cipher: titleCipher, nonce: titleNonce} = await encryptField(dek, sanitizedTitle);
 
-                const existingIndex = nextCredentials.findIndex((c) => c.name === sanitizedTitle && c.username === sanitizedUsername); // Match by name/user since ID wont match
+                const existingIndex = nextCredentials.findIndex((c) => c.name === sanitizedTitle && c.username === sanitizedUsername);
 
                 if (existingIndex >= 0) {
                     const existingId = nextCredentials[existingIndex].id;
@@ -1265,7 +1313,8 @@ export default function Dashboard() {
                         url: sanitizedUrl,
                         username: sanitizedUsername,
                         password: cred.password,
-                        notes: nextCredentials[existingIndex].notes, // preserve notes
+                        notes: nextCredentials[existingIndex].notes,
+                        totpSecret: nextCredentials[existingIndex].totpSecret,
                         favorite: !!updated.favorite,
                         collections: updated.collections || []
                     };
@@ -1294,6 +1343,7 @@ export default function Dashboard() {
                         username: sanitizedUsername,
                         password: cred.password,
                         notes: '',
+                        totpSecret: '',
                         favorite: !!created.favorite,
                         collections: created.collections || []
                     };
@@ -1379,6 +1429,24 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Failed to copy password.', error);
             setToast({type: 'error', msg: 'Failed to copy password.'});
+        }
+    };
+
+    const handleCopyTotp = async () => {
+        if (!totpCode) return;
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            setToast({
+                type: 'error',
+                msg: 'Copying code is not supported in this browser.',
+            });
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(totpCode);
+            setToast({type: 'success', msg: 'Code copied to clipboard.'});
+        } catch (error) {
+            setToast({type: 'error', msg: 'Failed to copy code.'});
         }
     };
 
@@ -1784,6 +1852,51 @@ export default function Dashboard() {
                                         </IconButton>
                                     </Box>
 
+                                    {selected?.totpSecret && (
+                                        <>
+                                            <Typography variant="caption" color="text.secondary">totp code</Typography>
+                                            <Box display="flex" alignItems="center" gap={2} sx={{mb: 1}}>
+                                                <Typography variant="h6" sx={{fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2}}>
+                                                    {totpCode || '...'}
+                                                </Typography>
+                                                <IconButton size="small" onClick={handleCopyTotp} title="Copy code">
+                                                    <ContentCopy fontSize="small"/>
+                                                </IconButton>
+                                                <CircularProgress
+                                                    variant="determinate"
+                                                    value={100}
+                                                    size={20}
+                                                    thickness={10}
+                                                    sx={{
+                                                        color: 'action.hover',
+                                                        position: 'absolute',
+                                                        ml: '160px'
+                                                    }}
+                                                />
+                                                <CircularProgress
+                                                    variant="determinate"
+                                                    value={100 - (totpProgress * 3.33)}
+                                                    size={20}
+                                                    thickness={10}
+                                                    color={totpProgress > 80 ? "error" : "primary"}
+                                                />
+                                            </Box>
+                                            <LinearProgress
+                                                variant="determinate"
+                                                value={100 - totpProgress}
+                                                sx={{
+                                                    width: 140,
+                                                    mb: 2,
+                                                    height: 4,
+                                                    borderRadius: 2,
+                                                    '& .MuiLinearProgress-bar': {
+                                                        transition: 'none'
+                                                    }
+                                                }}
+                                            />
+                                        </>
+                                    )}
+
                                     <Typography variant="caption" color="text.secondary">strength</Typography>
                                     <Box sx={{
                                         height: 8,
@@ -1854,6 +1967,7 @@ export default function Dashboard() {
                 </Box>
             </Box>
 
+            {/* Profile Dialog... (unchanged) */}
             <Dialog
                 open={profileDialogOpen}
                 onClose={(_, reason) => {
@@ -1869,6 +1983,7 @@ export default function Dashboard() {
                     paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
                 }}
             >
+                {/* ... */}
                 <DialogTitle sx={{fontWeight: 800}}>Profile settings</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2}>
@@ -2400,6 +2515,15 @@ export default function Dashboard() {
                             multiline
                             minRows={3}
                             size="small"
+                        />
+                        <TextField
+                            label="TOTP Secret"
+                            value={totpSecret}
+                            onChange={(e) => setTotpSecret(e.target.value)}
+                            placeholder="JBSWY3DPEHPK3PXP"
+                            fullWidth
+                            size="small"
+                            type="password"
                         />
                     </Stack>
                 </DialogContent>

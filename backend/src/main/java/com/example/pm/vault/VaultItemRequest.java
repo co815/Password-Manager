@@ -12,6 +12,8 @@ public record VaultItemRequest(
         String url,
         String notesCipher,
         String notesNonce,
+        String totpCipher,
+        String totpNonce,
         Boolean favorite,
         Set<String> collections
 ) {

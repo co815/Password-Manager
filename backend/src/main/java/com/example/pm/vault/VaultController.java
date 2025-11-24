@@ -58,6 +58,8 @@ public class VaultController {
             item.setUrl(payload.url());
             item.setNotesCipher(payload.notesCipher());
             item.setNotesNonce(payload.notesNonce());
+            item.setTotpCipher(payload.totpCipher());
+            item.setTotpNonce(payload.totpNonce());
             item.setFavorite(Boolean.TRUE.equals(payload.favorite()));
             item.setCollections(normalizeCollections(payload.collections()));
             item.setCreatedAt(now);
@@ -90,6 +92,8 @@ public class VaultController {
                         existing.setUrl(payload.url());
                         existing.setNotesCipher(payload.notesCipher());
                         existing.setNotesNonce(payload.notesNonce());
+                        existing.setTotpCipher(payload.totpCipher());
+                        existing.setTotpNonce(payload.totpNonce());
                         if (payload.collections() != null) {
                             existing.setCollections(normalizeCollections(payload.collections()));
                         }

@@ -261,7 +261,6 @@ describe('Dashboard', () => {
         vi.clearAllMocks();
         window.localStorage.clear();
 
-        // Setup default mocks
         fetchCredentialsMock.mockResolvedValue({credentials: []});
         listVaultMock.mockResolvedValue([]);
         deleteCredentialMock.mockResolvedValue(undefined);

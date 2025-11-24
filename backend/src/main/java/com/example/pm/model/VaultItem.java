@@ -41,6 +41,9 @@ public class VaultItem {
     private String notesCipher;
     private String notesNonce;
 
+    private String totpCipher;
+    private String totpNonce;
+
     @Default
     private boolean favorite = false;
 

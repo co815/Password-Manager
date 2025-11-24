@@ -101,7 +101,7 @@ async function refreshCsrfToken(): Promise<string | null> {
             return healthToken;
         }
     } catch {
-        // Ignore network errors here; the main request will surface failures to the caller.
+
     }
 
     const cookieToken = getCookie(CSRF_COOKIE);
@@ -336,6 +336,7 @@ export interface RevokeSessionsResponse {
     tokenVersion: number;
 }
 
+// Updated to match VaultItem.java
 export interface VaultItemRequest {
     titleCipher: string;
     titleNonce: string;
@@ -346,6 +347,8 @@ export interface VaultItemRequest {
     url?: string;
     notesCipher?: string;
     notesNonce?: string;
+    totpCipher?: string;
+    totpNonce?: string;
     favorite?: boolean;
     collections?: string[];
 }
