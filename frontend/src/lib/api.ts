@@ -336,7 +336,6 @@ export interface RevokeSessionsResponse {
     tokenVersion: number;
 }
 
-// Updated to match VaultItem.java
 export interface VaultItemRequest {
     titleCipher: string;
     titleNonce: string;

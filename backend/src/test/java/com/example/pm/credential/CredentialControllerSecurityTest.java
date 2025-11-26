@@ -138,7 +138,7 @@ class CredentialControllerSecurityTest {
     void createCredentialDuplicateServiceReturns409() throws Exception {
         stubUser("user-123");
         String token = jwtService.generate("user-123", 0);
-        when(credentialRepository.findByUserIdAndService("user-123", "Email"))
+        when(credentialRepository.findByUserIdAndServiceIgnoreCase("user-123", "Email"))
                 .thenReturn(Optional.of(new Credential()));
 
         var req = new CredentialDtos.AddCredentialRequest(
