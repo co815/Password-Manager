@@ -53,7 +53,7 @@ public class CredentialController {
     ) {
         return requireUser(authentication, userId -> {
             Optional<Credential> existingForService =
-                    credentials.findByUserIdAndService(userId, addRequest.service());
+                    credentials.findByUserIdAndServiceIgnoreCase(userId, addRequest.service());
 
             if (existingForService.isPresent()) {
                 return ResponseEntity.status(409)
@@ -89,7 +89,7 @@ public class CredentialController {
                     }
 
                     if (StringUtils.hasText(serviceToCheck)) {
-                        var conflictingCredential = credentials.findByUserIdAndService(userId, serviceToCheck)
+                        var conflictingCredential = credentials.findByUserIdAndServiceIgnoreCase(userId, serviceToCheck)
                                 .filter(credential -> !credential.getId().equals(existing.getId()));
 
                         if (conflictingCredential.isPresent()) {

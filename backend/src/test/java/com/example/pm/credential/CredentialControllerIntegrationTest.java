@@ -153,6 +153,15 @@ class CredentialControllerIntegrationTest {
                     .findFirst();
         });
 
+        when(credentialRepository.findByUserIdAndServiceIgnoreCase(anyString(), anyString())).thenAnswer(invocation -> {
+            String userId = invocation.getArgument(0);
+            String service = invocation.getArgument(1);
+            return credentialStore.values().stream()
+                    .filter(c -> userId != null && userId.equals(c.getUserId())
+                            && service != null && service.equalsIgnoreCase(c.getService()))
+                    .findFirst();
+        });
+
         Mockito.doAnswer(invocation -> {
             Credential credential = invocation.getArgument(0, Credential.class);
             credentialStore.remove(credential.getId());
@@ -245,6 +254,97 @@ class CredentialControllerIntegrationTest {
         }
         User user = userStore.get(userId);
         return user != null ? user.getEmail() : null;
+    }
+
+    @Test
+    void creatingCredentialWithSameServiceDifferentCaseShouldFail() throws Exception {
+        var registerRequest = new AuthDtos.RegisterRequest(
+                "alice@example.com",
+                "alice",
+                "sampleVerifier",
+                "clientSalt",
+                "encryptedDek",
+                "dekNonce",
+                null,
+                null
+        );
+
+        MvcResult registerCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie registerCsrfCookie = extractCookie(registerCsrfResult, "XSRF-TOKEN");
+        String registerCsrfToken = Optional.ofNullable(registerCsrfResult.getResponse().getHeader("X-XSRF-TOKEN"))
+                .orElseGet(registerCsrfCookie::getValue);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/register")
+                        .cookie(registerCsrfCookie)
+                        .header("X-XSRF-TOKEN", registerCsrfToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registerRequest)))
+                .andExpect(status().isOk());
+
+        userStore.values().forEach(user -> user.setEmailVerified(true));
+
+        var loginRequest = new AuthDtos.LoginRequest(registerRequest.email(), registerRequest.verifier(), null, null, null);
+
+        MvcResult loginCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie loginCsrfCookie = extractCookie(loginCsrfResult, "XSRF-TOKEN");
+        String loginCsrfToken = Optional.ofNullable(loginCsrfResult.getResponse().getHeader("X-XSRF-TOKEN"))
+                .orElseGet(loginCsrfCookie::getValue);
+
+        MvcResult loginResult = mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
+                        .cookie(loginCsrfCookie)
+                        .header("X-XSRF-TOKEN", loginCsrfToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie accessTokenCookie = extractCookie(loginResult, "accessToken");
+
+        MvcResult credentialCsrfResult = mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie csrfCookie = extractCookie(credentialCsrfResult, "XSRF-TOKEN");
+        String csrfToken = Optional.ofNullable(credentialCsrfResult.getResponse().getHeader("X-XSRF-TOKEN"))
+                .orElseGet(csrfCookie::getValue);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/credential")
+                        .cookie(accessTokenCookie, csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "service": "GitHub",
+                                  "websiteLink": "https://github.com",
+                                  "usernameEncrypted": "enc-user",
+                                  "usernameNonce": "nonce-user",
+                                  "passwordEncrypted": "enc-pass",
+                                  "passwordNonce": "nonce-pass"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/credential")
+                        .cookie(accessTokenCookie, csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "service": "github",
+                                  "websiteLink": "https://github.com",
+                                  "usernameEncrypted": "enc-user",
+                                  "usernameNonce": "nonce-user",
+                                  "passwordEncrypted": "enc-pass",
+                                  "passwordNonce": "nonce-pass"
+                                }
+                                """))
+                .andExpect(status().isConflict());
     }
 
     private Cookie extractCookie(MvcResult result, String name) {
