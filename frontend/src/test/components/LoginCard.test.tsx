@@ -15,6 +15,11 @@ const {rememberDekMock, restoreDekMock} = vi.hoisted(() => ({
 vi.mock('../../lib/crypto/dek-storage', () => ({
     rememberDek: rememberDekMock,
     restoreDek: restoreDekMock,
+}));
+
+vi.mock('../../lib/crypto', () => ({
+    generateLoginHash: vi.fn(),
+    fromB64: vi.fn(),
     forgetDek: vi.fn(),
     forgetAllDek: vi.fn(),
 }));

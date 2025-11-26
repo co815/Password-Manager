@@ -9,6 +9,7 @@ import com.example.pm.security.AuthSessionService;
 import com.example.pm.security.RateLimiterService;
 import com.example.pm.security.TotpService;
 import com.example.pm.security.CaptchaValidationService;
+import com.example.pm.security.PasswordVerifier;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -46,6 +47,7 @@ public class AuthController {
     private final CsrfTokenRepository csrfTokenRepository;
     private final PlaceholderSaltService placeholderSaltService;
     private final EmailVerificationService emailVerificationService;
+    private final PasswordVerifier passwordVerifier;
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
             "^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$",
@@ -63,7 +65,8 @@ public class AuthController {
                           PlaceholderSaltService placeholderSaltService,
                           EmailVerificationService emailVerificationService,
                           AuthSessionService authSessionService,
-                          CsrfTokenRepository csrfTokenRepository) {
+                          CsrfTokenRepository csrfTokenRepository,
+                          PasswordVerifier passwordVerifier) {
         this.users = users;
         this.authSessionService = authSessionService;
         this.rateLimiterService = rateLimiterService;
@@ -73,6 +76,7 @@ public class AuthController {
         this.placeholderSaltService = placeholderSaltService;
         this.emailVerificationService = emailVerificationService;
         this.csrfTokenRepository = csrfTokenRepository;
+        this.passwordVerifier = passwordVerifier;
     }
 
     @PostMapping("/register")
@@ -158,7 +162,7 @@ public class AuthController {
         }
 
         var userOpt = users.findByEmail(normalizedEmail);
-        if (userOpt.isEmpty() || !normalizedEquals(userOpt.get().getVerifier(), loginRequest.verifier())) {
+        if (userOpt.isEmpty() || !passwordVerifier.verify(loginRequest.verifier(), userOpt.get().getVerifier())) {
             auditService.recordLoginFailure(normalizedEmail);
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));

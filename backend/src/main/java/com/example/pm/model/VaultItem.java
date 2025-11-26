@@ -27,25 +27,7 @@ public class VaultItem {
     @Indexed
     private String userId;
 
-    private String titleCipher;
-    private String titleNonce;
-
-    private String usernameCipher;
-    private String usernameNonce;
-
-    private String passwordCipher;
-    private String passwordNonce;
-
-    private String url;
-
-    private String notesCipher;
-    private String notesNonce;
-
-    private String totpCipher;
-    private String totpNonce;
-
-    @Default
-    private boolean favorite = false;
+    private String data;
 
     @Default
     private Set<String> collections = new LinkedHashSet<>();

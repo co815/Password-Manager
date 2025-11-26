@@ -27,8 +27,9 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {useNavigate} from 'react-router-dom';
 
 import {ApiError, api, primeCsrfToken, type LoginRequest, type PublicUser} from '../../lib/api';
-import {makeVerifier, deriveKEK} from '../../lib/crypto/argon2';
+import {deriveKEK} from '../../lib/crypto/argon2';
 import {unwrapDEK} from '../../lib/crypto/unwrap';
+import { generateLoginHash, fromB64 } from '../../lib/crypto';
 import {useAuth} from '../../auth/auth-context';
 import {useCrypto} from '../../lib/crypto/crypto-context';
 import CaptchaChallenge from './CaptchaChallenge';
@@ -275,12 +276,12 @@ export default function LoginCard({onSuccess, onSwitchToSignup}: Props) {
                 return;
             }
 
-            const verifier = await makeVerifier(loginEmail, mp, saltClient);
+            const loginHash = await generateLoginHash(mp, fromB64(saltClient));
             await primeCsrfToken();
 
             const payload: LoginRequest = {
                 email: loginEmail,
-                verifier,
+                verifier: loginHash,
                 ...(captchaEnabled ? {captchaToken} : {}),
             };
 

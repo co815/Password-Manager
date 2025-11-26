@@ -29,7 +29,7 @@ import InfoOutlined from '@mui/icons-material/InfoOutlined';
 
 import {ApiError, api, primeCsrfToken} from '../../lib/api';
 import {createAccountMaterial} from '../../lib/crypto/keys';
-import {makeVerifier} from '../../lib/crypto/argon2';
+import { generateLoginHash, fromB64 } from '../../lib/crypto';
 import CaptchaChallenge from './CaptchaChallenge';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
 import {extractApiErrorDetails} from '../../lib/api-error';
@@ -139,12 +139,12 @@ export default function SignupCard({onSwitchToLogin}: Props) {
         setBusy(true);
         try {
             const {saltClient, dekEncrypted, dekNonce} = await createAccountMaterial(mp);
-            const verifier = await makeVerifier(trimmedEmail, mp, saltClient);
+            const loginHash = await generateLoginHash(mp, fromB64(saltClient));
             await primeCsrfToken();
             await api.register({
                 email: trimmedEmail,
                 username: trimmedUsername,
-                verifier,
+                verifier: loginHash,
                 saltClient,
                 dekEncrypted,
                 dekNonce,

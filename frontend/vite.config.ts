@@ -18,6 +18,12 @@ const config = {
     test: {
         environment: 'happy-dom',
         setupFiles: ['./src/test/setup.ts'],
+        deps: {
+            inline: [/hash-wasm/],
+            web: {
+                transform: [/hash-wasm/],
+            },
+        },
     },
 } satisfies ViteWithVitestConfig;
 
