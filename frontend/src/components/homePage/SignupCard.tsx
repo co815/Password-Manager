@@ -27,18 +27,18 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 
-import {ApiError, api, primeCsrfToken} from '../../lib/api';
-import {createAccountMaterial} from '../../lib/crypto/keys';
+import {ApiError, api, primeCsrfToken} from '@/lib/api.ts';
+import {createAccountMaterial} from '@/lib/crypto/keys.ts';
 import { generateLoginHash, fromB64 } from '../../lib/crypto';
 import CaptchaChallenge from './CaptchaChallenge';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
-import {extractApiErrorDetails} from '../../lib/api-error';
+import {extractApiErrorDetails} from '@/lib/api-error.ts';
 import {
     MIN_ACCEPTABLE_PASSWORD_SCORE,
     assessPasswordStrength,
     getPasswordStrengthColor,
     getPasswordStrengthLabel,
-} from '../../lib/passwordStrength';
+} from '@/lib/passwordStrength.ts';
 
 type Props = {
     onSwitchToLogin?: () => void;

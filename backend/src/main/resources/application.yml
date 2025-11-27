@@ -1,5 +1,7 @@
 server:
   port: 8080
+  ssl:
+    enabled: false
   #ssl:
    # key-store: classpath:pass-man-keystore.p12
     #key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:}
@@ -9,7 +11,7 @@ server:
   servlet:
     session:
       cookie:
-        secure: true
+        secure: false
         http-only: true
 
 spring:

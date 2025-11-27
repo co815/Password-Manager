@@ -26,17 +26,17 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {useNavigate} from 'react-router-dom';
 
-import {ApiError, api, primeCsrfToken, type LoginRequest, type PublicUser} from '../../lib/api';
-import {deriveKEK} from '../../lib/crypto/argon2';
-import {unwrapDEK} from '../../lib/crypto/unwrap';
+import {ApiError, api, primeCsrfToken, type LoginRequest, type PublicUser} from '@/lib/api.ts';
+import {deriveKEK} from '@/lib/crypto/argon2.ts';
+import {unwrapDEK} from '@/lib/crypto/unwrap.ts';
 import { generateLoginHash, fromB64 } from '../../lib/crypto';
-import {useAuth} from '../../auth/auth-context';
-import {useCrypto} from '../../lib/crypto/crypto-context';
+import {useAuth} from '@/auth/auth-context.ts';
+import {useCrypto} from '@/lib/crypto/crypto-context.ts';
 import CaptchaChallenge from './CaptchaChallenge';
 import {useCaptchaChallengeState} from './useCaptchaChallengeState';
-import {extractApiErrorDetails} from '../../lib/api-error';
-import {assertionToJSON, decodeRequestOptions, isWebAuthnSupported} from '../../lib/webauthn';
-import {rememberDek, restoreDek} from '../../lib/crypto/dek-storage';
+import {extractApiErrorDetails} from '@/lib/api-error.ts';
+import {assertionToJSON, decodeRequestOptions, isWebAuthnSupported} from '@/lib/webauthn.ts';
+import {rememberDek, restoreDek} from '@/lib/crypto/dek-storage.ts';
 
 type Props = {
     onSuccess?: (user: PublicUser, mp: string) => void;

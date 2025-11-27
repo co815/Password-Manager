@@ -32,6 +32,8 @@ public class VaultItem {
     @Default
     private Set<String> collections = new LinkedHashSet<>();
 
+    private boolean favorite;
+
     @CreatedDate
     private Instant createdAt;
 

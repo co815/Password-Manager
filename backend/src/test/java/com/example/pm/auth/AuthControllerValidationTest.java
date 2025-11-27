@@ -8,6 +8,7 @@ import com.example.pm.config.AuthCookieProps;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.AuthSessionService;
 import com.example.pm.security.JwtService;
+import com.example.pm.security.PasswordVerifier;
 import com.example.pm.security.TotpService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ class AuthControllerValidationTest {
     @MockBean org.springframework.security.web.csrf.CsrfTokenRepository csrfTokenRepository;
     @MockBean PlaceholderSaltService placeholderSaltService;
     @MockBean EmailVerificationService emailVerificationService;
+    @MockBean PasswordVerifier passwordVerifier;
 
     @Test
     void registerMissingFieldsReturnsBadRequestWithValidationDetails() throws Exception {

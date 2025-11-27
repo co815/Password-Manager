@@ -5,6 +5,7 @@ import com.example.pm.security.CaptchaValidationService;
 import com.example.pm.security.LoginThrottleEntry;
 import com.example.pm.security.LoginThrottleRepository;
 import com.example.pm.security.LoginThrottleService;
+import com.example.pm.security.PasswordVerifier;
 import com.example.pm.webauthn.MongoWebAuthnCredentialRepository;
 import com.example.pm.webauthn.WebAuthnCredentialRepository;
 import com.example.pm.webauthn.WebAuthnService;
@@ -100,6 +101,14 @@ public class TestSupportConfig {
     @Primary
     public WebAuthnService webAuthnService() {
         return Mockito.mock(WebAuthnService.class);
+    }
+
+    @Bean
+    @Primary
+    public PasswordVerifier passwordVerifier() {
+        PasswordVerifier verifier = Mockito.mock(PasswordVerifier.class);
+        Mockito.when(verifier.verify(Mockito.any(), Mockito.any())).thenReturn(true);
+        return verifier;
     }
 
     private static class InMemoryLoginThrottleRepository implements LoginThrottleRepository {

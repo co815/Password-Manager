@@ -67,8 +67,7 @@ class SecurityIntegrationTests {
 
     private static final String VALID_VAULT_PAYLOAD = """
             {
-              \"titleCipher\":\"t\",\"titleNonce\":\"tn\",\"usernameCipher\":\"u\",
-              \"usernameNonce\":\"un\",\"passwordCipher\":\"p\",\"passwordNonce\":\"pn\"
+              \"data\":\"some-encrypted-data\"
             }
             """;
 

@@ -86,13 +86,7 @@ class VaultControllerSecurityTest {
         VaultItem item = new VaultItem();
         item.setId("item-1");
         item.setUserId("user-123");
-        item.setTitleCipher("titleCipher");
-        item.setTitleNonce("titleNonce");
-        item.setUsernameCipher("usernameCipher");
-        item.setUsernameNonce("usernameNonce");
-        item.setPasswordCipher("passwordCipher");
-        item.setPasswordNonce("passwordNonce");
-        item.setUrl("https://example.com");
+        item.setData("encrypted-data");
         item.setCreatedAt(Instant.now());
 
         when(vaultItemRepository.findByUserId("user-123")).thenReturn(List.of(item));
@@ -104,17 +98,14 @@ class VaultControllerSecurityTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("item-1"))
-                .andExpect(jsonPath("$[0].usernameCipher").value("usernameCipher"));
+                .andExpect(jsonPath("$[0].data").value("encrypted-data"));
     }
 
     @Test
     void createVaultWithoutTokenReturns401() throws Exception {
         String payload = """
                 {
-                  "titleCipher":"tC","titleNonce":"tN",
-                  "usernameCipher":"uC","usernameNonce":"uN",
-                  "passwordCipher":"pC","passwordNonce":"pN",
-                  "url":"https://example.com"
+                  "data":"some-encrypted-data"
                 }
                 """;
 
@@ -147,13 +138,7 @@ class VaultControllerSecurityTest {
         VaultItem existing = new VaultItem();
         existing.setId("item-1");
         existing.setUserId("user-123");
-        existing.setTitleCipher("titleCipher");
-        existing.setTitleNonce("titleNonce");
-        existing.setUsernameCipher("usernameCipher");
-        existing.setUsernameNonce("usernameNonce");
-        existing.setPasswordCipher("passwordCipher");
-        existing.setPasswordNonce("passwordNonce");
-        existing.setUrl("https://example.com");
+        existing.setData("encrypted-data");
 
         when(vaultItemRepository.findByIdAndUserId("item-1", "user-123"))
                 .thenReturn(Optional.of(existing));

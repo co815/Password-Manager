@@ -12,6 +12,7 @@ import com.example.pm.model.User;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.AuthSessionService;
 import com.example.pm.security.CaptchaValidationService;
+import com.example.pm.security.PasswordVerifier;
 import com.example.pm.security.RateLimiterService;
 import com.example.pm.security.TotpService;
 import org.junit.jupiter.api.Test;
@@ -68,7 +69,7 @@ class AuthControllerTest {
                 .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
 
         AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, authSessionService);
+                placeholderSaltService, emailVerificationService, authSessionService, null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -127,7 +128,7 @@ class AuthControllerTest {
                 .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
 
         AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, authSessionService);
+                placeholderSaltService, emailVerificationService, authSessionService, null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -167,8 +168,12 @@ class AuthControllerTest {
 
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
+
+        PasswordVerifier passwordVerifier = mock(PasswordVerifier.class);
+        when(passwordVerifier.verify(any(), any())).thenReturn(false);
+
         AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, authSessionService);
+                placeholderSaltService, emailVerificationService, authSessionService, passwordVerifier);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -211,7 +216,7 @@ class AuthControllerTest {
         PlaceholderSaltService placeholderSaltService = new PlaceholderSaltService("test-secret");
         EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
         AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, authSessionService);
+                placeholderSaltService, emailVerificationService, authSessionService, null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -250,7 +255,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         ResponseEntity<?> response = controller.verifyEmail("token");
 
@@ -280,7 +286,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         ResponseEntity<?> response = controller.verifyEmail("token");
 
@@ -310,7 +317,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         ResponseEntity<?> response = controller.resendVerification(new ResendVerificationRequest("user@example.com"));
 
@@ -340,7 +348,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         ResponseEntity<?> response = controller.resendVerification(new ResendVerificationRequest("user@example.com"));
 
@@ -383,7 +392,7 @@ class AuthControllerTest {
                 .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
 
         AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, authSessionService);
+                placeholderSaltService, emailVerificationService, authSessionService, null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -439,7 +448,7 @@ class AuthControllerTest {
                 .thenReturn(new AuthSessionService.Session("token-value", cookie, csrfToken));
 
         AuthController controller = createController(users, rateLimiter, totp, audit, csrfTokenRepository,
-                placeholderSaltService, emailVerificationService, authSessionService);
+                placeholderSaltService, emailVerificationService, authSessionService, null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -481,7 +490,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setScheme("https");
@@ -528,7 +538,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -566,7 +577,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -603,7 +615,8 @@ class AuthControllerTest {
                 csrfTokenRepository,
                 placeholderSaltService,
                 emailVerificationService,
-                authSessionService);
+                authSessionService,
+                null);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -629,10 +642,15 @@ class AuthControllerTest {
                                             CsrfTokenRepository csrfTokenRepository,
                                             PlaceholderSaltService placeholderSaltService,
                                             EmailVerificationService emailVerificationService,
-                                            AuthSessionService authSessionService) {
+                                            AuthSessionService authSessionService,
+                                            PasswordVerifier passwordVerifier) {
         CaptchaValidationService captchaValidationService = mock(CaptchaValidationService.class);
         when(captchaValidationService.validateCaptcha(any(), any())).thenReturn(true);
+        if (passwordVerifier == null) {
+            passwordVerifier = mock(PasswordVerifier.class);
+            when(passwordVerifier.verify(any(), any())).thenReturn(true);
+        }
         return new AuthController(users, rateLimiter, totp, audit, captchaValidationService,
-                placeholderSaltService, emailVerificationService, authSessionService, csrfTokenRepository);
+                placeholderSaltService, emailVerificationService, authSessionService, csrfTokenRepository, passwordVerifier);
     }
 }

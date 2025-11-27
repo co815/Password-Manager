@@ -157,4 +157,32 @@ public class VaultController {
         }
         return handler.apply(userIdOpt.get());
     }
+
+    private Optional<String> validateCollections(Set<String> collections) {
+        if (collections == null) {
+            return Optional.empty();
+        }
+        if (collections.size() > MAX_COLLECTION_COUNT) {
+            return Optional.of("Too many collections");
+        }
+        for (String collection : collections) {
+            if (collection == null || collection.isBlank()) {
+                continue;
+            }
+            if (collection.length() > MAX_COLLECTION_NAME_LENGTH) {
+                return Optional.of("Collection name too long");
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Set<String> normalizeCollections(Set<String> collections) {
+        if (collections == null) {
+            return new LinkedHashSet<>();
+        }
+        return collections.stream()
+                .filter(c -> c != null && !c.isBlank())
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
 }
