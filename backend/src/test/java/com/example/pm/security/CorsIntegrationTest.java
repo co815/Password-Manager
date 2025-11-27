@@ -10,7 +10,6 @@ import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.repo.VaultItemRepository;
-import com.example.pm.security.AuthSessionService;
 import com.example.pm.webauthn.MongoWebAuthnCredentialRepository;
 import com.example.pm.webauthn.WebAuthnCredentialRepository;
 import org.junit.jupiter.api.Test;
@@ -25,7 +24,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
