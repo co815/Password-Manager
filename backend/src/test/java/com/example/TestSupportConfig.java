@@ -1,4 +1,4 @@
-package com.example.pm;
+package com.example;
 
 import com.example.pm.config.CaptchaProps;
 import com.example.pm.security.CaptchaValidationService;

@@ -1,6 +1,6 @@
 package com.example.pm.security;
 
-import com.example.pm.TestSupportConfig;
+import com.example.TestSupportConfig;
 import com.example.pm.auth.EmailVerificationService;
 import com.example.pm.auth.PlaceholderSaltService;
 import com.example.pm.model.AuditLog;
@@ -10,12 +10,9 @@ import com.example.pm.repo.AuditLogRepository;
 import com.example.pm.repo.CredentialRepository;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.repo.VaultItemRepository;
-import com.example.pm.security.AuthSessionService;
-import com.example.pm.security.RateLimiterService;
 import com.example.pm.webauthn.MongoWebAuthnCredentialRepository;
 import com.example.pm.webauthn.WebAuthnCredentialRepository;
 import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +35,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.mockito.Mockito.lenient;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +63,7 @@ class SecurityIntegrationTests {
 
     private static final String VALID_VAULT_PAYLOAD = """
             {
-              \"data\":\"some-encrypted-data\"
+              "data":"some-encrypted-data"
             }
             """;
 
@@ -187,8 +183,8 @@ class SecurityIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  \"email\": \"user@example.com\",
-                                  \"verifier\": \"client-verifier\"
+                                  "email": "user@example.com",
+                                  "verifier": "client-verifier"
                                 }
                                 """))
                 .andExpect(status().isForbidden());
@@ -202,8 +198,8 @@ class SecurityIntegrationTests {
                         .header("X-XSRF-TOKEN", csrfToken)
                         .content("""
                                 {
-                                  \"email\": \"user@example.com\",
-                                  \"verifier\": \"client-verifier\"
+                                  "email": "user@example.com",
+                                  "verifier": "client-verifier"
                                 }
                                 """))
                 .andExpect(status().isOk())

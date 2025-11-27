@@ -1,9 +1,7 @@
 package com.example.pm.auth;
 
-import com.example.pm.TestSupportConfig;
+import com.example.TestSupportConfig;
 import com.example.pm.auditlog.SecurityAuditService;
-import com.example.pm.auth.EmailVerificationService;
-import com.example.pm.auth.PlaceholderSaltService;
 import com.example.pm.config.AuthCookieProps;
 import com.example.pm.repo.UserRepository;
 import com.example.pm.security.AuthSessionService;

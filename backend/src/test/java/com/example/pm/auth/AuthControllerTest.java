@@ -1,8 +1,6 @@
 package com.example.pm.auth;
 
 import com.example.pm.auditlog.SecurityAuditService;
-import com.example.pm.auth.EmailVerificationService;
-import com.example.pm.auth.PlaceholderSaltService;
 import com.example.pm.dto.AuthDtos.LoginRequest;
 import com.example.pm.dto.AuthDtos.ResendVerificationRequest;
 import com.example.pm.dto.AuthDtos.SaltResponse;

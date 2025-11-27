@@ -1,6 +1,6 @@
 package com.example.pm.vault;
 
-import com.example.pm.TestSupportConfig;
+import com.example.TestSupportConfig;
 import com.example.pm.auditlog.AuditLogAspect;
 import com.example.pm.auditlog.AuditLogController;
 import com.example.pm.auth.EmailVerificationService;

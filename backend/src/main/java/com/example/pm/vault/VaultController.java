@@ -8,7 +8,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +92,7 @@ public class VaultController {
         return requireUser(authentication, userId -> vaultItems.findByIdAndUserId(id, userId)
                 .<ResponseEntity<?>>map(existing -> {
                     if (payload.favorite() != null) {
-                        existing.setFavorite(Boolean.TRUE.equals(payload.favorite()));
+                        existing.setFavorite(payload.favorite());
                     }
                     if (payload.collections() != null) {
                         existing.setCollections(normalizeCollections(payload.collections()));
