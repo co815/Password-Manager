@@ -60,6 +60,7 @@ export type VaultCredentialPlain = {
     username: string;
     password: string;
     url?: string;
+    collections?: string[];
 };
 
 export type VaultCredentialEncrypted = {
@@ -68,6 +69,7 @@ export type VaultCredentialEncrypted = {
     usernameCipher: string; usernameNonce: string;
     passwordCipher: string; passwordNonce: string;
     urlCipher?: string; urlNonce?: string;
+    collections?: string[];
 };
 
 export type VaultCredentialExport = {
@@ -105,6 +107,7 @@ export async function packCredentials(
             nameCipher: name.cipher, nameNonce: name.nonce,
             usernameCipher: username.cipher, usernameNonce: username.nonce,
             passwordCipher: password.cipher, passwordNonce: password.nonce,
+            collections: cred.collections,
         };
 
         if (cred.url && cred.url.trim()) {
@@ -168,6 +171,8 @@ export function parseVaultExport(raw: string): VaultCredentialExport {
             urlNonce = assertString(item.urlNonce, 'Credential entry missing URL nonce.');
         }
 
+        const collections = Array.isArray(item.collections) ? item.collections.map(String) : undefined;
+
         return {
             id,
             nameCipher,
@@ -178,6 +183,7 @@ export function parseVaultExport(raw: string): VaultCredentialExport {
             passwordNonce,
             urlCipher,
             urlNonce,
+            collections,
         } satisfies VaultCredentialEncrypted;
     });
 
@@ -208,6 +214,7 @@ export async function unpackCredentials(
             username,
             password,
             url,
+            collections: item.collections,
         });
     }
 

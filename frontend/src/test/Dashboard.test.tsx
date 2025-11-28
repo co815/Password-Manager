@@ -1,6 +1,6 @@
 import {useState, type ReactNode} from 'react';
 import {Buffer} from 'node:buffer';
-import {configure, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {configure, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import Dashboard from '../pages/Dashboard';
 import {AuthContext, type AuthContextValue} from '../auth/auth-context';
 import {CryptoContext, type CryptoContextValue} from '../lib/crypto/crypto-context';

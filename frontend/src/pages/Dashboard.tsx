@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import type {ChangeEvent, FormEvent, MouseEvent} from 'react';
 import {useAuth} from '../auth/auth-context';
 import {useCrypto} from '../lib/crypto/crypto-context';
-import {api, ApiError, type MfaEnrollmentResponse, type MfaStatusResponse, type PublicCredential, type VaultItem} from '../lib/api';
+import {api, ApiError, type MfaEnrollmentResponse, type MfaStatusResponse, type VaultItem} from '../lib/api';
 import {isAuditAdminEmail} from '../lib/accessControl';
 import Alert from '@mui/material/Alert';
 import {deriveKEK, makeVerifier} from '../lib/crypto/argon2';
@@ -47,7 +47,6 @@ import {
     LockOpen,
     Menu as MenuIcon,
     Logout,
-    Timer,
 } from '@mui/icons-material';
 import {passwordTemplates} from '../lib/passwordTemplates';
 import {
@@ -1357,7 +1356,7 @@ export default function Dashboard() {
             }
 
             setCredentials(nextCredentials);
-            setSelected((prevSelected) => {
+            setSelected((_prevSelected) => {
                 if (nextSelected) return nextSelected;
                 return nextCredentials[0] ?? null;
             });

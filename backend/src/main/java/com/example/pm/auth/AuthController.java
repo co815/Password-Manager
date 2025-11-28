@@ -94,6 +94,7 @@ public class AuthController {
                     .body(new ErrorResponse(400, "INVALID_AVATAR", ex.getMessage()));
         }
         User newUser = User.fromRegisterRequest(registerRequest);
+        newUser.setVerifier(passwordVerifier.encode(newUser.getVerifier()));
 
         newUser.setAvatarData(normalizedAvatar);
         if (users.findByEmail(newUser.getEmail()).isPresent())

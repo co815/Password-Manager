@@ -1,5 +1,4 @@
-export const fromB64 = (s: string) =>
-    Uint8Array.from(atob(s), c => c.charCodeAt(0));
+import { fromB64 } from './codec';
 
 export async function unwrapDEK(
     kek: CryptoKey,

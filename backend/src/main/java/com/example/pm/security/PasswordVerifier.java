@@ -11,4 +11,8 @@ public class PasswordVerifier {
     public boolean verify(String rawPassword, String encodedPassword) {
         return encoder.matches(rawPassword, encodedPassword);
     }
+
+    public String encode(String rawPassword) {
+        return encoder.encode(rawPassword);
+    }
 }
