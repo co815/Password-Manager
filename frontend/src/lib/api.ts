@@ -337,17 +337,7 @@ export interface RevokeSessionsResponse {
 }
 
 export interface VaultItemRequest {
-    titleCipher: string;
-    titleNonce: string;
-    usernameCipher: string;
-    usernameNonce: string;
-    passwordCipher: string;
-    passwordNonce: string;
-    url?: string;
-    notesCipher?: string;
-    notesNonce?: string;
-    totpCipher?: string;
-    totpNonce?: string;
+    data: string;
     favorite?: boolean;
     collections?: string[];
 }

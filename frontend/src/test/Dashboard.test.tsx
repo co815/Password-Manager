@@ -204,6 +204,20 @@ function base64Encode(text: string): string {
     return Buffer.from(text, 'utf-8').toString('base64');
 }
 
+function mockPack(plain: any) {
+    const p = plain;
+    const enc = {
+        titleCipher: base64Encode(p.title), titleNonce: base64Encode('n'),
+        usernameCipher: base64Encode(p.username), usernameNonce: base64Encode('n'),
+        passwordCipher: base64Encode(p.password), passwordNonce: base64Encode('n'),
+        url: p.url,
+        notesCipher: p.notes ? base64Encode(p.notes) : undefined,
+        notesNonce: p.notes ? base64Encode('n') : undefined
+    };
+    return JSON.stringify(enc);
+}
+
+
 describe('Dashboard', () => {
     const fakeDek = {} as CryptoKey;
 
@@ -216,7 +230,7 @@ describe('Dashboard', () => {
             getRandomValues: (array: Uint8Array | Uint32Array) => {
                 const arr = array;
                 for (let i = 0; i < arr.length; i += 1) {
-                    arr[i] = (i + 1) % 255;
+                    arr[i] = (i + 1) % 255; // simple deterministic noise
                 }
                 return arr;
             },
@@ -236,6 +250,7 @@ describe('Dashboard', () => {
                     _key: CryptoKey,
                     data: ArrayBuffer | Uint8Array,
                 ) => {
+                    // return identity
                     if (data instanceof ArrayBuffer) {
                         return data;
                     }
@@ -266,38 +281,29 @@ describe('Dashboard', () => {
         deleteCredentialMock.mockResolvedValue(undefined);
         deleteVaultMock.mockResolvedValue({ ok: true });
 
-        createVaultMock.mockResolvedValue({
-            id: 'item-created-default',
-            titleCipher: base64Encode('Service'),
-            titleNonce: 'nonce',
-            usernameCipher: 'u-cipher',
-            usernameNonce: 'u-nonce',
-            passwordCipher: 'p-cipher',
-            passwordNonce: 'p-nonce',
-            favorite: false,
-            collections: []
+        // Default mock implementation for createVault
+        createVaultMock.mockImplementation(async (req) => {
+            return {
+                id: 'item-created-default',
+                data: req.data,
+                favorite: req.favorite,
+                collections: req.collections
+            };
         });
 
-        updateVaultMock.mockResolvedValue({
-            id: 'item-updated-default',
-            titleCipher: base64Encode('Service'),
-            titleNonce: 'nonce',
-            usernameCipher: 'u-cipher',
-            usernameNonce: 'u-nonce',
-            passwordCipher: 'p-cipher',
-            passwordNonce: 'p-nonce',
-            favorite: false,
-            collections: []
+        // Default mock implementation for updateVault
+        updateVaultMock.mockImplementation(async (id, req) => {
+            return {
+                id: id,
+                data: req.data,
+                favorite: req.favorite,
+                collections: req.collections
+            };
         });
 
         updateVaultMetadataMock.mockResolvedValue({
             id: 'item-meta-default',
-            titleCipher: base64Encode('Service'),
-            titleNonce: 'nonce',
-            usernameCipher: 'u-cipher',
-            usernameNonce: 'u-nonce',
-            passwordCipher: 'p-cipher',
-            passwordNonce: 'p-nonce',
+            data: 'some-data',
             favorite: false,
             collections: []
         });
@@ -380,12 +386,11 @@ describe('Dashboard', () => {
         });
 
         const createPayload = createVaultMock.mock.calls[0]?.[0] as VaultItemRequest;
-        expect(createPayload).toMatchObject({
-            url: 'https://example.com',
-        });
-        expect(createPayload.titleCipher).toBeDefined();
-        expect(createPayload.usernameCipher).toBeDefined();
-        expect(createPayload.passwordCipher).toBeDefined();
+        expect(createPayload.data).toBeDefined();
+
+        // Since we mocked encrypt as identity + base64 for test, we can check basic string presence in the encoded data
+        // But `serializeItem` does JSON stringify of base64 values.
+        // It's opaque blob mostly.
 
         await screen.findByRole('heading', {name: 'Example Service'});
 
@@ -406,7 +411,7 @@ describe('Dashboard', () => {
 
         await waitFor(() => {
             expect(updateVaultMock).toHaveBeenCalledWith('item-created-default', expect.objectContaining({
-
+                data: expect.any(String)
             }));
         });
     }, 15000);
@@ -429,19 +434,22 @@ describe('Dashboard', () => {
     });
 
     it('lists vault items correctly', async () => {
+        const itemPlain = {
+            title: 'Simple Item',
+            username: 'user',
+            password: 'pass',
+            url: 'https://example.com'
+        };
+
+        const data = mockPack(itemPlain);
+
         const vaultItems: VaultItem[] = [
             {
                 id: 'item-simple',
                 userId: 'user-1',
-                titleCipher: base64Encode('Simple Item'),
-                titleNonce: base64Encode('n1'),
-                usernameCipher: base64Encode('user'),
-                usernameNonce: base64Encode('n2'),
-                passwordCipher: base64Encode('pass'),
-                passwordNonce: base64Encode('n3'),
+                data: data,
                 favorite: false,
                 collections: [],
-                url: 'https://example.com'
             }
         ];
 

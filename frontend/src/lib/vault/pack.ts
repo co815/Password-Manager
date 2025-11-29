@@ -8,6 +8,7 @@ export type VaultItemPlain = {
     password: string;
     url?: string;
     notes?: string;
+    totpSecret?: string;
 };
 
 export type VaultItemEncrypted = {
@@ -16,6 +17,7 @@ export type VaultItemEncrypted = {
     passwordCipher: string; passwordNonce: string;
     url?: string;
     notesCipher?: string; notesNonce?: string;
+    totpCipher?: string; totpNonce?: string;
 };
 
 export async function packItem(
@@ -38,6 +40,12 @@ export async function packItem(
         out.notesCipher = n.cipher;
         out.notesNonce = n.nonce;
     }
+
+    if (p.totpSecret && p.totpSecret.trim()) {
+        const totp = await seal(dek, p.totpSecret);
+        out.totpCipher = totp.cipher;
+        out.totpNonce = totp.nonce;
+    }
     return out;
 }
 
@@ -51,7 +59,26 @@ export async function unpackItem(
     const notes = e.notesCipher && e.notesNonce
         ? await open(dek, e.notesCipher, e.notesNonce)
         : undefined;
-    return {title, username, password, url: e.url, notes};
+    const totpSecret = e.totpCipher && e.totpNonce
+        ? await open(dek, e.totpCipher, e.totpNonce)
+        : undefined;
+    return {title, username, password, url: e.url, notes, totpSecret};
+}
+
+export async function serializeItem(
+    dek: CryptoKey,
+    p: VaultItemPlain
+): Promise<string> {
+    const encrypted = await packItem(dek, p);
+    return JSON.stringify(encrypted);
+}
+
+export async function deserializeItem(
+    dek: CryptoKey,
+    data: string
+): Promise<VaultItemPlain> {
+    const encrypted = JSON.parse(data) as VaultItemEncrypted;
+    return unpackItem(dek, encrypted);
 }
 
 export type VaultCredentialPlain = {

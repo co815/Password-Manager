@@ -47,6 +47,12 @@ public class VaultController {
             VaultItem item = new VaultItem();
             item.setUserId(userId);
             item.setData(payload.data());
+            if (payload.collections() != null) {
+                item.setCollections(normalizeCollections(payload.collections()));
+            }
+            if (payload.favorite() != null) {
+                item.setFavorite(payload.favorite());
+            }
             item.setCreatedAt(now);
             item.setUpdatedAt(now);
 
@@ -67,6 +73,12 @@ public class VaultController {
             return vaultItems.findByIdAndUserId(id, userId)
                     .<ResponseEntity<?>>map(existing -> {
                         existing.setData(payload.data());
+                        if (payload.collections() != null) {
+                            existing.setCollections(normalizeCollections(payload.collections()));
+                        }
+                        if (payload.favorite() != null) {
+                            existing.setFavorite(payload.favorite());
+                        }
                         existing.setUpdatedAt(Instant.now());
 
                         VaultItem saved = vaultItems.save(existing);

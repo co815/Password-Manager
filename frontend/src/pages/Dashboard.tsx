@@ -9,7 +9,12 @@ import Alert from '@mui/material/Alert';
 import {deriveKEK, makeVerifier} from '../lib/crypto/argon2';
 import {unwrapDEK} from '../lib/crypto/unwrap';
 import {encryptDekWithKek} from '../lib/crypto/keys';
-import {deserializeVaultCredentials, serializeVaultCredentials} from '../lib/vault/pack';
+import {
+    deserializeItem,
+    deserializeVaultCredentials,
+    serializeItem,
+    serializeVaultCredentials
+} from '../lib/vault/pack';
 import {extractApiErrorDetails} from '../lib/api-error';
 import {attestationToJSON, decodeCreationOptions, isWebAuthnSupported} from '../lib/webauthn';
 import {rememberDek, restoreDek} from '../lib/crypto/dek-storage';
@@ -110,19 +115,11 @@ function inferCategoryFromLegacy(name: string, url?: string): string {
     return UNCATEGORIZED_LABEL;
 }
 
-const te = new TextEncoder();
 const toB64 = (buf: ArrayBuffer | Uint8Array) =>
     btoa(String.fromCharCode(...new Uint8Array(buf instanceof ArrayBuffer ? buf : buf.buffer)));
-const randIv = (len = 12) => crypto.getRandomValues(new Uint8Array(len));
 
 const ALLOWED_AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_AVATAR_SIZE = 256 * 1024;
-
-async function encryptField(dek: CryptoKey, text: string) {
-    const iv = randIv();
-    const ct = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, dek, te.encode(text ?? ''));
-    return {cipher: toB64(ct), nonce: toB64(iv)} as { cipher: string; nonce: string };
-}
 
 export default function Dashboard() {
     const {user, logout, login, refresh} = useAuth();
@@ -380,16 +377,23 @@ export default function Dashboard() {
                         try {
                             const inferredTag = inferCategoryFromLegacy(old.service, old.websiteLink);
 
-                            const {cipher: titleCipher, nonce: titleNonce} = await encryptField(dek, old.service);
+
+                            // Let's decrypt first.
+                            const username = await decryptField(dek, old.usernameEncrypted, old.usernameNonce);
+                            const password = await decryptField(dek, old.passwordEncrypted, old.passwordNonce);
+
+                            const serialized = await serializeItem(dek, {
+                                title: old.service,
+                                username: username,
+                                password: password,
+                                url: old.websiteLink,
+                                notes: '', // Legacy didn't have notes in this view?
+                                // Actually, `PublicCredential` doesn't show notes. `Credential` in Dashboard does.
+                                // The legacy `fetchCredentials` endpoint might not return notes.
+                            });
 
                             await api.createVault({
-                                titleCipher,
-                                titleNonce,
-                                usernameCipher: old.usernameEncrypted,
-                                usernameNonce: old.usernameNonce,
-                                passwordCipher: old.passwordEncrypted,
-                                passwordNonce: old.passwordNonce,
-                                url: old.websiteLink || undefined,
+                                data: serialized,
                                 favorite: old.favorite,
                                 collections: [inferredTag]
                             });
@@ -407,27 +411,22 @@ export default function Dashboard() {
                 const decrypted: Credential[] = [];
 
                 for (const item of vaultItems) {
-                    const titleDec = await decryptField(dek, item.titleCipher, item.titleNonce);
-                    const usernameDec = await decryptField(dek, item.usernameCipher, item.usernameNonce);
-                    const passwordDec = await decryptField(dek, item.passwordCipher, item.passwordNonce);
-                    const notesDec = (item.notesCipher && item.notesNonce)
-                        ? await decryptField(dek, item.notesCipher, item.notesNonce)
-                        : '';
-                    const totpDec = (item.totpCipher && item.totpNonce)
-                        ? await decryptField(dek, item.totpCipher, item.totpNonce)
-                        : '';
-
-                    decrypted.push({
-                        id: item.id!,
-                        name: titleDec,
-                        url: item.url,
-                        username: usernameDec,
-                        password: passwordDec,
-                        notes: notesDec,
-                        totpSecret: totpDec,
-                        favorite: !!item.favorite,
-                        collections: item.collections || []
-                    });
+                    try {
+                        const plain = await deserializeItem(dek, item.data);
+                        decrypted.push({
+                            id: item.id!,
+                            name: plain.title,
+                            url: plain.url,
+                            username: plain.username,
+                            password: plain.password,
+                            notes: plain.notes || '',
+                            totpSecret: plain.totpSecret || '',
+                            favorite: !!item.favorite,
+                            collections: item.collections || []
+                        });
+                    } catch (e) {
+                        console.error("Failed to decrypt item", item.id, e);
+                    }
                 }
 
                 setCredentials(decrypted);
@@ -1083,30 +1082,24 @@ export default function Dashboard() {
 
         setBusy(true);
         try {
-            const {cipher: usernameCipher, nonce: usernameNonce} = await encryptField(dek, username);
-            const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, password);
-            const {cipher: titleCipher, nonce: titleNonce} = await encryptField(dek, title);
-            const {cipher: notesCipher, nonce: notesNonce} = await encryptField(dek, notes);
-            const {cipher: totpCipher, nonce: totpNonce} = await encryptField(dek, totpSecret);
-
             const trimmedTitle = title.trim();
             const trimmedUrl = url.trim();
             const trimmedUsername = username.trim();
             const collectionList = tags.split(',').map(t => t.trim()).filter(Boolean);
 
+            const serialized = await serializeItem(dek, {
+                title: trimmedTitle,
+                username: trimmedUsername,
+                password: password,
+                url: trimmedUrl,
+                notes: notes,
+                totpSecret: totpSecret
+            });
+
             if (dialogMode === 'add') {
                 const created = await api.createVault({
-                    titleCipher,
-                    titleNonce,
-                    usernameCipher,
-                    usernameNonce,
-                    passwordCipher,
-                    passwordNonce,
-                    url: trimmedUrl,
-                    notesCipher,
-                    notesNonce,
-                    totpCipher,
-                    totpNonce,
+                    data: serialized,
+                    favorite: false, // Default
                     collections: collectionList
                 });
 
@@ -1127,18 +1120,9 @@ export default function Dashboard() {
                 setToast({type: 'success', msg: 'Item saved.'});
             } else if (dialogMode === 'edit' && editingTarget) {
                 const updated = await api.updateVault(editingTarget.id, {
-                    titleCipher,
-                    titleNonce,
-                    usernameCipher,
-                    usernameNonce,
-                    passwordCipher,
-                    passwordNonce,
-                    url: trimmedUrl,
-                    notesCipher,
-                    notesNonce,
-                    totpCipher,
-                    totpNonce,
-                    collections: collectionList
+                    data: serialized,
+                    collections: collectionList,
+                    favorite: editingTarget.favorite
                 });
 
                 const updatedCredential: Credential = {
@@ -1287,22 +1271,19 @@ export default function Dashboard() {
                 const sanitizedUsername = trimmedUsername || cred.username;
                 const tags = cred.collections || [];
 
-                const {cipher: usernameCipher, nonce: usernameNonce} = await encryptField(dek, sanitizedUsername);
-                const {cipher: passwordCipher, nonce: passwordNonce} = await encryptField(dek, cred.password);
-                const {cipher: titleCipher, nonce: titleNonce} = await encryptField(dek, sanitizedTitle);
+                const serialized = await serializeItem(dek, {
+                    title: sanitizedTitle,
+                    username: sanitizedUsername,
+                    password: cred.password,
+                    url: sanitizedUrl
+                });
 
                 const existingIndex = nextCredentials.findIndex((c) => c.name === sanitizedTitle && c.username === sanitizedUsername);
 
                 if (existingIndex >= 0) {
                     const existingId = nextCredentials[existingIndex].id;
                     const updated = await api.updateVault(existingId, {
-                        titleCipher,
-                        titleNonce,
-                        usernameCipher,
-                        usernameNonce,
-                        passwordCipher,
-                        passwordNonce,
-                        url: sanitizedUrl,
+                        data: serialized,
                         collections: tags,
                     });
 
@@ -1325,13 +1306,7 @@ export default function Dashboard() {
                     updatedCount++;
                 } else {
                     const created = await api.createVault({
-                        titleCipher,
-                        titleNonce,
-                        usernameCipher,
-                        usernameNonce,
-                        passwordCipher,
-                        passwordNonce,
-                        url: sanitizedUrl,
+                        data: serialized,
                         collections: tags
                     });
 
