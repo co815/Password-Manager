@@ -53,222 +53,227 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-        "security.salt.rate-limit.requests=2",
-        "security.salt.rate-limit.window-seconds=3600",
-        "app.cors.origins[0]=http://localhost:5173",
-        "app.cors.origins[1]=https://localhost:5173"
+                "security.salt.rate-limit.requests=2",
+                "security.salt.rate-limit.window-seconds=3600",
+                "app.cors.origins[0]=http://localhost:5173",
+                "app.cors.origins[1]=https://localhost:5173"
 })
 @Import(TestSupportConfig.class)
+@SuppressWarnings("null")
 class SecurityIntegrationTests {
 
-    private static final String VALID_VAULT_PAYLOAD = """
-            {
-              "data":"some-encrypted-data"
-            }
-            """;
+        private static final String VALID_VAULT_PAYLOAD = """
+                        {
+                          "data":"some-encrypted-data"
+                        }
+                        """;
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @MockBean
-    private VaultItemRepository vaultItemRepository;
+        @MockBean
+        private VaultItemRepository vaultItemRepository;
 
-    @MockBean
-    private UserRepository userRepository;
+        @MockBean
+        private UserRepository userRepository;
 
-    @MockBean
-    private AuditLogRepository auditLogRepository;
+        @MockBean
+        private AuditLogRepository auditLogRepository;
 
-    @MockBean
-    private CredentialRepository credentialRepository;
+        @MockBean
+        private CredentialRepository credentialRepository;
 
-    @MockBean
-    private RateLimiterService rateLimiterService;
+        @MockBean
+        private RateLimiterService rateLimiterService;
 
-    @MockBean
-    private PlaceholderSaltService placeholderSaltService;
+        @MockBean
+        private PlaceholderSaltService placeholderSaltService;
 
-    @MockBean
-    private EmailVerificationService emailVerificationService;
+        @MockBean
+        private EmailVerificationService emailVerificationService;
 
-    @MockBean
-    private AuthSessionService authSessionService;
+        @MockBean
+        private AuthSessionService authSessionService;
 
-    @MockBean
-    private MongoWebAuthnCredentialRepository mongoWebAuthnCredentialRepository;
+        @MockBean
+        private MongoWebAuthnCredentialRepository mongoWebAuthnCredentialRepository;
 
-    @MockBean
-    private WebAuthnCredentialRepository webAuthnCredentialRepository;
+        @MockBean
+        private WebAuthnCredentialRepository webAuthnCredentialRepository;
 
-    @BeforeEach
-    void setUpMocks() {
-        reset(vaultItemRepository, auditLogRepository, userRepository, credentialRepository, rateLimiterService);
-        lenient().when(vaultItemRepository.save(any(VaultItem.class)))
-                .thenAnswer(invocation -> {
-                    VaultItem item = invocation.getArgument(0);
-                    if (item.getId() == null) {
-                        item.setId("vault-1");
-                    }
-                    if (item.getCreatedAt() == null) {
-                        item.setCreatedAt(Instant.now());
-                    }
-                    if (item.getUpdatedAt() == null) {
-                        item.setUpdatedAt(Instant.now());
-                    }
-                    return item;
-                });
-        lenient().when(auditLogRepository.save(any(AuditLog.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(rateLimiterService.isAllowed(anyString())).thenReturn(true);
-        lenient().when(authSessionService.startSession(any(User.class), any(), any())).thenAnswer(invocation -> {
-            ResponseCookie cookie = ResponseCookie.from("accessToken", "token-value").build();
-            CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "csrf-token-value");
-            return new AuthSessionService.Session("token-value", cookie, csrfToken);
-        });
-    }
+        @BeforeEach
+        void setUpMocks() {
+                reset(vaultItemRepository, auditLogRepository, userRepository, credentialRepository,
+                                rateLimiterService);
+                lenient().when(vaultItemRepository.save(any(VaultItem.class)))
+                                .thenAnswer(invocation -> {
+                                        VaultItem item = invocation.getArgument(0);
+                                        if (item.getId() == null) {
+                                                item.setId("vault-1");
+                                        }
+                                        if (item.getCreatedAt() == null) {
+                                                item.setCreatedAt(Instant.now());
+                                        }
+                                        if (item.getUpdatedAt() == null) {
+                                                item.setUpdatedAt(Instant.now());
+                                        }
+                                        return item;
+                                });
+                lenient().when(auditLogRepository.save(any(AuditLog.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+                lenient().when(rateLimiterService.isAllowed(anyString())).thenReturn(true);
+                lenient().when(authSessionService.startSession(any(User.class), any(), any()))
+                                .thenAnswer(invocation -> {
+                                        ResponseCookie cookie = ResponseCookie.from("accessToken", "token-value")
+                                                        .build();
+                                        CsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf",
+                                                        "csrf-token-value");
+                                        return new AuthSessionService.Session("token-value", cookie, csrfToken);
+                                });
+        }
 
-    @Test
-    void csrfTokenIsProvidedInCookieAndHeader() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(header().exists("X-XSRF-TOKEN"))
-                .andReturn();
+        @Test
+        void csrfTokenIsProvidedInCookieAndHeader() throws Exception {
+                MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
+                                .andExpect(status().isOk())
+                                .andExpect(header().exists("X-XSRF-TOKEN"))
+                                .andReturn();
 
-        String csrfToken = result.getResponse().getHeader("X-XSRF-TOKEN");
-        assertThat(csrfToken).isNotBlank();
+                String csrfToken = result.getResponse().getHeader("X-XSRF-TOKEN");
+                assertThat(csrfToken).isNotBlank();
 
-        List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
-        assertThat(setCookieHeaders).isNotEmpty();
-        String xsrfCookieHeader = setCookieHeaders.stream()
-                .filter(headerValue -> headerValue.startsWith("XSRF-TOKEN="))
-                .findFirst()
-                .orElseThrow();
+                List<String> setCookieHeaders = result.getResponse().getHeaders("Set-Cookie");
+                assertThat(setCookieHeaders).isNotEmpty();
+                String xsrfCookieHeader = setCookieHeaders.stream()
+                                .filter(headerValue -> headerValue.startsWith("XSRF-TOKEN="))
+                                .findFirst()
+                                .orElseThrow();
 
-        assertThat(xsrfCookieHeader).doesNotContain("HttpOnly");
-        assertThat(xsrfCookieHeader).contains("SameSite=Strict");
-    }
+                assertThat(xsrfCookieHeader).doesNotContain("HttpOnly");
+                assertThat(xsrfCookieHeader).contains("SameSite=Strict");
+        }
 
-    @Test
-    void csrfCookieFallsBackToLaxWhenSecureNotAvailable() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/auth/csrf")
-                        .secure(true)
-                        .header("Origin", "http://localhost:5173"))
-                .andExpect(status().isOk())
-                .andReturn();
+        @Test
+        void csrfCookieFallsBackToLaxWhenSecureNotAvailable() throws Exception {
+                MvcResult result = mockMvc.perform(get("/api/auth/csrf")
+                                .secure(true)
+                                .header("Origin", "http://localhost:5173"))
+                                .andExpect(status().isOk())
+                                .andReturn();
 
-        String xsrfCookieHeader = result.getResponse().getHeaders("Set-Cookie").stream()
-                .filter(headerValue -> headerValue.startsWith("XSRF-TOKEN="))
-                .findFirst()
-                .orElseThrow();
+                String xsrfCookieHeader = result.getResponse().getHeaders("Set-Cookie").stream()
+                                .filter(headerValue -> headerValue.startsWith("XSRF-TOKEN="))
+                                .findFirst()
+                                .orElseThrow();
 
-        assertThat(xsrfCookieHeader).contains("SameSite=Lax");
-        assertThat(xsrfCookieHeader).doesNotContain("Secure");
-    }
+                assertThat(xsrfCookieHeader).contains("SameSite=Lax");
+                assertThat(xsrfCookieHeader).doesNotContain("Secure");
+        }
 
-    @Test
-    void loginRequiresCsrfToken() throws Exception {
-        when(userRepository.findByEmail("user@example.com"))
-                .thenReturn(Optional.of(User.builder()
-                        .id("user-1")
-                        .email("user@example.com")
-                        .username("user")
-                        .verifier("client-verifier")
-                        .saltClient("client-salt")
-                        .dekEncrypted("dek")
-                        .dekNonce("nonce")
-                        .emailVerified(true)
-                        .build()));
+        @Test
+        void loginRequiresCsrfToken() throws Exception {
+                when(userRepository.findByEmail("user@example.com"))
+                                .thenReturn(Optional.of(User.builder()
+                                                .id("user-1")
+                                                .email("user@example.com")
+                                                .username("user")
+                                                .verifier("client-verifier")
+                                                .saltClient("client-salt")
+                                                .dekEncrypted("dek")
+                                                .dekNonce("nonce")
+                                                .emailVerified(true)
+                                                .build()));
 
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "email": "user@example.com",
-                                  "verifier": "client-verifier"
-                                }
-                                """))
-                .andExpect(status().isForbidden());
+                mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "email": "user@example.com",
+                                                  "verifier": "client-verifier"
+                                                }
+                                                """))
+                                .andExpect(status().isForbidden());
 
-        String csrfToken = obtainCsrfToken();
-        Cookie csrfCookie = buildCsrfCookie(csrfToken);
+                String csrfToken = obtainCsrfToken();
+                Cookie csrfCookie = buildCsrfCookie(csrfToken);
 
-        mockMvc.perform(post("/api/auth/login")
-                        .cookie(csrfCookie)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-XSRF-TOKEN", csrfToken)
-                        .content("""
-                                {
-                                  "email": "user@example.com",
-                                  "verifier": "client-verifier"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(header().exists("X-XSRF-TOKEN"));
-    }
+                mockMvc.perform(post("/api/auth/login")
+                                .cookie(csrfCookie)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .header("X-XSRF-TOKEN", csrfToken)
+                                .content("""
+                                                {
+                                                  "email": "user@example.com",
+                                                  "verifier": "client-verifier"
+                                                }
+                                                """))
+                                .andExpect(status().isOk())
+                                .andExpect(header().exists("X-XSRF-TOKEN"));
+        }
 
-    @Test
-    void requestWithoutCsrfHeaderIsRejected() throws Exception {
-        String token = obtainCsrfToken();
-        Cookie csrfCookie = buildCsrfCookie(token);
+        @Test
+        void requestWithoutCsrfHeaderIsRejected() throws Exception {
+                String token = obtainCsrfToken();
+                Cookie csrfCookie = buildCsrfCookie(token);
 
-        mockMvc.perform(post("/api/vault")
-                        .cookie(csrfCookie)
-                        .with(authentication(authenticatedUser()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(VALID_VAULT_PAYLOAD))
-                .andExpect(status().isForbidden());
-    }
+                mockMvc.perform(post("/api/vault")
+                                .cookie(csrfCookie)
+                                .with(authentication(authenticatedUser()))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(VALID_VAULT_PAYLOAD))
+                                .andExpect(status().isForbidden());
+        }
 
-    @Test
-    void requestWithCsrfHeaderIsAccepted() throws Exception {
-        String token = obtainCsrfToken();
-        Cookie csrfCookie = buildCsrfCookie(token);
+        @Test
+        void requestWithCsrfHeaderIsAccepted() throws Exception {
+                String token = obtainCsrfToken();
+                Cookie csrfCookie = buildCsrfCookie(token);
 
-        mockMvc.perform(post("/api/vault")
-                        .cookie(csrfCookie)
-                        .with(authentication(authenticatedUser()))
-                        .with(user("tester").roles("USER"))
-                        .header("X-XSRF-TOKEN", token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(VALID_VAULT_PAYLOAD))
-                .andExpect(status().isOk());
-    }
+                mockMvc.perform(post("/api/vault")
+                                .cookie(csrfCookie)
+                                .with(authentication(authenticatedUser()))
+                                .with(user("tester").roles("USER"))
+                                .header("X-XSRF-TOKEN", token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(VALID_VAULT_PAYLOAD))
+                                .andExpect(status().isOk());
+        }
 
-    @Test
-    void saltEndpointIsRateLimited() throws Exception {
-        when(userRepository.findByEmail("known@example.com"))
-                .thenReturn(Optional.of(User.builder()
-                        .id("user-1")
-                        .email("known@example.com")
-                        .username("known")
-                        .saltClient("real-salt")
-                        .build()));
+        @Test
+        void saltEndpointIsRateLimited() throws Exception {
+                when(userRepository.findByEmail("known@example.com"))
+                                .thenReturn(Optional.of(User.builder()
+                                                .id("user-1")
+                                                .email("known@example.com")
+                                                .username("known")
+                                                .saltClient("real-salt")
+                                                .build()));
 
-        when(rateLimiterService.isAllowed(anyString())).thenReturn(true, false);
+                when(rateLimiterService.isAllowed(anyString())).thenReturn(true, false);
 
-        mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
-                .andExpect(status().isOk());
+                mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
+                                .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.error").value("TOO_MANY_REQUESTS"));
-    }
+                mockMvc.perform(get("/api/auth/salt").param("identifier", "known@example.com"))
+                                .andExpect(status().isTooManyRequests())
+                                .andExpect(jsonPath("$.error").value("TOO_MANY_REQUESTS"));
+        }
 
-    private String obtainCsrfToken() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andReturn();
-        return result.getResponse().getHeader("X-XSRF-TOKEN");
-    }
+        private String obtainCsrfToken() throws Exception {
+                MvcResult result = mockMvc.perform(get("/api/auth/csrf"))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                return result.getResponse().getHeader("X-XSRF-TOKEN");
+        }
 
-    private Cookie buildCsrfCookie(String token) {
-        Cookie cookie = new Cookie("XSRF-TOKEN", token);
-        cookie.setHttpOnly(false);
-        cookie.setPath("/");
-        return cookie;
-    }
+        private Cookie buildCsrfCookie(String token) {
+                Cookie cookie = new Cookie("XSRF-TOKEN", token);
+                cookie.setHttpOnly(false);
+                cookie.setPath("/");
+                return cookie;
+        }
 
-    private UsernamePasswordAuthenticationToken authenticatedUser() {
-        return new UsernamePasswordAuthenticationToken("user-1", null, List.of());
-    }
+        private UsernamePasswordAuthenticationToken authenticatedUser() {
+                return new UsernamePasswordAuthenticationToken("user-1", null, List.of());
+        }
 }

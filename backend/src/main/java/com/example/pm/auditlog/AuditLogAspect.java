@@ -22,17 +22,20 @@ import java.util.StringJoiner;
 @Aspect
 @Component
 @RequiredArgsConstructor
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class AuditLogAspect {
 
     private final AuditLogRepository auditLogRepo;
 
     @Pointcut("execution(public * com.example.pm.*.*Controller.*(..))")
-    public void controllerMethods() {}
+    public void controllerMethods() {
+    }
 
     @AfterReturning(pointcut = "controllerMethods()", returning = "result")
     public void saveAuditLog(JoinPoint joinPoint, Object result) {
         String userId = resolveUserId();
-        if (userId == null) return;
+        if (userId == null)
+            return;
 
         String action = joinPoint.getSignature().getName().toUpperCase();
         String targetType = joinPoint.getTarget().getClass().getSimpleName();

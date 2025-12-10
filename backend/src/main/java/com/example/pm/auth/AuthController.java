@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/auth")
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class AuthController {
 
     private final UserRepository users;
@@ -51,22 +52,21 @@ public class AuthController {
 
     private static final Pattern AVATAR_DATA_URL_PATTERN = Pattern.compile(
             "^data:(image/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=\\r\\n]+)$",
-            Pattern.CASE_INSENSITIVE
-    );
+            Pattern.CASE_INSENSITIVE);
     private static final int MAX_AVATAR_BYTES = 256 * 1024;
 
     private static final SecureRandom RECOVERY_RANDOM = new SecureRandom();
     private static final char[] RECOVERY_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
 
     public AuthController(UserRepository users,
-                          RateLimiterService rateLimiterService, TotpService totpService,
-                          SecurityAuditService auditService,
-                          CaptchaValidationService captchaValidationService,
-                          PlaceholderSaltService placeholderSaltService,
-                          EmailVerificationService emailVerificationService,
-                          AuthSessionService authSessionService,
-                          CsrfTokenRepository csrfTokenRepository,
-                          PasswordVerifier passwordVerifier) {
+            RateLimiterService rateLimiterService, TotpService totpService,
+            SecurityAuditService auditService,
+            CaptchaValidationService captchaValidationService,
+            PlaceholderSaltService placeholderSaltService,
+            EmailVerificationService emailVerificationService,
+            AuthSessionService authSessionService,
+            CsrfTokenRepository csrfTokenRepository,
+            PasswordVerifier passwordVerifier) {
         this.users = users;
         this.authSessionService = authSessionService;
         this.rateLimiterService = rateLimiterService;
@@ -81,7 +81,7 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest,
-                                      HttpServletRequest request) {
+            HttpServletRequest request) {
         if (!captchaValidationService.validateCaptcha(registerRequest.captchaToken(), resolveClientIp(request))) {
             return ResponseEntity.badRequest()
                     .body(new ErrorResponse(400, "INVALID_CAPTCHA", "CAPTCHA verification failed. Please try again."));
@@ -120,8 +120,7 @@ public class AuthController {
         if (trimmed.isEmpty()) {
             return ResponseEntity.ok(new SaltResponse(
                     placeholderEmailFor(trimmed),
-                    placeholderSaltService.fakeSaltFor(trimmed)
-            ));
+                    placeholderSaltService.fakeSaltFor(trimmed)));
         }
 
         String normalizedEmail = trimmed.contains("@") ? trimmed.toLowerCase(Locale.ROOT) : null;
@@ -134,14 +133,13 @@ public class AuthController {
                 .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new SaltResponse(u.getEmail(), u.getSaltClient())))
                 .orElseGet(() -> ResponseEntity.ok(new SaltResponse(
                         normalizedEmail != null ? normalizedEmail : placeholderEmailFor(trimmed),
-                        placeholderSaltService.fakeSaltFor(normalizedEmail != null ? normalizedEmail : trimmed)
-                )));
+                        placeholderSaltService.fakeSaltFor(normalizedEmail != null ? normalizedEmail : trimmed))));
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest,
-                                   HttpServletRequest request,
-                                   HttpServletResponse response) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
 
         if (!captchaValidationService.validateCaptcha(loginRequest.captchaToken(), resolveClientIp(request))) {
             auditService.recordLoginFailure(loginRequest.email());
@@ -149,7 +147,8 @@ public class AuthController {
                     .body(new ErrorResponse(400, "INVALID_CAPTCHA", "CAPTCHA verification failed. Please try again."));
         }
 
-        String normalizedEmail = loginRequest.email() == null ? null : loginRequest.email().trim().toLowerCase(Locale.ROOT);
+        String normalizedEmail = loginRequest.email() == null ? null
+                : loginRequest.email().trim().toLowerCase(Locale.ROOT);
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -291,7 +290,7 @@ public class AuthController {
 
     @PostMapping("/master/rotate")
     public ResponseEntity<?> rotateMasterPassword(Authentication authentication,
-                                                  @Valid @RequestBody RotateMasterPasswordRequest request) {
+            @Valid @RequestBody RotateMasterPasswordRequest request) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -321,8 +320,7 @@ public class AuthController {
 
                     return ResponseEntity.ok(new RotateMasterPasswordResponse(
                             user.getMasterPasswordLastRotated(),
-                            invalidated
-                    ));
+                            invalidated));
                 })
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
@@ -386,8 +384,7 @@ public class AuthController {
                     return ResponseEntity.ok(new MfaEnrollmentResponse(
                             secret,
                             totpService.buildOtpAuthUrl(user.getEmail(), secret),
-                            recoveryCodes
-                    ));
+                            recoveryCodes));
                 })
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body(new ErrorResponse(404, "NOT FOUND", "User not found")));
@@ -395,7 +392,7 @@ public class AuthController {
 
     @PostMapping("/mfa/activate")
     public ResponseEntity<?> activateMfa(Authentication authentication,
-                                         @Valid @RequestBody MfaActivationRequest request) {
+            @Valid @RequestBody MfaActivationRequest request) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -424,7 +421,7 @@ public class AuthController {
 
     @PostMapping("/mfa/disable")
     public ResponseEntity<?> disableMfa(Authentication authentication,
-                                        @RequestBody MfaDisableRequest request) {
+            @RequestBody MfaDisableRequest request) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -603,7 +600,7 @@ public class AuthController {
 
     @PutMapping("/profile/avatar")
     public ResponseEntity<?> updateAvatar(Authentication authentication,
-                                          @RequestBody AvatarUploadRequest request) {
+            @RequestBody AvatarUploadRequest request) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));

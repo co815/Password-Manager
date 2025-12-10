@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class AuditLogRepositoryCustomImpl implements AuditLogRepositoryCustom {
 
     private final MongoTemplate mongoTemplate;

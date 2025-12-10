@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Service
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class CaptchaValidationService {
 
     private static final Logger log = LoggerFactory.getLogger(CaptchaValidationService.class);
@@ -78,7 +79,7 @@ public class CaptchaValidationService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record CaptchaResponse(@JsonProperty("success") boolean success,
-                           @JsonProperty("error-codes") List<String> errorCodes) {
+            @JsonProperty("error-codes") List<String> errorCodes) {
 
         CaptchaResponse {
             errorCodes = errorCodes == null ? List.of() : List.copyOf(errorCodes);

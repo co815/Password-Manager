@@ -42,6 +42,7 @@ import java.util.Optional;
 @RestController
 @Profile("!test")
 @RequestMapping("/api/auth/webauthn")
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class WebAuthnController {
 
     private final WebAuthnService webAuthnService;
@@ -53,12 +54,12 @@ public class WebAuthnController {
     private final ObjectMapper webauthnObjectMapper;
 
     public WebAuthnController(WebAuthnService webAuthnService,
-                              UserRepository userRepository,
-                              SecurityAuditService auditService,
-                              AuthSessionService authSessionService,
-                              RateLimiterService rateLimiterService,
-                              CaptchaValidationService captchaValidationService,
-                              @Qualifier("webauthnObjectMapper") ObjectMapper webauthnObjectMapper) {
+            UserRepository userRepository,
+            SecurityAuditService auditService,
+            AuthSessionService authSessionService,
+            RateLimiterService rateLimiterService,
+            CaptchaValidationService captchaValidationService,
+            @Qualifier("webauthnObjectMapper") ObjectMapper webauthnObjectMapper) {
         this.webAuthnService = webAuthnService;
         this.userRepository = userRepository;
         this.auditService = auditService;
@@ -89,7 +90,7 @@ public class WebAuthnController {
 
     @PostMapping("/register/finish")
     public ResponseEntity<?> finishRegistration(Authentication authentication,
-                                                @Valid @RequestBody RegistrationFinishRequest request) {
+            @Valid @RequestBody RegistrationFinishRequest request) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -106,8 +107,9 @@ public class WebAuthnController {
                     .body(new ErrorResponse(400, "BAD_REQUEST", "Credential payload required"));
         }
         try {
-            PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> credential =
-                    webauthnObjectMapper.convertValue(request.credential(), new TypeReference<>() {});
+            PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> credential = webauthnObjectMapper
+                    .convertValue(request.credential(), new TypeReference<>() {
+                    });
             var saved = webAuthnService.finishRegistration(request.requestId(), credential);
             if (!saved.getUserId().equals(user.getId())) {
                 return ResponseEntity.status(403)
@@ -123,7 +125,7 @@ public class WebAuthnController {
 
     @PostMapping("/login/options")
     public ResponseEntity<?> startLogin(@Valid @RequestBody LoginOptionsRequest request,
-                                        HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest) {
         String normalizedEmail = request.email() == null ? null : request.email().trim().toLowerCase(Locale.ROOT);
         if (!captchaValidationService.validateCaptcha(request.captchaToken(), resolveClientIp(httpRequest))) {
             auditService.recordPasskeyAuthenticationFailure(normalizedEmail);
@@ -153,7 +155,8 @@ public class WebAuthnController {
                                         "Please verify your email address before logging in."));
                     }
                     try {
-                        WebAuthnService.AssertionStart start = webAuthnService.startAssertion(user.getId(), user.getEmail());
+                        WebAuthnService.AssertionStart start = webAuthnService.startAssertion(user.getId(),
+                                user.getEmail());
                         JsonNode publicKey = webauthnObjectMapper.valueToTree(start.options());
                         return ResponseEntity.ok(new LoginOptionsResponse(start.requestId(), publicKey));
                     } catch (IllegalStateException ex) {
@@ -171,15 +174,16 @@ public class WebAuthnController {
 
     @PostMapping("/login/finish")
     public ResponseEntity<?> finishLogin(@Valid @RequestBody LoginFinishRequest request,
-                                         HttpServletRequest httpRequest,
-                                         HttpServletResponse httpResponse) {
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         if (request.credential() == null) {
             return ResponseEntity.badRequest()
                     .body(new ErrorResponse(400, "BAD_REQUEST", "Credential payload required"));
         }
         try {
-            PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> credential =
-                    webauthnObjectMapper.convertValue(request.credential(), new TypeReference<>() {});
+            PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> credential = webauthnObjectMapper
+                    .convertValue(request.credential(), new TypeReference<>() {
+                    });
             WebAuthnService.AssertionFinish finish = webAuthnService.finishAssertion(request.requestId(), credential);
             Optional<User> userOpt = userRepository.findById(finish.userId());
             String username = finish.result().getUsername();

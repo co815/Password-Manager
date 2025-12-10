@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 
 @Profile("!dev & !test")
 @Component
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class SmtpEmailSender implements EmailSender {
 
     private static final Logger log = LoggerFactory.getLogger(SmtpEmailSender.class);

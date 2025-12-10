@@ -17,7 +17,8 @@ import java.util.Optional;
 import java.util.function.Function;
 
 @RestController
-@RequestMapping({"/api/credentials", "/api/credential"})
+@RequestMapping({ "/api/credentials", "/api/credential" })
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class CredentialController {
 
     private final CredentialRepository credentials;
@@ -49,11 +50,10 @@ public class CredentialController {
     @PostMapping
     public ResponseEntity<?> addCredential(
             Authentication authentication,
-            @RequestBody @Valid CredentialDtos.AddCredentialRequest addRequest
-    ) {
+            @RequestBody @Valid CredentialDtos.AddCredentialRequest addRequest) {
         return requireUser(authentication, userId -> {
-            Optional<Credential> existingForService =
-                    credentials.findByUserIdAndServiceIgnoreCase(userId, addRequest.service());
+            Optional<Credential> existingForService = credentials.findByUserIdAndServiceIgnoreCase(userId,
+                    addRequest.service());
 
             if (existingForService.isPresent()) {
                 return ResponseEntity.status(409)
@@ -73,8 +73,7 @@ public class CredentialController {
     public ResponseEntity<?> updateCredential(
             Authentication authentication,
             @PathVariable String id,
-            @RequestBody @Valid CredentialDtos.UpdateCredentialRequest updateRequest
-    ) {
+            @RequestBody @Valid CredentialDtos.UpdateCredentialRequest updateRequest) {
         return requireUser(authentication, userId -> credentials.findById(id)
                 .filter(credential -> userId.equals(credential.getUserId()))
                 .<ResponseEntity<?>>map(existing -> {
@@ -146,8 +145,7 @@ public class CredentialController {
     public ResponseEntity<?> updateFavorite(
             Authentication authentication,
             @PathVariable String id,
-            @RequestBody CredentialDtos.UpdateFavoriteRequest updateFavoriteRequest
-    ) {
+            @RequestBody CredentialDtos.UpdateFavoriteRequest updateFavoriteRequest) {
         if (updateFavoriteRequest == null || updateFavoriteRequest.favorite() == null) {
             return badRequest("Favorite value is required");
         }
@@ -188,7 +186,7 @@ public class CredentialController {
     }
 
     private ResponseEntity<?> requireUser(Authentication authentication,
-                                          Function<String, ResponseEntity<?>> handler) {
+            Function<String, ResponseEntity<?>> handler) {
         var userIdOpt = resolveUserId(authentication);
         if (userIdOpt.isEmpty()) {
             return unauthorizedResponse();

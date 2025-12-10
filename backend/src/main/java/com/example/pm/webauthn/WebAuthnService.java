@@ -29,10 +29,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 @Profile("!test")
+@SuppressWarnings({ "deprecation", "null" }) // WebAuthn library deprecates backup state methods; suppress null-safety
+                                             // false positives
 public class WebAuthnService {
 
     private final RelyingParty relyingParty;
@@ -40,8 +41,8 @@ public class WebAuthnService {
     private final WebAuthnChallengeStore challengeStore;
 
     public WebAuthnService(RelyingParty relyingParty,
-                           WebAuthnCredentialRepository credentialRepository,
-                           WebAuthnChallengeStore challengeStore) {
+            WebAuthnCredentialRepository credentialRepository,
+            WebAuthnChallengeStore challengeStore) {
         this.relyingParty = relyingParty;
         this.credentialRepository = credentialRepository;
         this.challengeStore = challengeStore;
@@ -57,15 +58,14 @@ public class WebAuthnService {
         PublicKeyCredentialCreationOptions options = relyingParty.startRegistration(
                 StartRegistrationOptions.builder()
                         .user(identity)
-                        .build()
-        );
+                        .build());
 
         String requestId = challengeStore.storeRegistration(userId, options);
         return new RegistrationStart(requestId, options);
     }
 
     public WebAuthnCredential finishRegistration(String requestId,
-                                                 PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> response) {
+            PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> response) {
         RegistrationChallenge challenge = challengeStore.consumeRegistration(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Registration request expired or not found"));
 
@@ -111,7 +111,7 @@ public class WebAuthnService {
     }
 
     public AssertionFinish finishAssertion(String requestId,
-                                           PublicKeyCredential<com.yubico.webauthn.data.AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> response) {
+            PublicKeyCredential<com.yubico.webauthn.data.AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> response) {
         AssertionChallenge challenge = challengeStore.consumeAssertion(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Authentication request expired or not found"));
 
@@ -158,9 +158,12 @@ public class WebAuthnService {
         return new String(userHandle.getBytes(), StandardCharsets.UTF_8);
     }
 
-    public record RegistrationStart(String requestId, PublicKeyCredentialCreationOptions options) {}
+    public record RegistrationStart(String requestId, PublicKeyCredentialCreationOptions options) {
+    }
 
-    public record AssertionStart(String requestId, PublicKeyCredentialRequestOptions options) {}
+    public record AssertionStart(String requestId, PublicKeyCredentialRequestOptions options) {
+    }
 
-    public record AssertionFinish(String userId, AssertionResult result) {}
+    public record AssertionFinish(String userId, AssertionResult result) {
+    }
 }

@@ -15,6 +15,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+@SuppressWarnings("null")
 class CaptchaValidationServiceTest {
 
     @Test
@@ -101,8 +102,9 @@ class CaptchaValidationServiceTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(content().formData(expected))
-                .andRespond(withSuccess("{\"success\":false,\"error-codes\":[\"invalid-input-response\",\"bad-request\"]}",
-                        MediaType.APPLICATION_JSON));
+                .andRespond(
+                        withSuccess("{\"success\":false,\"error-codes\":[\"invalid-input-response\",\"bad-request\"]}",
+                                MediaType.APPLICATION_JSON));
 
         assertThat(service.validateCaptcha("bad-token", null)).isFalse();
         server.verify();

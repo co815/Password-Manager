@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 
 @Service
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class AuthSessionService {
 
     private final JwtService jwtService;
@@ -21,9 +22,9 @@ public class AuthSessionService {
     private final boolean sslEnabled;
 
     public AuthSessionService(JwtService jwtService,
-                              AuthCookieProps authCookieProps,
-                              CsrfTokenRepository csrfTokenRepository,
-                              @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
+            AuthCookieProps authCookieProps,
+            CsrfTokenRepository csrfTokenRepository,
+            @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
         this.jwtService = jwtService;
         this.authCookieProps = authCookieProps;
         this.csrfTokenRepository = csrfTokenRepository;

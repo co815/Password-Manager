@@ -9,6 +9,7 @@ import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class SecurityAuditService {
 
     private final AuditLogRepository auditLogRepository;

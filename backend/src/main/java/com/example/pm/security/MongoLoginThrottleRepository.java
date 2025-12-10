@@ -8,6 +8,7 @@ import java.util.Optional;
 
 @Repository
 @ConditionalOnBean(MongoTemplate.class)
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 class MongoLoginThrottleRepository implements LoginThrottleRepository {
 
     private final MongoTemplate mongoTemplate;

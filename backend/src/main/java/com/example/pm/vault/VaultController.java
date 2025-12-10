@@ -17,6 +17,7 @@ import java.util.function.Function;
 
 @RestController
 @RequestMapping("/api/vault")
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class VaultController {
 
     private static final int MAX_COLLECTION_COUNT = 32;
@@ -63,8 +64,8 @@ public class VaultController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> update(Authentication authentication,
-                                    @PathVariable String id,
-                                    @RequestBody VaultItemRequest payload) {
+            @PathVariable String id,
+            @RequestBody VaultItemRequest payload) {
         return requireUser(authentication, userId -> {
             if (payload.data() == null || payload.data().isEmpty()) {
                 return badRequest("Missing vault data");
@@ -90,8 +91,8 @@ public class VaultController {
 
     @PutMapping("/{id}/metadata")
     public ResponseEntity<?> updateMetadata(Authentication authentication,
-                                            @PathVariable String id,
-                                            @RequestBody VaultMetadataUpdateRequest payload) {
+            @PathVariable String id,
+            @RequestBody VaultMetadataUpdateRequest payload) {
         if (payload == null) {
             return badRequest("Missing request body");
         }
@@ -161,7 +162,7 @@ public class VaultController {
     }
 
     private ResponseEntity<?> requireUser(Authentication authentication,
-                                          Function<String, ResponseEntity<?>> handler) {
+            Function<String, ResponseEntity<?>> handler) {
         var userIdOpt = resolveUserId(authentication);
         if (userIdOpt.isEmpty()) {
             return unauthorizedResponse();

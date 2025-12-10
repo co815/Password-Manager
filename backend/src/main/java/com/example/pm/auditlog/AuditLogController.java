@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/audit-logs")
+@SuppressWarnings("null") // Suppress Spring null-safety false positives
 public class AuditLogController {
 
     private final AuditLogRepository auditLogs;
@@ -38,8 +39,8 @@ public class AuditLogController {
     private final AuditLogProps auditLogProps;
 
     public AuditLogController(AuditLogRepository auditLogs,
-                              UserRepository users,
-                              AuditLogProps auditLogProps) {
+            UserRepository users,
+            AuditLogProps auditLogProps) {
         this.auditLogs = auditLogs;
         this.users = users;
         this.auditLogProps = auditLogProps;
@@ -47,15 +48,15 @@ public class AuditLogController {
 
     @GetMapping
     public ResponseEntity<?> listAuditLogs(Authentication authentication,
-                                           @RequestParam(name = "page", defaultValue = "0") int page,
-                                           @RequestParam(name = "pageSize", defaultValue = "50") int pageSize,
-                                           @RequestParam(name = "search", required = false) String search,
-                                           @RequestParam(name = "action", required = false) List<String> actions,
-                                           @RequestParam(name = "targetType", required = false) List<String> targetTypes,
-                                           @RequestParam(name = "targetId", required = false) String targetId,
-                                           @RequestParam(name = "actor", required = false) String actorIdentifier,
-                                           @RequestParam(name = "from", required = false) String from,
-                                           @RequestParam(name = "to", required = false) String to) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "pageSize", defaultValue = "50") int pageSize,
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "action", required = false) List<String> actions,
+            @RequestParam(name = "targetType", required = false) List<String> targetTypes,
+            @RequestParam(name = "targetId", required = false) String targetId,
+            @RequestParam(name = "actor", required = false) String actorIdentifier,
+            @RequestParam(name = "from", required = false) String from,
+            @RequestParam(name = "to", required = false) String to) {
         String userId = resolveUserId(authentication);
         if (userId == null) {
             return ResponseEntity.status(401)
@@ -88,8 +89,7 @@ public class AuditLogController {
                     0,
                     0,
                     false,
-                    false
-            ));
+                    false));
         }
 
         AuditLogQuery query = new AuditLogQuery(
@@ -99,8 +99,7 @@ public class AuditLogController {
                 resolvedActorId,
                 normalize(search),
                 fromInstant,
-                toInstant
-        );
+                toInstant);
 
         PageRequest pageRequest = PageRequest.of(safePage, safePageSize, Sort.by(Sort.Direction.DESC, "createdDate"));
         Page<AuditLog> pageResult = auditLogs.searchAuditLogs(query, pageRequest);
@@ -113,8 +112,7 @@ public class AuditLogController {
                     pageResult.getTotalElements(),
                     pageResult.getTotalPages(),
                     pageResult.hasNext(),
-                    pageResult.hasPrevious()
-            ));
+                    pageResult.hasPrevious()));
         }
 
         Set<String> actorIds = logs.stream()
@@ -127,8 +125,7 @@ public class AuditLogController {
                 .collect(Collectors.toMap(
                         User::getId,
                         Function.identity(),
-                        (existing, duplicate) -> existing
-                ));
+                        (existing, duplicate) -> existing));
 
         List<AuditLogDtos.AuditLogEntry> payload = logs.stream()
                 .map(log -> {
@@ -145,21 +142,20 @@ public class AuditLogController {
                 pageResult.getTotalElements(),
                 pageResult.getTotalPages(),
                 pageResult.hasNext(),
-                pageResult.hasPrevious()
-        ));
+                pageResult.hasPrevious()));
     }
 
     @GetMapping("/export")
     public ResponseEntity<?> exportAuditLogs(Authentication authentication,
-                                             @RequestParam(name = "limit", defaultValue = "1000") int limit,
-                                             @RequestParam(name = "search", required = false) String search,
-                                             @RequestParam(name = "action", required = false) List<String> actions,
-                                             @RequestParam(name = "targetType", required = false) List<String> targetTypes,
-                                             @RequestParam(name = "targetId", required = false) String targetId,
-                                             @RequestParam(name = "actor", required = false) String actorIdentifier,
-                                             @RequestParam(name = "from", required = false) String from,
-                                             @RequestParam(name = "to", required = false) String to,
-                                             @RequestParam(name = "format", defaultValue = "csv") String format) {
+            @RequestParam(name = "limit", defaultValue = "1000") int limit,
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "action", required = false) List<String> actions,
+            @RequestParam(name = "targetType", required = false) List<String> targetTypes,
+            @RequestParam(name = "targetId", required = false) String targetId,
+            @RequestParam(name = "actor", required = false) String actorIdentifier,
+            @RequestParam(name = "from", required = false) String from,
+            @RequestParam(name = "to", required = false) String to,
+            @RequestParam(name = "format", defaultValue = "csv") String format) {
         ResponseEntity<?> authResult = listAuditLogs(
                 authentication,
                 0,
@@ -170,10 +166,10 @@ public class AuditLogController {
                 targetId,
                 actorIdentifier,
                 from,
-                to
-        );
+                to);
 
-        if (!(authResult.getBody() instanceof AuditLogDtos.ListResponse response) || authResult.getStatusCode().value() != 200) {
+        if (!(authResult.getBody() instanceof AuditLogDtos.ListResponse response)
+                || authResult.getStatusCode().value() != 200) {
             return authResult;
         }
 
@@ -293,6 +289,7 @@ public class AuditLogController {
         }
         return escaped;
     }
+
     private String resolveUserId(Authentication authentication) {
         if (authentication == null) {
             return null;

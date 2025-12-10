@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@SuppressWarnings("null")
 class AuthRateLimitingFilterTest {
 
     private static final String CLIENT_IP = "203.0.113.10";
@@ -55,16 +56,16 @@ class AuthRateLimitingFilterTest {
     void loginRateLimitPerMinute() throws Exception {
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .content(loginPayload("user@example.com", null))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .with(client(CLIENT_IP)))
+                    .content(loginPayload("user@example.com", null))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .with(client(CLIENT_IP)))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/auth/login")
-                        .content(loginPayload("user@example.com", null))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content(loginPayload("user@example.com", null))
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -72,16 +73,16 @@ class AuthRateLimitingFilterTest {
     void registerRateLimitPerMinute() throws Exception {
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/register")
-                            .content(loginPayload("user@example.com", null))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .with(client(CLIENT_IP)))
+                    .content(loginPayload("user@example.com", null))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .with(client(CLIENT_IP)))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/auth/register")
-                        .content("{}")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content("{}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -90,9 +91,9 @@ class AuthRateLimitingFilterTest {
         for (int block = 0; block < 5; block++) {
             for (int i = 0; i < 10; i++) {
                 mockMvc.perform(post("/api/auth/login")
-                                .content(loginPayload("user@example.com", null))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .with(client(CLIENT_IP)))
+                        .content(loginPayload("user@example.com", null))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .with(client(CLIENT_IP)))
                         .andExpect(status().isOk());
             }
             if (block < 4) {
@@ -103,9 +104,9 @@ class AuthRateLimitingFilterTest {
         clock.advanceSeconds(61);
 
         mockMvc.perform(post("/api/auth/login")
-                        .content(loginPayload("user@example.com", null))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content(loginPayload("user@example.com", null))
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -114,9 +115,9 @@ class AuthRateLimitingFilterTest {
         for (int block = 0; block < 5; block++) {
             for (int i = 0; i < 10; i++) {
                 mockMvc.perform(post("/api/auth/register")
-                                .content(registerPayload("user@example.com"))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .with(client(CLIENT_IP)))
+                        .content(registerPayload("user@example.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .with(client(CLIENT_IP)))
                         .andExpect(status().isOk());
             }
             if (block < 4) {
@@ -127,9 +128,9 @@ class AuthRateLimitingFilterTest {
         clock.advanceSeconds(61);
 
         mockMvc.perform(post("/api/auth/register")
-                        .content(registerPayload("user@example.com"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content(registerPayload("user@example.com"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -137,24 +138,24 @@ class AuthRateLimitingFilterTest {
     void captchaBypassesLimit() throws Exception {
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .content(loginPayload("user@example.com", null))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .with(client(CLIENT_IP)))
+                    .content(loginPayload("user@example.com", null))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .with(client(CLIENT_IP)))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/auth/login")
-                        .content(loginPayload("user@example.com", null))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content(loginPayload("user@example.com", null))
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isTooManyRequests());
 
         captchaValidationService.allow("valid-token");
 
         mockMvc.perform(post("/api/auth/login")
-                        .content(loginPayload("user@example.com", "valid-token"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content(loginPayload("user@example.com", "valid-token"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isOk());
     }
 
@@ -162,9 +163,9 @@ class AuthRateLimitingFilterTest {
     void nonAuthEndpointsAreNotRateLimited() throws Exception {
         for (int i = 0; i < 12; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .content("{}")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .with(client(CLIENT_IP)))
+                    .content("{}")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .with(client(CLIENT_IP)))
                     .andExpect(i < 10 ? status().isOk() : status().isTooManyRequests());
         }
 
@@ -172,9 +173,9 @@ class AuthRateLimitingFilterTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/profile/update")
-                        .content("{}")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content("{}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isOk());
     }
 
@@ -185,16 +186,16 @@ class AuthRateLimitingFilterTest {
 
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .content(loginPayload("user@example.com", null))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .with(client(proxyIp, spoofedIp)))
+                    .content(loginPayload("user@example.com", null))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .with(client(proxyIp, spoofedIp)))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/auth/login")
-                        .content(loginPayload("user@example.com", null))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(proxyIp, "198.51.100.11")))
+                .content(loginPayload("user@example.com", null))
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(proxyIp, "198.51.100.11")))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -206,16 +207,16 @@ class AuthRateLimitingFilterTest {
 
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .content(loginPayload("user@example.com", null))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .with(client(proxyIp, clientIp)))
+                    .content(loginPayload("user@example.com", null))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .with(client(proxyIp, clientIp)))
                     .andExpect(status().isOk());
         }
 
         mockMvc.perform(post("/api/auth/login")
-                        .content(loginPayload("user@example.com", null))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(proxyIp, clientIp)))
+                .content(loginPayload("user@example.com", null))
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(proxyIp, clientIp)))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -231,9 +232,9 @@ class AuthRateLimitingFilterTest {
         sb.append("\"}");
 
         mockMvc.perform(post("/api/auth/login")
-                        .content(sb.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(client(CLIENT_IP)))
+                .content(sb.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(client(CLIENT_IP)))
                 .andExpect(status().isPayloadTooLarge());
     }
 

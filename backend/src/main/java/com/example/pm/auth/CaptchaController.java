@@ -25,8 +25,11 @@ public class CaptchaController {
             CaptchaProps.Provider provider = captchaProps.getProvider();
             if (provider == CaptchaProps.Provider.RECAPTCHA) {
                 String configuredSiteKey = captchaProps.getSiteKey();
-                enabled = configuredSiteKey != null && !configuredSiteKey.isBlank();
-                siteKey = enabled ? configuredSiteKey.trim() : null;
+                if (configuredSiteKey != null && !configuredSiteKey.isBlank()) {
+                    siteKey = configuredSiteKey.trim();
+                } else {
+                    enabled = false;
+                }
             } else {
                 siteKey = sanitizePrompt(captchaProps.getSiteKey());
             }
@@ -35,8 +38,7 @@ public class CaptchaController {
         return new CaptchaConfigResponse(
                 enabled,
                 captchaProps.getProvider(),
-                siteKey
-        );
+                siteKey);
     }
 
     private String sanitizePrompt(String raw) {

@@ -17,6 +17,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("null") // Suppress Spring null-safety false positives in tests
 class AuditLogAspectTest {
 
     private AuditLogRepository auditLogRepository;
@@ -47,7 +48,7 @@ class AuditLogAspectTest {
         when(signature.getDeclaringTypeName()).thenReturn(DummyController.class.getName());
         when(joinPoint.getSignature()).thenReturn(signature);
         when(joinPoint.getTarget()).thenReturn(new DummyController());
-        when(joinPoint.getArgs()).thenReturn(new Object[]{
+        when(joinPoint.getArgs()).thenReturn(new Object[] {
                 "super-secret",
                 new TestPayload("hidden-value")
         });
@@ -66,7 +67,9 @@ class AuditLogAspectTest {
         assertThat(auditLog.getDetails()).doesNotContain("response-secret");
     }
 
-    private static class DummyController { }
+    private static class DummyController {
+    }
 
-    private record TestPayload(String value) { }
+    private record TestPayload(String value) {
+    }
 }

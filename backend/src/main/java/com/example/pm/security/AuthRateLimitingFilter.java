@@ -10,9 +10,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -35,9 +35,9 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
     private final CaptchaValidationService captchaValidationService;
 
     public AuthRateLimitingFilter(ObjectMapper objectMapper,
-                                  RateLimitProps rateLimitProps,
-                                  LoginThrottleService loginThrottleService,
-                                  CaptchaValidationService captchaValidationService) {
+            RateLimitProps rateLimitProps,
+            LoginThrottleService loginThrottleService,
+            CaptchaValidationService captchaValidationService) {
         this.objectMapper = objectMapper;
         this.rateLimitProps = rateLimitProps;
         this.loginThrottleService = loginThrottleService;
@@ -45,7 +45,7 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
@@ -55,7 +55,8 @@ public class AuthRateLimitingFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain)
             throws ServletException, IOException {
         HttpServletRequest workingRequest = request;
         JsonNode body = null;

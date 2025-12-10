@@ -22,13 +22,15 @@ import java.util.stream.Collectors;
 
 @Component
 @Profile("!test")
+@SuppressWarnings({ "deprecation", "null" }) // WebAuthn library deprecates backup state methods; suppress null-safety
+                                             // false positives
 public class MongoWebAuthnCredentialRepository implements CredentialRepository {
 
     private final ObjectProvider<WebAuthnCredentialRepository> credentialsProvider;
     private final ObjectProvider<UserRepository> userRepositoryProvider;
 
     public MongoWebAuthnCredentialRepository(ObjectProvider<WebAuthnCredentialRepository> credentials,
-                                             ObjectProvider<UserRepository> userRepository) {
+            ObjectProvider<UserRepository> userRepository) {
         this.credentialsProvider = credentials;
         this.userRepositoryProvider = userRepository;
     }
@@ -138,7 +140,8 @@ public class MongoWebAuthnCredentialRepository implements CredentialRepository {
     }
 
     private PublicKeyCredentialDescriptor toDescriptor(WebAuthnCredential credential) {
-        PublicKeyCredentialDescriptor.PublicKeyCredentialDescriptorBuilder builder = PublicKeyCredentialDescriptor.builder()
+        PublicKeyCredentialDescriptor.PublicKeyCredentialDescriptorBuilder builder = PublicKeyCredentialDescriptor
+                .builder()
                 .id(ByteArray.fromBase64(credential.getCredentialId()))
                 .type(PublicKeyCredentialType.PUBLIC_KEY);
         if (credential.getTransports() != null && !credential.getTransports().isEmpty()) {

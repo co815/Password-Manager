@@ -25,26 +25,37 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @WebMvcTest(controllers = AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({AuthCookieProps.class, TestSupportConfig.class})
+@Import({ AuthCookieProps.class, TestSupportConfig.class })
+@SuppressWarnings("null")
 class AuthControllerValidationTest {
 
-    @Autowired MockMvc mockMvc;
+    @Autowired
+    MockMvc mockMvc;
 
-    @MockBean UserRepository userRepository;
-    @MockBean AuthSessionService authSessionService;
-    @MockBean JwtService jwtService;
-    @MockBean TotpService totpService;
-    @MockBean SecurityAuditService auditService;
-    @MockBean org.springframework.security.web.csrf.CsrfTokenRepository csrfTokenRepository;
-    @MockBean PlaceholderSaltService placeholderSaltService;
-    @MockBean EmailVerificationService emailVerificationService;
-    @MockBean PasswordVerifier passwordVerifier;
+    @MockBean
+    UserRepository userRepository;
+    @MockBean
+    AuthSessionService authSessionService;
+    @MockBean
+    JwtService jwtService;
+    @MockBean
+    TotpService totpService;
+    @MockBean
+    SecurityAuditService auditService;
+    @MockBean
+    org.springframework.security.web.csrf.CsrfTokenRepository csrfTokenRepository;
+    @MockBean
+    PlaceholderSaltService placeholderSaltService;
+    @MockBean
+    EmailVerificationService emailVerificationService;
+    @MockBean
+    PasswordVerifier passwordVerifier;
 
     @Test
     void registerMissingFieldsReturnsBadRequestWithValidationDetails() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.type").value("VALIDATION_FAILED"))
