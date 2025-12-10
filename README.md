@@ -148,7 +148,7 @@ Then open your browser to **http://localhost:5173**
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/Password-Manager.git
+git clone https://github.com/co815/Password-Manager.git
 cd Password-Manager
 ```
 

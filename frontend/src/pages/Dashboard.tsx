@@ -1,23 +1,23 @@
-import {useMemo, useState, useEffect, useCallback, useRef} from 'react';
-import {useNavigate} from 'react-router-dom';
-import type {ChangeEvent, FormEvent, MouseEvent} from 'react';
-import {useAuth} from '../auth/auth-context';
-import {useCrypto} from '../lib/crypto/crypto-context';
-import {api, ApiError, type MfaEnrollmentResponse, type MfaStatusResponse, type VaultItem} from '../lib/api';
-import {isAuditAdminEmail} from '../lib/accessControl';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import { useAuth } from '../auth/auth-context';
+import { useCrypto } from '../lib/crypto/crypto-context';
+import { api, ApiError, type MfaEnrollmentResponse, type MfaStatusResponse, type VaultItem } from '../lib/api';
+import { isAuditAdminEmail } from '../lib/accessControl';
 import Alert from '@mui/material/Alert';
-import {deriveKEK, makeVerifier} from '../lib/crypto/argon2';
-import {unwrapDEK} from '../lib/crypto/unwrap';
-import {encryptDekWithKek} from '../lib/crypto/keys';
+import { deriveKEK, makeVerifier } from '../lib/crypto/argon2';
+import { unwrapDEK } from '../lib/crypto/unwrap';
+import { encryptDekWithKek } from '../lib/crypto/keys';
 import {
     deserializeItem,
     deserializeVaultCredentials,
     serializeItem,
     serializeVaultCredentials
 } from '../lib/vault/pack';
-import {extractApiErrorDetails} from '../lib/api-error';
-import {attestationToJSON, decodeCreationOptions, isWebAuthnSupported} from '../lib/webauthn';
-import {rememberDek, restoreDek} from '../lib/crypto/dek-storage';
+import { extractApiErrorDetails } from '../lib/api-error';
+import { attestationToJSON, decodeCreationOptions, isWebAuthnSupported } from '../lib/webauthn';
+import { rememberDek, restoreDek } from '../lib/crypto/dek-storage';
 import * as OTPAuth from 'otpauth';
 
 import {
@@ -53,7 +53,7 @@ import {
     Menu as MenuIcon,
     Logout,
 } from '@mui/icons-material';
-import {passwordTemplates} from '../lib/passwordTemplates';
+import { passwordTemplates } from '../lib/passwordTemplates';
 import {
     MIN_ACCEPTABLE_PASSWORD_SCORE,
     assessPasswordStrength,
@@ -68,7 +68,7 @@ async function decryptField(dek: CryptoKey, cipher: string, nonce: string) {
     try {
         const ct = Uint8Array.from(atob(cipher), c => c.charCodeAt(0));
         const iv = Uint8Array.from(atob(nonce), c => c.charCodeAt(0));
-        const pt = await crypto.subtle.decrypt({name: 'AES-GCM', iv}, dek, ct);
+        const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, dek, ct);
         return td.decode(pt);
     } catch {
         return '*** DECRYPTION ERROR ***';
@@ -122,8 +122,8 @@ const ALLOWED_AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_AVATAR_SIZE = 256 * 1024;
 
 export default function Dashboard() {
-    const {user, logout, login, refresh} = useAuth();
-    const {dek, locked, hadDek, setDEK} = useCrypto();
+    const { user, logout, login, refresh } = useAuth();
+    const { dek, locked, hadDek, setDEK } = useCrypto();
     const navigate = useNavigate();
 
     const theme = useTheme();
@@ -171,6 +171,7 @@ export default function Dashboard() {
     const [notes, setNotes] = useState('');
     const [tags, setTags] = useState('');
     const [totpSecret, setTotpSecret] = useState('');
+    const [totpSecretError, setTotpSecretError] = useState<string | null>(null);
     const [showPwd, setShowPwd] = useState(false);
     const [generatorAnchorEl, setGeneratorAnchorEl] = useState<null | HTMLElement>(null);
     const generatorMenuOpen = Boolean(generatorAnchorEl);
@@ -241,6 +242,14 @@ export default function Dashboard() {
         () =>
             assessPasswordStrength(password, [username, title, user?.email ?? '', user?.username ?? '']),
         [password, title, user?.email, user?.username, username]
+    );
+
+    // Calculate password strength for the selected credential
+    const selectedPwdStrength = useMemo(
+        () => selected?.password
+            ? assessPasswordStrength(selected.password, [selected.username, selected.name, user?.email ?? '', user?.username ?? ''])
+            : null,
+        [selected?.password, selected?.username, selected?.name, user?.email, user?.username]
     );
 
     const unlockDialogTitle = useMemo(() => {
@@ -371,7 +380,7 @@ export default function Dashboard() {
 
                 if (legacyCreds.length > 0) {
                     setMigrating(true);
-                    setToast({type: 'success', msg: `Migrating ${legacyCreds.length} legacy items to new Vault format...`});
+                    setToast({ type: 'success', msg: `Migrating ${legacyCreds.length} legacy items to new Vault format...` });
 
                     for (const old of legacyCreds) {
                         try {
@@ -403,7 +412,7 @@ export default function Dashboard() {
                             console.error("Migration failed for item", old.credentialId, err);
                         }
                     }
-                    setToast({type: 'success', msg: 'Migration complete.'});
+                    setToast({ type: 'success', msg: 'Migration complete.' });
                     setMigrating(false);
                 }
 
@@ -433,7 +442,7 @@ export default function Dashboard() {
                 setSelected(decrypted[0] ?? null);
             } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : 'Failed to load vault';
-                setToast({type: 'error', msg: message || 'Failed to load vault'});
+                setToast({ type: 'error', msg: message || 'Failed to load vault' });
                 setMigrating(false);
             }
         })();
@@ -511,7 +520,7 @@ export default function Dashboard() {
             } catch (error) {
                 if (!cancelled) {
                     const message = error instanceof Error ? error.message : 'Failed to load MFA status';
-                    setMfaMessage({type: 'error', text: message || 'Failed to load MFA status'});
+                    setMfaMessage({ type: 'error', text: message || 'Failed to load MFA status' });
                     setMfaStatus(null);
                 }
             } finally {
@@ -539,7 +548,7 @@ export default function Dashboard() {
         }
 
         const dynamic = Array.from(counts.entries())
-            .sort((a, b) => a[0].localeCompare(b[0], undefined, {sensitivity: 'base'}))
+            .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }))
             .map<CategoryItem>(([label, count]) => ({
                 id: label,
                 label,
@@ -547,7 +556,7 @@ export default function Dashboard() {
             }));
 
         return [
-            {id: ALL_CATEGORY_ID, label: 'All Items', count: credentials.length},
+            { id: ALL_CATEGORY_ID, label: 'All Items', count: credentials.length },
             ...dynamic,
         ];
     }, [credentials]);
@@ -583,7 +592,7 @@ export default function Dashboard() {
     }, [credentials, searchQuery, selectedCategory]);
 
     const activeCategory = useMemo(() =>
-            categoryItems.find((category) => category.id === selectedCategory) ?? categoryItems[0],
+        categoryItems.find((category) => category.id === selectedCategory) ?? categoryItems[0],
         [categoryItems, selectedCategory]);
 
     useEffect(() => {
@@ -605,12 +614,12 @@ export default function Dashboard() {
 
     const renderCategoryIcon = (categoryId: string) => {
         if (categoryId === ALL_CATEGORY_ID) {
-            return <Key/>;
+            return <Key />;
         }
         if (categoryId === UNCATEGORIZED_LABEL) {
-            return <Note/>;
+            return <Note />;
         }
-        return <LinkIcon/>;
+        return <LinkIcon />;
     };
 
     const resetFormFields = () => {
@@ -621,6 +630,7 @@ export default function Dashboard() {
         setNotes('');
         setTags('');
         setTotpSecret('');
+        setTotpSecretError(null);
         setShowPwd(false);
     };
 
@@ -709,11 +719,11 @@ export default function Dashboard() {
         setRotateMessage(null);
 
         if (!user) {
-            setRotateMessage({type: 'error', text: 'User profile unavailable. Try refreshing the page.'});
+            setRotateMessage({ type: 'error', text: 'User profile unavailable. Try refreshing the page.' });
             return;
         }
         if (!dek || locked) {
-            setRotateMessage({type: 'error', text: 'Unlock your vault before rotating the master password.'});
+            setRotateMessage({ type: 'error', text: 'Unlock your vault before rotating the master password.' });
             return;
         }
 
@@ -722,15 +732,15 @@ export default function Dashboard() {
         const confirm = rotateConfirmPassword.trim();
 
         if (!current) {
-            setRotateMessage({type: 'error', text: 'Enter your current master password.'});
+            setRotateMessage({ type: 'error', text: 'Enter your current master password.' });
             return;
         }
         if (!next) {
-            setRotateMessage({type: 'error', text: 'Enter a new master password.'});
+            setRotateMessage({ type: 'error', text: 'Enter a new master password.' });
             return;
         }
         if (next !== confirm) {
-            setRotateMessage({type: 'error', text: 'New master passwords do not match.'});
+            setRotateMessage({ type: 'error', text: 'New master passwords do not match.' });
             return;
         }
 
@@ -740,7 +750,7 @@ export default function Dashboard() {
             const newSaltClient = toB64(crypto.getRandomValues(new Uint8Array(16)));
             const newVerifier = await makeVerifier(user.email, next, newSaltClient);
             const newKek = await deriveKEK(next, newSaltClient);
-            const {dekEncrypted, dekNonce} = await encryptDekWithKek(dek, newKek);
+            const { dekEncrypted, dekNonce } = await encryptDekWithKek(dek, newKek);
 
             await api.rotateMasterPassword({
                 currentVerifier,
@@ -764,7 +774,7 @@ export default function Dashboard() {
             await refresh();
         } catch (error) {
             const message = messageFromError(error, 'Failed to rotate master password');
-            setRotateMessage({type: 'error', text: message});
+            setRotateMessage({ type: 'error', text: message });
         } finally {
             setRotateBusy(false);
         }
@@ -787,7 +797,7 @@ export default function Dashboard() {
             await refresh();
         } catch (error) {
             const message = messageFromError(error, 'Failed to revoke sessions');
-            setToast({type: 'error', msg: message});
+            setToast({ type: 'error', msg: message });
         } finally {
             setRevokeBusy(false);
         }
@@ -816,7 +826,7 @@ export default function Dashboard() {
             });
         } catch (error) {
             const message = messageFromError(error, 'Failed to start MFA enrollment');
-            setMfaMessage({type: 'error', text: message});
+            setMfaMessage({ type: 'error', text: message });
         } finally {
             setMfaActionBusy(false);
         }
@@ -844,7 +854,7 @@ export default function Dashboard() {
             await refresh();
         } catch (error) {
             const message = messageFromError(error, 'Failed to activate MFA');
-            setMfaMessage({type: 'error', text: message});
+            setMfaMessage({ type: 'error', text: message });
         } finally {
             setMfaActionBusy(false);
         }
@@ -879,7 +889,7 @@ export default function Dashboard() {
             await refresh();
         } catch (error) {
             const message = messageFromError(error, 'Failed to disable MFA');
-            setMfaMessage({type: 'error', text: message});
+            setMfaMessage({ type: 'error', text: message });
         } finally {
             setMfaActionBusy(false);
         }
@@ -901,7 +911,7 @@ export default function Dashboard() {
         try {
             const options = await api.startPasskeyRegistration();
             const publicKey = decodeCreationOptions(options.publicKey);
-            const credential = await navigator.credentials.create({publicKey});
+            const credential = await navigator.credentials.create({ publicKey });
             if (!credential) {
                 setPasskeyMessage({
                     type: 'error',
@@ -928,7 +938,7 @@ export default function Dashboard() {
             });
         } catch (error) {
             if (error instanceof ApiError) {
-                const {message} = extractApiErrorDetails(error);
+                const { message } = extractApiErrorDetails(error);
                 setPasskeyMessage({
                     type: 'error',
                     text: message || 'Failed to register a passkey.',
@@ -961,13 +971,13 @@ export default function Dashboard() {
         <Stack
             component="ul"
             spacing={0.5}
-            sx={{listStyle: 'none', paddingLeft: 0, marginBottom: 0}}
+            sx={{ listStyle: 'none', paddingLeft: 0, marginBottom: 0 }}
         >
             {codes.map((code) => (
                 <Typography
                     key={code}
                     component="li"
-                    sx={{fontFamily: 'monospace', fontSize: 14}}
+                    sx={{ fontFamily: 'monospace', fontSize: 14 }}
                 >
                     {code}
                 </Typography>
@@ -1076,8 +1086,20 @@ export default function Dashboard() {
 
     async function handleSave() {
         if (!dek || !dialogMode) {
-            setToast({type: 'error', msg: 'Session not ready. Unlock vault and try again.'});
+            setToast({ type: 'error', msg: 'Session not ready. Unlock vault and try again.' });
             return;
+        }
+
+        // Validate TOTP secret if provided
+        if (totpSecret.trim()) {
+            try {
+                const cleanSecret = totpSecret.replace(/\s+/g, '');
+                OTPAuth.Secret.fromBase32(cleanSecret);
+                setTotpSecretError(null);
+            } catch {
+                setTotpSecretError('Invalid TOTP secret. Please enter a valid Base32 encoded secret.');
+                return;
+            }
         }
 
         setBusy(true);
@@ -1117,7 +1139,7 @@ export default function Dashboard() {
 
                 setCredentials((prev) => [newCredential, ...prev]);
                 setSelected(newCredential);
-                setToast({type: 'success', msg: 'Item saved.'});
+                setToast({ type: 'success', msg: 'Item saved.' });
             } else if (dialogMode === 'edit' && editingTarget) {
                 const updated = await api.updateVault(editingTarget.id, {
                     data: serialized,
@@ -1143,7 +1165,7 @@ export default function Dashboard() {
                 setSelected((prevSelected) =>
                     prevSelected && prevSelected.id === editingTarget.id ? updatedCredential : prevSelected,
                 );
-                setToast({type: 'success', msg: 'Item updated.'});
+                setToast({ type: 'success', msg: 'Item updated.' });
             }
 
             setDialogMode(null);
@@ -1153,7 +1175,7 @@ export default function Dashboard() {
             resetFormFields();
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to save';
-            setToast({type: 'error', msg: message || 'Failed to save'});
+            setToast({ type: 'error', msg: message || 'Failed to save' });
         } finally {
             setBusy(false);
         }
@@ -1171,11 +1193,11 @@ export default function Dashboard() {
                 }
                 return next;
             });
-            setToast({type: 'success', msg: 'Item deleted.'});
+            setToast({ type: 'success', msg: 'Item deleted.' });
             setDeleteTarget(null);
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to delete item';
-            setToast({type: 'error', msg: message || 'Failed to delete item'});
+            setToast({ type: 'error', msg: message || 'Failed to delete item' });
         } finally {
             setDeleteBusy(false);
         }
@@ -1188,7 +1210,7 @@ export default function Dashboard() {
 
     const handleExportVault = async () => {
         if (!dek) {
-            setToast({type: 'error', msg: 'Unlock your vault to export credentials.'});
+            setToast({ type: 'error', msg: 'Unlock your vault to export credentials.' });
             return;
         }
         if (exportBusy) return;
@@ -1196,12 +1218,12 @@ export default function Dashboard() {
         setExportBusy(true);
         try {
             const payload = await serializeVaultCredentials(dek, credentials);
-            const blob = new Blob([payload], {type: 'application/json'});
+            const blob = new Blob([payload], { type: 'application/json' });
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const filename = `vault-${timestamp}.pmvault`;
 
             if (typeof window === 'undefined') {
-                setToast({type: 'error', msg: 'Export is not available in this environment.'});
+                setToast({ type: 'error', msg: 'Export is not available in this environment.' });
                 return;
             }
 
@@ -1224,7 +1246,7 @@ export default function Dashboard() {
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Failed to export vault.';
-            setToast({type: 'error', msg: message || 'Failed to export vault.'});
+            setToast({ type: 'error', msg: message || 'Failed to export vault.' });
         } finally {
             setExportBusy(false);
         }
@@ -1232,7 +1254,7 @@ export default function Dashboard() {
 
     const handleImportClick = () => {
         if (!dek) {
-            setToast({type: 'error', msg: 'Unlock your vault to import credentials.'});
+            setToast({ type: 'error', msg: 'Unlock your vault to import credentials.' });
             return;
         }
         if (importBusy) return;
@@ -1244,7 +1266,7 @@ export default function Dashboard() {
         event.target.value = '';
         if (!file) return;
         if (!dek) {
-            setToast({type: 'error', msg: 'Unlock your vault to import credentials.'});
+            setToast({ type: 'error', msg: 'Unlock your vault to import credentials.' });
             return;
         }
 
@@ -1253,7 +1275,7 @@ export default function Dashboard() {
             const raw = await file.text();
             const imported = await deserializeVaultCredentials(dek, raw);
             if (imported.length === 0) {
-                setToast({type: 'success', msg: 'Vault file contained no items.'});
+                setToast({ type: 'success', msg: 'Vault file contained no items.' });
                 return;
             }
 
@@ -1348,7 +1370,7 @@ export default function Dashboard() {
             } else if (error instanceof Error) {
                 message = error.message || message;
             }
-            setToast({type: 'error', msg: message});
+            setToast({ type: 'error', msg: message });
         } finally {
             setImportBusy(false);
         }
@@ -1376,12 +1398,12 @@ export default function Dashboard() {
             );
             setSelected((prevSelected) =>
                 prevSelected && prevSelected.id === targetId
-                    ? {...prevSelected, favorite: !!updated.favorite}
+                    ? { ...prevSelected, favorite: !!updated.favorite }
                     : prevSelected,
             );
         } catch (error) {
             const message = messageFromError(error, 'Failed to update favorite');
-            setToast({type: 'error', msg: message});
+            setToast({ type: 'error', msg: message });
         } finally {
             setFavoriteBusy(false);
         }
@@ -1399,10 +1421,10 @@ export default function Dashboard() {
 
         try {
             await navigator.clipboard.writeText(selected.password);
-            setToast({type: 'success', msg: 'Password copied to clipboard.'});
+            setToast({ type: 'success', msg: 'Password copied to clipboard.' });
         } catch (error) {
             console.error('Failed to copy password.', error);
-            setToast({type: 'error', msg: 'Failed to copy password.'});
+            setToast({ type: 'error', msg: 'Failed to copy password.' });
         }
     };
 
@@ -1418,9 +1440,9 @@ export default function Dashboard() {
 
         try {
             await navigator.clipboard.writeText(totpCode);
-            setToast({type: 'success', msg: 'Code copied to clipboard.'});
+            setToast({ type: 'success', msg: 'Code copied to clipboard.' });
         } catch (error) {
-            setToast({type: 'error', msg: 'Failed to copy code.'});
+            setToast({ type: 'error', msg: 'Failed to copy code.' });
         }
     };
 
@@ -1450,7 +1472,7 @@ export default function Dashboard() {
                         : `All Items (${credentials.length})`}
                 </Typography>
             </Box>
-            <Divider/>
+            <Divider />
             <List dense>
                 {categoryItems.map((category) => (
                     <ListItemButton
@@ -1461,19 +1483,19 @@ export default function Dashboard() {
                             if (isMobile) setMobileOpen(false);
                         }}
                     >
-                        <ListItemIcon sx={{minWidth: 36}}>{renderCategoryIcon(category.id)}</ListItemIcon>
-                        <ListItemText primary={`${category.label} (${category.count})`}/>
+                        <ListItemIcon sx={{ minWidth: 36 }}>{renderCategoryIcon(category.id)}</ListItemIcon>
+                        <ListItemText primary={`${category.label} (${category.count})`} />
                     </ListItemButton>
                 ))}
                 {isAuditAdmin && (
                     <>
-                        <Divider sx={{my: 1}}/>
+                        <Divider sx={{ my: 1 }} />
                         <ListItemButton onClick={() => {
                             navigate('/audit-log');
                             if (isMobile) setMobileOpen(false);
                         }}>
-                            <ListItemIcon sx={{minWidth: 36}}><ListAlt/></ListItemIcon>
-                            <ListItemText primary="Audit Log"/>
+                            <ListItemIcon sx={{ minWidth: 36 }}><ListAlt /></ListItemIcon>
+                            <ListItemText primary="Audit Log" />
                         </ListItemButton>
                     </>
                 )}
@@ -1482,7 +1504,7 @@ export default function Dashboard() {
     );
 
     return (
-        <Box display="flex" minHeight="100vh" sx={{bgcolor: 'background.default'}}>
+        <Box display="flex" minHeight="100vh" sx={{ bgcolor: 'background.default' }}>
             <input
                 ref={fileInputRef}
                 type="file"
@@ -1494,10 +1516,10 @@ export default function Dashboard() {
                 variant="temporary"
                 open={mobileOpen}
                 onClose={handleDrawerToggle}
-                ModalProps={{keepMounted: true}}
+                ModalProps={{ keepMounted: true }}
                 sx={{
-                    display: {xs: 'block', md: 'none'},
-                    '& .MuiDrawer-paper': {boxSizing: 'border-box', width: 260},
+                    display: { xs: 'block', md: 'none' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 260 },
                 }}
             >
                 {drawerContent}
@@ -1507,7 +1529,7 @@ export default function Dashboard() {
                 variant="permanent"
                 anchor="left"
                 sx={{
-                    display: {xs: 'none', md: 'block'},
+                    display: { xs: 'none', md: 'block' },
                     '& .MuiDrawer-paper': {
                         width: 260,
                         borderRight: '1px solid',
@@ -1526,12 +1548,12 @@ export default function Dashboard() {
                 p={3}
                 component="main"
                 sx={{
-                    marginLeft: {xs: 0, md: '260px'},
-                    width: {md: `calc(100% - 260px)`},
-                    height: {md: '100vh'},
-                    overflow: {md: 'hidden'},
-                    display: {md: 'flex'},
-                    flexDirection: {md: 'column'},
+                    marginLeft: { xs: 0, md: '260px' },
+                    width: { md: `calc(100% - 260px)` },
+                    height: { md: '100vh' },
+                    overflow: { md: 'hidden' },
+                    display: { md: 'flex' },
+                    flexDirection: { md: 'column' },
                 }}
             >
                 <Box display="flex" alignItems="center" justifyContent="space-between" marginBottom={2} gap={2}>
@@ -1542,9 +1564,9 @@ export default function Dashboard() {
                                 aria-label="open drawer"
                                 edge="start"
                                 onClick={handleDrawerToggle}
-                                sx={{mr: 1}}
+                                sx={{ mr: 1 }}
                             >
-                                <MenuIcon/>
+                                <MenuIcon />
                             </IconButton>
                         )}
                         {(!isMobile || searchExpanded) && (
@@ -1557,12 +1579,12 @@ export default function Dashboard() {
                                 onBlur={() => {
                                     if (isMobile && !searchQuery) setSearchExpanded(false);
                                 }}
-                                sx={{maxWidth: 420, width: isMobile ? '100%' : 'auto', flex: 1}}
+                                sx={{ maxWidth: 420, width: isMobile ? '100%' : 'auto', flex: 1 }}
                                 slotProps={{
                                     input: {
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <Search fontSize="small"/>
+                                                <Search fontSize="small" />
                                             </InputAdornment>
                                         ),
                                     },
@@ -1571,18 +1593,18 @@ export default function Dashboard() {
                         )}
                         {isMobile && !searchExpanded && (
                             <IconButton onClick={() => setSearchExpanded(true)}>
-                                <Search/>
+                                <Search />
                             </IconButton>
                         )}
                     </Box>
 
                     <Box display="flex" alignItems="center" gap={2}>
 
-                        <IconButton onClick={handleUserMenuOpen} sx={{p: 0}}>
+                        <IconButton onClick={handleUserMenuOpen} sx={{ p: 0 }}>
                             <Avatar
                                 alt={user?.email ?? 'User'}
                                 src={avatarLoadError ? undefined : avatarSrc ?? undefined}
-                                slotProps={{img: {onError: () => setAvatarLoadError(true)}}}
+                                slotProps={{ img: { onError: () => setAvatarLoadError(true) } }}
                             >
                                 {avatarInitials}
                             </Avatar>
@@ -1598,18 +1620,18 @@ export default function Dashboard() {
                             transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                         >
-                            <MenuItem disabled sx={{opacity: 1, color: 'text.primary', fontWeight: 600}}>
+                            <MenuItem disabled sx={{ opacity: 1, color: 'text.primary', fontWeight: 600 }}>
                                 <Typography variant="body2">{user?.email ?? 'User'}</Typography>
                             </MenuItem>
-                            <Divider/>
+                            <Divider />
                             <MenuItem onClick={handleProfileDialogOpen}>
-                                <ListItemIcon><Settings fontSize="small"/></ListItemIcon>
+                                <ListItemIcon><Settings fontSize="small" /></ListItemIcon>
                                 <ListItemText>Settings</ListItemText>
                             </MenuItem>
                             <MenuItem onClick={() => {
                                 handleLogoutClick();
                             }}>
-                                <ListItemIcon><Logout fontSize="small"/></ListItemIcon>
+                                <ListItemIcon><Logout fontSize="small" /></ListItemIcon>
                                 <ListItemText>Log out</ListItemText>
                             </MenuItem>
                         </Menu>
@@ -1618,38 +1640,38 @@ export default function Dashboard() {
 
                 <Box
                     display="grid"
-                    gridTemplateColumns={{xs: '1fr', md: '280px 1fr'}}
+                    gridTemplateColumns={{ xs: '1fr', md: '280px 1fr' }}
                     gap={2}
                     sx={{
-                        flex: {md: 1},
-                        minHeight: {md: 0},
+                        flex: { md: 1 },
+                        minHeight: { md: 0 },
                     }}
                 >
                     <Card
                         variant="outlined"
                         sx={{
                             overflow: 'hidden',
-                            height: {md: '100%'},
-                            display: {md: 'flex'},
-                            flexDirection: {md: 'column'},
+                            height: { md: '100%' },
+                            display: { md: 'flex' },
+                            flexDirection: { md: 'column' },
                         }}
                     >
                         <List
                             dense
                             disablePadding
                             sx={{
-                                overflowY: {md: 'auto'},
-                                flex: {md: 1},
+                                overflowY: { md: 'auto' },
+                                flex: { md: 1 },
                             }}
                         >
                             {locked ? (
                                 <ListItem>
-                                    <ListItemText primary="Vault locked" secondary="Unlock to view items."/>
+                                    <ListItemText primary="Vault locked" secondary="Unlock to view items." />
                                 </ListItem>
                             ) : migrating ? (
                                 <ListItem>
-                                    <ListItemText primary="Migrating data..." secondary="Please wait."/>
-                                    <CircularProgress size={20} sx={{ml: 2}}/>
+                                    <ListItemText primary="Migrating data..." secondary="Please wait." />
+                                    <CircularProgress size={20} sx={{ ml: 2 }} />
                                 </ListItem>
                             ) : filteredCredentials.length === 0 ? (
                                 <ListItem>
@@ -1695,8 +1717,8 @@ export default function Dashboard() {
                     <Card
                         sx={{
                             minHeight: 420,
-                            height: {md: '100%'},
-                            overflowY: {md: 'auto'},
+                            height: { md: '100%' },
+                            overflowY: { md: 'auto' },
                         }}
                         elevation={0}
                         variant="outlined"
@@ -1721,7 +1743,7 @@ export default function Dashboard() {
                                     <Button
                                         variant="contained"
                                         onClick={() => promptUnlock(null)}
-                                        startIcon={<LockOpen/>}
+                                        startIcon={<LockOpen />}
                                         data-testid="unlock-vault-button"
                                         disableElevation
                                     >
@@ -1740,7 +1762,7 @@ export default function Dashboard() {
                                                 onClick={handleAddClick}
                                                 title="Add item"
                                             >
-                                                <AddIcon/>
+                                                <AddIcon />
                                             </IconButton>
                                             <IconButton
                                                 size="small"
@@ -1748,7 +1770,7 @@ export default function Dashboard() {
                                                 title="Export vault"
                                                 disabled={!dek || exportBusy}
                                             >
-                                                <Download/>
+                                                <Download />
                                             </IconButton>
                                             <IconButton
                                                 size="small"
@@ -1756,7 +1778,7 @@ export default function Dashboard() {
                                                 title="Import vault"
                                                 disabled={!dek || importBusy}
                                             >
-                                                <UploadFile/>
+                                                <UploadFile />
                                             </IconButton>
                                             <IconButton
                                                 size="small"
@@ -1764,7 +1786,7 @@ export default function Dashboard() {
                                                 disabled={!selected || favoriteBusy}
                                                 title={selectedIsFavorite ? 'Remove from favorites' : 'Add to favorites'}
                                             >
-                                                {selectedIsFavorite ? <Star color="warning"/> : <StarBorder/>}
+                                                {selectedIsFavorite ? <Star color="warning" /> : <StarBorder />}
                                             </IconButton>
                                             <IconButton
                                                 size="small"
@@ -1772,7 +1794,7 @@ export default function Dashboard() {
                                                 disabled={!selected}
                                                 title="Edit item"
                                             >
-                                                <Edit/>
+                                                <Edit />
                                             </IconButton>
                                             <IconButton
                                                 size="small"
@@ -1781,16 +1803,16 @@ export default function Dashboard() {
                                                 title="Delete item"
                                                 color="error"
                                             >
-                                                <Delete/>
+                                                <Delete />
                                             </IconButton>
                                         </Box>
                                     </Box>
 
                                     <Typography variant="caption" color="text.secondary">username</Typography>
-                                    <Typography sx={{marginBottom: 1}}>{selected?.username || '—'}</Typography>
+                                    <Typography sx={{ marginBottom: 1 }}>{selected?.username || '—'}</Typography>
 
                                     <Typography variant="caption" color="text.secondary">password</Typography>
-                                    <Box display="flex" alignItems="center" gap={0.5} sx={{marginBottom: 1}}>
+                                    <Box display="flex" alignItems="center" gap={0.5} sx={{ marginBottom: 1 }}>
                                         <Typography
                                             sx={{
                                                 fontFamily: 'monospace',
@@ -1811,8 +1833,8 @@ export default function Dashboard() {
                                             disabled={!selected}
                                             title={showSelectedPassword ? 'Hide password' : 'Show password'}
                                         >
-                                            {showSelectedPassword ? <VisibilityOff fontSize="small"/> :
-                                                <Visibility fontSize="small"/>}
+                                            {showSelectedPassword ? <VisibilityOff fontSize="small" /> :
+                                                <Visibility fontSize="small" />}
                                         </IconButton>
                                         <IconButton
                                             size="small"
@@ -1822,38 +1844,37 @@ export default function Dashboard() {
                                             disabled={!selected}
                                             title="Copy password"
                                         >
-                                            <ContentCopy fontSize="small"/>
+                                            <ContentCopy fontSize="small" />
                                         </IconButton>
                                     </Box>
 
                                     {selected?.totpSecret && (
                                         <>
                                             <Typography variant="caption" color="text.secondary">totp code</Typography>
-                                            <Box display="flex" alignItems="center" gap={2} sx={{mb: 1}}>
-                                                <Typography variant="h6" sx={{fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2}}>
+                                            <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
+                                                <Typography variant="h6" sx={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2 }}>
                                                     {totpCode || '...'}
                                                 </Typography>
                                                 <IconButton size="small" onClick={handleCopyTotp} title="Copy code">
-                                                    <ContentCopy fontSize="small"/>
+                                                    <ContentCopy fontSize="small" />
                                                 </IconButton>
-                                                <CircularProgress
-                                                    variant="determinate"
-                                                    value={100}
-                                                    size={20}
-                                                    thickness={10}
-                                                    sx={{
-                                                        color: 'action.hover',
-                                                        position: 'absolute',
-                                                        ml: '160px'
-                                                    }}
-                                                />
-                                                <CircularProgress
-                                                    variant="determinate"
-                                                    value={100 - (totpProgress * 3.33)}
-                                                    size={20}
-                                                    thickness={10}
-                                                    color={totpProgress > 80 ? "error" : "primary"}
-                                                />
+                                                <Box sx={{ position: 'relative', display: 'inline-flex', ml: 1 }}>
+                                                    <CircularProgress
+                                                        variant="determinate"
+                                                        value={100}
+                                                        size={24}
+                                                        thickness={4}
+                                                        sx={{ color: 'action.hover' }}
+                                                    />
+                                                    <CircularProgress
+                                                        variant="determinate"
+                                                        value={100 - (totpProgress * 3.33)}
+                                                        size={24}
+                                                        thickness={4}
+                                                        color={totpProgress > 80 ? "error" : "primary"}
+                                                        sx={{ position: 'absolute', left: 0 }}
+                                                    />
+                                                </Box>
                                             </Box>
                                             <LinearProgress
                                                 variant="determinate"
@@ -1878,15 +1899,19 @@ export default function Dashboard() {
                                         backgroundColor: 'action.hover',
                                         borderRadius: 4,
                                         marginTop: 0.5,
-                                        marginBottom: 2,
+                                        marginBottom: 0.5,
                                     }}>
                                         <Box sx={{
                                             height: '100%',
-                                            width: '40%',
-                                            backgroundColor: 'success.main',
-                                            borderRadius: 4
-                                        }}/>
+                                            width: `${selectedPwdStrength ? (selectedPwdStrength.score / 4) * 100 : 0}%`,
+                                            backgroundColor: selectedPwdStrength ? getPasswordStrengthColor(selectedPwdStrength.score) : 'action.disabled',
+                                            borderRadius: 4,
+                                            transition: 'width 0.3s ease, background-color 0.3s ease'
+                                        }} />
                                     </Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                                        {selectedPwdStrength ? getPasswordStrengthLabel(selectedPwdStrength.score) : 'No password'}
+                                    </Typography>
 
                                     <Typography variant="caption" color="text.secondary">website</Typography>
                                     <Box sx={{ mb: 2 }}>
@@ -1896,7 +1921,7 @@ export default function Dashboard() {
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 size="small"
-                                                startIcon={<LinkIcon/>}
+                                                startIcon={<LinkIcon />}
                                             >
                                                 {(() => {
                                                     try {
@@ -1953,12 +1978,12 @@ export default function Dashboard() {
                 fullWidth
                 maxWidth="xs"
                 slotProps={{
-                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
-                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                    backdrop: { sx: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)' } },
+                    paper: { sx: { borderRadius: 4, backgroundImage: 'none' } },
                 }}
             >
                 {/* ... */}
-                <DialogTitle sx={{fontWeight: 800}}>Profile settings</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 800 }}>Profile settings</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2}>
                         <DialogContentText>
@@ -1970,7 +1995,7 @@ export default function Dashboard() {
                             <Avatar
                                 alt={user?.email ?? user?.username ?? 'User avatar'}
                                 src={avatarPreview ?? avatarSrc ?? undefined}
-                                sx={{width: 80, height: 80, fontSize: 28}}
+                                sx={{ width: 80, height: 80, fontSize: 28 }}
                             >
                                 {avatarInitials}
                             </Avatar>
@@ -1978,7 +2003,7 @@ export default function Dashboard() {
                                 <Button
                                     component="label"
                                     variant="outlined"
-                                    startIcon={<Upload fontSize="small"/>}
+                                    startIcon={<Upload fontSize="small" />}
                                 >
                                     Choose image
                                     <input
@@ -1992,13 +2017,13 @@ export default function Dashboard() {
                                     onClick={handleAvatarRemove}
                                     disabled={!avatarPreview && !avatarSrc}
                                     color="inherit"
-                                    startIcon={<DeleteOutline fontSize="small"/>}
+                                    startIcon={<DeleteOutline fontSize="small" />}
                                 >
                                     Remove avatar
                                 </Button>
                             </Stack>
                         </Stack>
-                        <Divider/>
+                        <Divider />
                         <Stack spacing={3}>
                             <Stack spacing={1.5}>
                                 <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -2058,7 +2083,7 @@ export default function Dashboard() {
                                             }
                                             helperText={
                                                 rotateConfirmPassword
-                                                && rotateNewPassword !== rotateConfirmPassword
+                                                    && rotateNewPassword !== rotateConfirmPassword
                                                     ? 'Passwords do not match.'
                                                     : undefined
                                             }
@@ -2103,7 +2128,7 @@ export default function Dashboard() {
                                     </Button>
                                 </Stack>
                             </Stack>
-                            <Divider/>
+                            <Divider />
                             <Stack spacing={1.5}>
                                 <Box display="flex" alignItems="center" justifyContent="space-between">
                                     <Box>
@@ -2145,7 +2170,7 @@ export default function Dashboard() {
                                     </Alert>
                                 ) : null}
                                 {mfaLoading ? (
-                                    <LinearProgress/>
+                                    <LinearProgress />
                                 ) : mfaStatus?.enabled ? (
                                     <Stack spacing={1.5}>
                                         <Typography variant="body2">
@@ -2228,14 +2253,14 @@ export default function Dashboard() {
                                                     value={mfaEnrollment.secret}
                                                     fullWidth
                                                     size="small"
-                                                    slotProps={{input: {readOnly: true}}}
+                                                    slotProps={{ input: { readOnly: true } }}
                                                 />
                                                 <TextField
                                                     label="otpauth URL"
                                                     value={mfaEnrollment.otpauthUrl}
                                                     fullWidth
                                                     size="small"
-                                                    slotProps={{input: {readOnly: true}}}
+                                                    slotProps={{ input: { readOnly: true } }}
                                                     multiline
                                                     minRows={2}
                                                 />
@@ -2276,7 +2301,7 @@ export default function Dashboard() {
                                     </Stack>
                                 )}
                             </Stack>
-                            <Divider/>
+                            <Divider />
                             <Stack spacing={1.5}>
                                 <Box display="flex" alignItems="center" justifyContent="space-between">
                                     <Box>
@@ -2311,8 +2336,8 @@ export default function Dashboard() {
                                             variant="contained"
                                             disabled={passkeyBusy}
                                             startIcon={passkeyBusy
-                                                ? <CircularProgress size={18} color="inherit"/>
-                                                : <Key/>}
+                                                ? <CircularProgress size={18} color="inherit" />
+                                                : <Key />}
                                         >
                                             {passkeyBusy ? 'Waiting for confirmation…' : 'Register a passkey'}
                                         </Button>
@@ -2322,7 +2347,7 @@ export default function Dashboard() {
                         </Stack>
                     </Stack>
                 </DialogContent>
-                <DialogActions sx={{px: 3, pb: 2}}>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button onClick={handleProfileDialogClose} disabled={avatarSaving}>Cancel</Button>
                     <Button
                         onClick={() => {
@@ -2342,11 +2367,11 @@ export default function Dashboard() {
                 fullWidth
                 maxWidth="sm"
                 slotProps={{
-                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
-                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                    backdrop: { sx: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)' } },
+                    paper: { sx: { borderRadius: 4, backgroundImage: 'none' } },
                 }}
             >
-                <DialogTitle sx={{fontWeight: 800}}>
+                <DialogTitle sx={{ fontWeight: 800 }}>
                     {dialogMode === 'edit' ? 'Edit item' : 'Add item'}
                 </DialogTitle>
                 <DialogContent>
@@ -2388,7 +2413,7 @@ export default function Dashboard() {
                                                         size="small"
                                                         aria-label="Generate password"
                                                     >
-                                                        <AutoFixHigh fontSize="small"/>
+                                                        <AutoFixHigh fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title={showPwd ? 'Hide password' : 'Show password'}>
@@ -2398,8 +2423,8 @@ export default function Dashboard() {
                                                         size="small"
                                                         aria-label={showPwd ? 'Hide password' : 'Show password'}
                                                     >
-                                                        {showPwd ? <VisibilityOff fontSize="small"/> :
-                                                            <Visibility fontSize="small"/>}
+                                                        {showPwd ? <VisibilityOff fontSize="small" /> :
+                                                            <Visibility fontSize="small" />}
                                                     </IconButton>
                                                 </Tooltip>
                                             </InputAdornment>
@@ -2419,10 +2444,10 @@ export default function Dashboard() {
                                     },
                                 }}
                             />
-                            <Box sx={{mt: 0.5}}>
+                            <Box sx={{ mt: 0.5 }}>
                                 <Typography
                                     variant="caption"
-                                    sx={{fontWeight: 600, display: 'block'}}
+                                    sx={{ fontWeight: 600, display: 'block' }}
                                     color={pwdStrength.compromised ? 'error.main' : 'inherit'}
                                 >
                                     {strengthLabel}
@@ -2431,7 +2456,7 @@ export default function Dashboard() {
                                     <Typography
                                         variant="caption"
                                         color={pwdStrength.compromised ? 'error.main' : 'text.secondary'}
-                                        sx={{display: 'block'}}
+                                        sx={{ display: 'block' }}
                                     >
                                         Estimated crack time: {pwdStrength.crackTime}
                                     </Typography>
@@ -2457,7 +2482,7 @@ export default function Dashboard() {
                                     <Typography
                                         variant="caption"
                                         color="error.main"
-                                        sx={{display: 'block', fontWeight: 600, mt: 0.75}}
+                                        sx={{ display: 'block', fontWeight: 600, mt: 0.75 }}
                                     >
                                         {passwordWarning}
                                     </Typography>
@@ -2490,36 +2515,56 @@ export default function Dashboard() {
                             minRows={3}
                             size="small"
                         />
-                        <TextField
-                            label="TOTP Secret"
-                            value={totpSecret}
-                            onChange={(e) => setTotpSecret(e.target.value)}
-                            placeholder="JBSWY3DPEHPK3PXP"
-                            fullWidth
-                            size="small"
-                            type="password"
-                        />
+                        <Box>
+                            <TextField
+                                label="TOTP Secret"
+                                value={totpSecret}
+                                onChange={(e) => {
+                                    setTotpSecret(e.target.value);
+                                    setTotpSecretError(null);
+                                }}
+                                placeholder="JBSWY3DPEHPK3PXP"
+                                fullWidth
+                                size="small"
+                                type="password"
+                                error={!!totpSecretError}
+                                helperText={totpSecretError || 'Enter a Base32 encoded secret for 2FA'}
+                            />
+                            {dialogMode === 'edit' && totpSecret && (
+                                <Button
+                                    size="small"
+                                    color="error"
+                                    onClick={() => {
+                                        setTotpSecret('');
+                                        setTotpSecretError(null);
+                                    }}
+                                    sx={{ mt: 1 }}
+                                >
+                                    Remove TOTP
+                                </Button>
+                            )}
+                        </Box>
                     </Stack>
                 </DialogContent>
                 <Menu
                     anchorEl={generatorAnchorEl}
                     open={generatorMenuOpen}
                     onClose={handleGeneratorMenuClose}
-                    anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
-                    transformOrigin={{vertical: 'top', horizontal: 'right'}}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                 >
                     {passwordTemplates.map((template) => (
                         <MenuItem key={template.id} onClick={() => handleSelectTemplate(template.id)}>
                             <ListItemText
                                 primary={template.label}
                                 secondary={template.description}
-                                primaryTypographyProps={{fontWeight: 600}}
-                                secondaryTypographyProps={{variant: 'caption', color: 'text.secondary'}}
+                                primaryTypographyProps={{ fontWeight: 600 }}
+                                secondaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
                             />
                         </MenuItem>
                     ))}
                 </Menu>
-                <DialogActions sx={{px: 3, pb: 2}}>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button onClick={handleDialogClose} disabled={busy}>Cancel</Button>
                     <Button
                         onClick={() => {
@@ -2541,13 +2586,13 @@ export default function Dashboard() {
                 fullWidth
                 maxWidth="xs"
                 slotProps={{
-                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
-                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                    backdrop: { sx: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)' } },
+                    paper: { sx: { borderRadius: 4, backgroundImage: 'none' } },
                 }}
             >
-                <DialogTitle sx={{fontWeight: 800}}>{unlockDialogTitle}</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 800 }}>{unlockDialogTitle}</DialogTitle>
                 <DialogContent>
-                    <Typography variant="body2" color="text.secondary" sx={{marginBottom: 2}}>
+                    <Typography variant="body2" color="text.secondary" sx={{ marginBottom: 2 }}>
                         {unlockDialogDescription}
                     </Typography>
                     <TextField
@@ -2570,7 +2615,7 @@ export default function Dashboard() {
                                             onClick={() => setShowUnlockPwd(!showUnlockPwd)}
                                             edge="end"
                                         >
-                                            {showUnlockPwd ? <VisibilityOff/> : <Visibility/>}
+                                            {showUnlockPwd ? <VisibilityOff /> : <Visibility />}
                                         </IconButton>
                                     </InputAdornment>
                                 ),
@@ -2578,7 +2623,7 @@ export default function Dashboard() {
                         }}
                     />
                 </DialogContent>
-                <DialogActions sx={{px: 3, pb: 2}}>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button
                         onClick={() => closeUnlockDialog()}
                         disabled={unlockBusy}
@@ -2605,17 +2650,17 @@ export default function Dashboard() {
                 fullWidth
                 maxWidth="xs"
                 slotProps={{
-                    backdrop: {sx: {backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)'}},
-                    paper: {sx: {borderRadius: 4, backgroundImage: 'none'}},
+                    backdrop: { sx: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(2,6,23,0.45)' } },
+                    paper: { sx: { borderRadius: 4, backgroundImage: 'none' } },
                 }}
             >
-                <DialogTitle sx={{fontWeight: 800}}>Delete item</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 800 }}>Delete item</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
                         Are you sure you want to delete "{deleteTarget?.name}"? This action cannot be undone.
                     </DialogContentText>
                 </DialogContent>
-                <DialogActions sx={{px: 3, pb: 2}}>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button onClick={handleDeleteDialogClose} disabled={deleteBusy}>Cancel</Button>
                     <Button
                         onClick={() => {
@@ -2634,7 +2679,7 @@ export default function Dashboard() {
             <Snackbar
                 open={!!toast}
                 autoHideDuration={3500}
-                anchorOrigin={{vertical: 'bottom', horizontal: 'center'}}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 onClose={() => setToast(null)}
             >
                 {toast ? <Alert severity={toast.type}>{toast.msg}</Alert> : undefined}
