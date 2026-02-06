@@ -123,7 +123,7 @@ If you want to get up and running quickly, follow these steps:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/Password-Manager.git
+git clone https://github.com/co815/Password-Manager.git
 cd Password-Manager
 
 # 2. Start MongoDB (and optionally MailHog for email testing)
