@@ -210,14 +210,6 @@ public class AuthController {
         if (request == null) {
             return null;
         }
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
-        }
         String remote = request.getRemoteAddr();
         return remote == null ? null : remote.trim();
     }
@@ -299,12 +291,11 @@ public class AuthController {
         String userId = (String) authentication.getPrincipal();
         return users.findById(userId)
                 .<ResponseEntity<?>>map(user -> {
-                    if (!normalizedEquals(user.getVerifier(), request.currentVerifier())) {
+                    if (!passwordVerifier.verify(request.currentVerifier(), user.getVerifier())) {
                         return ResponseEntity.status(403)
                                 .body(new ErrorResponse(403, "FORBIDDEN", "Verifier mismatch"));
                     }
-
-                    user.setVerifier(request.newVerifier());
+                    user.setVerifier(passwordVerifier.encode(request.newVerifier()));
                     user.setSaltClient(request.newSaltClient());
                     user.setDekEncrypted(request.newDekEncrypted());
                     user.setDekNonce(request.newDekNonce());
@@ -342,7 +333,7 @@ public class AuthController {
                                 .body(new ErrorResponse(403, "FORBIDDEN", "Invalid recovery code"));
                     }
 
-                    user.setVerifier(request.newVerifier());
+                    user.setVerifier(passwordVerifier.encode(request.newVerifier()));
                     user.setSaltClient(request.newSaltClient());
                     user.setDekEncrypted(request.newDekEncrypted());
                     user.setDekNonce(request.newDekNonce());
@@ -421,7 +412,7 @@ public class AuthController {
 
     @PostMapping("/mfa/disable")
     public ResponseEntity<?> disableMfa(Authentication authentication,
-            @RequestBody MfaDisableRequest request) {
+            @Valid @RequestBody MfaDisableRequest request) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid Credentials"));
@@ -544,17 +535,6 @@ public class AuthController {
         user.setTokenVersion(current + 1);
     }
 
-    private boolean normalizedEquals(String left, String right) {
-        if (left == null || right == null) {
-            return false;
-        }
-        String normalizedLeft = left.trim();
-        String normalizedRight = right.trim();
-        byte[] leftBytes = normalizedLeft.getBytes(StandardCharsets.UTF_8);
-        byte[] rightBytes = normalizedRight.getBytes(StandardCharsets.UTF_8);
-        return MessageDigest.isEqual(leftBytes, rightBytes);
-    }
-
     private String buildSaltRateLimitKey(HttpServletRequest request, String identifier) {
         return buildRateLimitKey("salt", request, identifier);
     }
@@ -568,8 +548,25 @@ public class AuthController {
                 ? request.getRemoteAddr()
                 : "unknown";
         String normalized = identifier == null ? "" : identifier.trim().toLowerCase(Locale.ROOT);
-        int identifierHash = normalized.isEmpty() ? 0 : normalized.hashCode();
-        return prefix + ":" + remoteAddr + ":" + Integer.toHexString(identifierHash);
+        String identifierHash = hashForRateLimit(normalized);
+        return prefix + ":" + remoteAddr + ":" + identifierHash;
+    }
+
+    private String hashForRateLimit(String value) {
+        if (value == null || value.isEmpty()) {
+            return "empty";
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(16);
+            for (int i = 0; i < 8; i++) {
+                sb.append(String.format("%02x", hash[i]));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     private static String placeholderEmailFor(String identifier) {

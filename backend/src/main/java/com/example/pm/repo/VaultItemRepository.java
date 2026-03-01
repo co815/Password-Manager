@@ -10,4 +10,6 @@ public interface VaultItemRepository extends MongoRepository<VaultItem, String> 
     List<VaultItem> findByUserId(String userId);
 
     Optional<VaultItem> findByIdAndUserId(String id, String userId);
+
+    long countByUserId(String userId);
 }
