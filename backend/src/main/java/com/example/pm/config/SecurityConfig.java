@@ -71,10 +71,6 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.POST, "/api/auth/webauthn/login/options",
                                                                 "/api/auth/webauthn/login/finish")
                                                 .permitAll()
-                                                .requestMatchers(HttpMethod.POST, "/api/auth/login",
-                                                                "/api/auth/register",
-                                                                "/api/auth/resend-verification")
-                                                .permitAll()
                                                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
                                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                                 .anyRequest().authenticated())

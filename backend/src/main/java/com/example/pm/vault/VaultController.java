@@ -22,6 +22,8 @@ public class VaultController {
 
     private static final int MAX_COLLECTION_COUNT = 32;
     private static final int MAX_COLLECTION_NAME_LENGTH = 64;
+    private static final int MAX_DATA_BYTES = 64 * 1024;
+    private static final int MAX_ITEMS_PER_USER = 500;
 
     private final VaultItemRepository vaultItems;
 
@@ -42,6 +44,16 @@ public class VaultController {
         return requireUser(authentication, userId -> {
             if (payload.data() == null || payload.data().isEmpty()) {
                 return badRequest("Missing vault data");
+            }
+            if (payload.data().length() > MAX_DATA_BYTES) {
+                return badRequest("Vault data exceeds the maximum allowed size (64 KB).");
+            }
+
+            long existingCount = vaultItems.countByUserId(userId);
+            if (existingCount >= MAX_ITEMS_PER_USER) {
+                return ResponseEntity.status(429)
+                        .body(new ErrorResponse(429, "LIMIT_EXCEEDED",
+                                "Maximum vault item limit reached."));
             }
 
             Instant now = Instant.now();
@@ -69,6 +81,9 @@ public class VaultController {
         return requireUser(authentication, userId -> {
             if (payload.data() == null || payload.data().isEmpty()) {
                 return badRequest("Missing vault data");
+            }
+            if (payload.data().length() > MAX_DATA_BYTES) {
+                return badRequest("Vault data exceeds the maximum allowed size (64 KB).");
             }
 
             return vaultItems.findByIdAndUserId(id, userId)
