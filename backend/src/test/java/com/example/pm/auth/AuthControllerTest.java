@@ -660,6 +660,6 @@ class AuthControllerTest {
                 }
                 return new AuthController(users, rateLimiter, totp, audit, captchaValidationService,
                                 placeholderSaltService, emailVerificationService, authSessionService,
-                                csrfTokenRepository, passwordVerifier);
+                                csrfTokenRepository, passwordVerifier, null);
         }
 }

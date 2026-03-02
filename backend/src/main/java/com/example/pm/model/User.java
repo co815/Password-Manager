@@ -14,14 +14,22 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
-@Data @Builder @AllArgsConstructor @NoArgsConstructor
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Document("users")
 public class User {
-    @Id private String id;
+    @Id
+    private String id;
 
-    @Indexed(unique = true) @NotBlank @Email
+    @Indexed(unique = true)
+    @NotBlank
+    @Email
     private String email;
-    @Indexed(unique = true) @NotBlank @Size(min = 4)
+    @Indexed(unique = true)
+    @NotBlank
+    @Size(min = 4)
     private String username;
 
     private String verifier;
@@ -36,6 +44,8 @@ public class User {
     private Instant mfaEnabledAt;
     private String mfaSecret;
     private List<String> mfaRecoveryCodes;
+    @Builder.Default
+    private long lastUsedTotpCounter = -1L;
     private int tokenVersion;
     private boolean emailVerified;
     @Indexed(unique = true, sparse = true)

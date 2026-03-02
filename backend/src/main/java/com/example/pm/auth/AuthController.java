@@ -13,6 +13,7 @@ import com.example.pm.security.PasswordVerifier;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +37,7 @@ import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/auth")
-@SuppressWarnings("null") // Suppress Spring null-safety false positives
+@SuppressWarnings("null")
 public class AuthController {
 
     private final UserRepository users;
@@ -58,6 +59,8 @@ public class AuthController {
     private static final SecureRandom RECOVERY_RANDOM = new SecureRandom();
     private static final char[] RECOVERY_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
 
+    private final com.example.pm.config.RateLimitProps rateLimitProps;
+
     public AuthController(UserRepository users,
             RateLimiterService rateLimiterService, TotpService totpService,
             SecurityAuditService auditService,
@@ -66,7 +69,8 @@ public class AuthController {
             EmailVerificationService emailVerificationService,
             AuthSessionService authSessionService,
             CsrfTokenRepository csrfTokenRepository,
-            PasswordVerifier passwordVerifier) {
+            PasswordVerifier passwordVerifier,
+            com.example.pm.config.RateLimitProps rateLimitProps) {
         this.users = users;
         this.authSessionService = authSessionService;
         this.rateLimiterService = rateLimiterService;
@@ -77,6 +81,7 @@ public class AuthController {
         this.emailVerificationService = emailVerificationService;
         this.csrfTokenRepository = csrfTokenRepository;
         this.passwordVerifier = passwordVerifier;
+        this.rateLimitProps = rateLimitProps;
     }
 
     @PostMapping("/register")
@@ -102,7 +107,12 @@ public class AuthController {
 
         if (users.findByUsername(newUser.getUsername()).isPresent())
             return ResponseEntity.status(409).body(new ErrorResponse(409, "CONFLICT", "Username already exists"));
-        emailVerificationService.registerPendingUser(newUser);
+
+        try {
+            emailVerificationService.registerPendingUser(newUser);
+        } catch (DuplicateKeyException e) {
+            return ResponseEntity.status(409).body(new ErrorResponse(409, "CONFLICT", "Account already exists"));
+        }
 
         return ResponseEntity.ok(new SimpleMessageResponse("Check your inbox to verify your email."));
     }
@@ -180,9 +190,17 @@ public class AuthController {
         if (user.isMfaEnabled()) {
             boolean usedRecovery = false;
             boolean verified = false;
-            if (loginRequest.mfaCode() != null && totpService.verifyCode(user.getMfaSecret(), loginRequest.mfaCode())) {
-                verified = true;
-            } else if (loginRequest.recoveryCode() != null && consumeRecoveryCode(user, loginRequest.recoveryCode())) {
+            long matchedCounter = -1L;
+            if (loginRequest.mfaCode() != null) {
+                matchedCounter = totpService.verifyCodeReturningCounter(
+                        user.getMfaSecret(), loginRequest.mfaCode(),
+                        user.getLastUsedTotpCounter());
+                if (matchedCounter >= 0) {
+                    verified = true;
+                }
+            }
+            if (!verified && loginRequest.recoveryCode() != null
+                    && consumeRecoveryCode(user, loginRequest.recoveryCode())) {
                 verified = true;
                 usedRecovery = true;
             }
@@ -191,7 +209,10 @@ public class AuthController {
                 return ResponseEntity.status(401)
                         .body(new ErrorResponse(401, "UNAUTHORIZED", "Invalid MFA challenge"));
             }
-            if (usedRecovery) {
+            if (matchedCounter >= 0) {
+                user.setLastUsedTotpCounter(matchedCounter);
+                users.save(user);
+            } else if (usedRecovery) {
                 users.save(user);
             }
         }
@@ -211,7 +232,21 @@ public class AuthController {
             return null;
         }
         String remote = request.getRemoteAddr();
-        return remote == null ? null : remote.trim();
+        if (remote == null) {
+            return null;
+        }
+        remote = remote.trim();
+
+        if (rateLimitProps != null && rateLimitProps.isTrustedProxy(remote)) {
+            String xff = request.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isBlank()) {
+                String first = xff.split(",")[0].trim();
+                if (!first.isEmpty()) {
+                    return first;
+                }
+            }
+        }
+        return remote;
     }
 
     @GetMapping("/verify-email")
@@ -426,10 +461,16 @@ public class AuthController {
                     }
                     boolean viaRecovery = false;
                     boolean verified = false;
-                    if (request != null && request.code() != null
-                            && totpService.verifyCode(user.getMfaSecret(), request.code())) {
-                        verified = true;
-                    } else if (request != null && request.recoveryCode() != null
+                    if (request != null && request.code() != null) {
+                        long matchedCounter = totpService.verifyCodeReturningCounter(
+                                user.getMfaSecret(), request.code(),
+                                user.getLastUsedTotpCounter());
+                        if (matchedCounter >= 0) {
+                            verified = true;
+                            user.setLastUsedTotpCounter(matchedCounter);
+                        }
+                    }
+                    if (!verified && request != null && request.recoveryCode() != null
                             && consumeRecoveryCode(user, request.recoveryCode())) {
                         verified = true;
                         viaRecovery = true;
@@ -490,23 +531,9 @@ public class AuthController {
         }
         List<String> hashed = new ArrayList<>(codes.size());
         for (String code : codes) {
-            hashed.add(hashRecoveryCode(code));
+            hashed.add(passwordVerifier.encode(code.trim().toUpperCase(Locale.ROOT)));
         }
         return hashed;
-    }
-
-    private String hashRecoveryCode(String code) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(code.trim().toUpperCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder(hash.length * 2);
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
     }
 
     private boolean consumeRecoveryCode(User user, String recoveryCode) {
@@ -514,13 +541,16 @@ public class AuthController {
                 || user.getMfaRecoveryCodes().isEmpty()) {
             return false;
         }
-        String hashed = hashRecoveryCode(recoveryCode);
+        String normalized = recoveryCode.trim().toUpperCase(Locale.ROOT);
         List<String> existing = new ArrayList<>(user.getMfaRecoveryCodes());
-        boolean removed = existing.remove(hashed);
-        if (removed) {
-            user.setMfaRecoveryCodes(existing);
+        for (int i = 0; i < existing.size(); i++) {
+            if (passwordVerifier.verify(normalized, existing.get(i))) {
+                existing.remove(i);
+                user.setMfaRecoveryCodes(existing);
+                return true;
+            }
         }
-        return removed;
+        return false;
     }
 
     private void disableMfaState(User user) {
