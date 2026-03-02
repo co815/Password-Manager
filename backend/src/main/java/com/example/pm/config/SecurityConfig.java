@@ -95,12 +95,12 @@ public class SecurityConfig {
                                                                 authException) -> writeError(response,
                                                                                 HttpServletResponse.SC_UNAUTHORIZED,
                                                                                 "UNAUTHORIZED",
-                                                                                "Nu esti autentificat sau token invalid"))
+                                                                                "Not authenticated or token invalid"))
                                                 .accessDeniedHandler((request, response,
                                                                 accessDeniedException) -> writeError(response,
                                                                                 HttpServletResponse.SC_FORBIDDEN,
                                                                                 "FORBIDDEN",
-                                                                                "Nu ai permisiunea necesara")));
+                                                                                "Access denied")));
 
                 if (sslEnabled) {
                         http.requiresChannel(ch -> ch.anyRequest().requiresSecure());

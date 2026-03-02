@@ -17,19 +17,24 @@ import java.util.Map;
 public class JwtService {
     private final SecretKey key;
     private final long expiryMinutes;
+    private final String issuer;
 
     public JwtService(@Value("${app.jwt.secret}") String secret,
-                      @Value("${app.jwt.expiryMinutes:15}") long expiryMinutes) {
+            @Value("${app.jwt.expiryMinutes:15}") long expiryMinutes,
+            @Value("${app.jwt.issuer:PasswordManager}") String issuer) {
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new BeanInitializationException("app.jwt.secret must be at least 32 bytes long for HMAC-SHA256 security.");
+            throw new BeanInitializationException(
+                    "app.jwt.secret must be at least 32 bytes long for HMAC-SHA256 security.");
         }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiryMinutes = expiryMinutes;
+        this.issuer = (issuer != null && !issuer.isBlank()) ? issuer : "PasswordManager";
     }
 
     public String generate(String subject, int tokenVersion) {
         Instant now = Instant.now();
         return Jwts.builder()
+                .issuer(issuer)
                 .subject(subject)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(expiryMinutes * 60)))
@@ -39,7 +44,10 @@ public class JwtService {
     }
 
     public JwtPayload validate(String token) {
-        var claims = Jwts.parser().verifyWith(key).build()
+        var claims = Jwts.parser()
+                .verifyWith(key)
+                .requireIssuer(issuer)
+                .build()
                 .parseSignedClaims(token)
                 .getPayload();
         Integer tokenVersion = claims.get("tv", Integer.class);
@@ -50,5 +58,6 @@ public class JwtService {
         return Duration.ofMinutes(expiryMinutes);
     }
 
-    public record JwtPayload(String subject, int tokenVersion) {}
+    public record JwtPayload(String subject, int tokenVersion) {
+    }
 }

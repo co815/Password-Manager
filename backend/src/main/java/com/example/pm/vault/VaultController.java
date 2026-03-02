@@ -17,7 +17,7 @@ import java.util.function.Function;
 
 @RestController
 @RequestMapping("/api/vault")
-@SuppressWarnings("null") // Suppress Spring null-safety false positives
+@SuppressWarnings("null")
 public class VaultController {
 
     private static final int MAX_COLLECTION_COUNT = 32;
@@ -173,7 +173,7 @@ public class VaultController {
     private ResponseEntity<ErrorResponse> unauthorizedResponse() {
         return ResponseEntity.status(401)
                 .body(new ErrorResponse(401, "UNAUTHORIZED",
-                        "Nu esti autentificat sau token invalid"));
+                        "Not authenticated or token invalid"));
     }
 
     private ResponseEntity<?> requireUser(Authentication authentication,

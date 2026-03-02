@@ -20,7 +20,7 @@ import java.util.Locale;
 public class TotpService {
 
     private static final char[] BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".toCharArray();
-    private static final int SECRET_SIZE = 20; // 160 bits
+    private static final int SECRET_SIZE = 20;
     private static final int TOTP_DIGITS = 6;
     private static final int TIME_STEP_SECONDS = 30;
     private static final int WINDOW = 1;
@@ -50,18 +50,22 @@ public class TotpService {
     }
 
     public boolean verifyCode(String secret, String code) {
+        return verifyCode(secret, code, -1L);
+    }
+
+    public long verifyCodeReturningCounter(String secret, String code, long lastUsed) {
         if (secret == null || secret.isBlank() || code == null) {
-            return false;
+            return -1L;
         }
         String trimmed = code.trim();
         if (!trimmed.matches("\\d{" + TOTP_DIGITS + "}")) {
-            return false;
+            return -1L;
         }
         byte[] key;
         try {
             key = decodeBase32(secret);
         } catch (IllegalArgumentException ex) {
-            return false;
+            return -1L;
         }
         long currentInterval = Instant.now().getEpochSecond() / TIME_STEP_SECONDS;
         for (int offset = -WINDOW; offset <= WINDOW; offset++) {
@@ -69,12 +73,19 @@ public class TotpService {
             if (counter < 0) {
                 continue;
             }
+            if (counter <= lastUsed) {
+                continue;
+            }
             int expected = generateTotp(key, counter);
             if (timedEquals(expected, Integer.parseInt(trimmed))) {
-                return true;
+                return counter;
             }
         }
-        return false;
+        return -1L;
+    }
+
+    private boolean verifyCode(String secret, String code, long lastUsed) {
+        return verifyCodeReturningCounter(secret, code, lastUsed) >= 0;
     }
 
     private int generateTotp(byte[] key, long counter) {

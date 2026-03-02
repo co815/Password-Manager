@@ -50,5 +50,14 @@ public class RateLimiterService {
         return allowed.get();
     }
 
+    /**
+     * Removes expired rate-limit windows. Called periodically by
+     * {@link RateLimiterCleanupTask} to prevent unbounded memory growth.
+     */
+    public void evictExpiredWindows() {
+        Instant cutoff = Instant.now().minus(window);
+        windows.entrySet().removeIf(entry -> entry.getValue().windowStart().isBefore(cutoff));
+    }
+
     private record RequestWindow(Instant windowStart, int count) { }
 }
